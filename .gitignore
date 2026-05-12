@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.sqlite3
+Backend/db.sqlite3
+Backend/staticfiles/
+Backend/media/
+
+# Node / Vite
+node_modules/
+FrontEnd/dist/
+frontend/dist/
+
+# Entorno
+.env
+Backend/.env

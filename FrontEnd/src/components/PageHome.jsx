@@ -4,8 +4,7 @@ import { TopBar } from './TopBar.jsx';
 import { Navbar } from './Navbar.jsx';
 import { Hero } from './Hero.jsx';
 import { SeasonKpis } from './SeasonKpis.jsx';
-import { TorneoFemenino } from './TorneoFemenino.jsx';
-import { TorneoMasculino } from './TorneoMasculino.jsx';
+import { TorneoView } from './TorneoView.jsx';
 import { LeadersSection } from './LeadersSection.jsx';
 import { PlayoffsBracket } from './PlayoffsBracket.jsx';
 import { Footer } from './Footer.jsx';
@@ -30,12 +29,12 @@ function installTabDelegation() {
     const nav = btn.closest(".tab-nav");
     if (nav) {
       nav.querySelectorAll(".tab-btn").forEach((b) => {
-        b.classList.remove("active-fem", "active-masc");
+        b.classList.remove("active-fem", "active-masc", "active");
       });
     }
     const target = document.getElementById(`${prefix}-${name}`);
     if (target) target.classList.add("active");
-    btn.classList.add(torneo === "f" ? "active-fem" : "active-masc");
+    btn.classList.add("active");
   };
   document.addEventListener("click", handler);
   return () => document.removeEventListener("click", handler);
@@ -97,9 +96,7 @@ export function PageHome() {
       <Hero />
       <SeasonKpis />
       <div className="full-rule"></div>
-      <TorneoFemenino />
-      <div className="full-rule"></div>
-      <TorneoMasculino />
+      <TorneoView />
       <div className="full-rule"></div>
       <LeadersSection />
       <div className="full-rule"></div>

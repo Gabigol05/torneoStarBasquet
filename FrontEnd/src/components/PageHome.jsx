@@ -1,6 +1,5 @@
 /* eslint-disable react/no-unknown-property */
 import { useEffect } from "react";
-import { TopBar } from './TopBar.jsx';
 import { Navbar } from './Navbar.jsx';
 import { Hero } from './Hero.jsx';
 import { SeasonKpis } from './SeasonKpis.jsx';
@@ -91,7 +90,6 @@ export function PageHome() {
 
   return (
     <>
-      <TopBar />
       <Navbar />
       <Hero />
       <SeasonKpis />

@@ -5,12 +5,12 @@ export function TournamentSelector() {
 
   return (
     <div className="tournament-selector-wrap">
-      <div 
-        className={`tournament-toggle mode-${mode}`} 
+      <div
+        className={`tournament-toggle mode-${mode}`}
         onClick={toggleMode}
       >
         <div className="tournament-toggle-slider"></div>
-        
+
         <div className={`tournament-option ${mode === 'masculino' ? 'active' : ''}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="4" />
@@ -19,7 +19,7 @@ export function TournamentSelector() {
           </svg>
           MASC
         </div>
-        
+
         <div className={`tournament-option ${mode === 'femenino' ? 'active' : ''}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="10" r="4" />

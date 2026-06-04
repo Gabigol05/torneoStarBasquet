@@ -32,6 +32,11 @@ export function PlayerProfileModal({ player, isOpen, onClose }) {
 
           <div className="pp-name">{player.name}</div>
           <div className="pp-team">{player.team}</div>
+          {player.fechaNac && player.fechaNac !== '-' && (
+            <div style={{ fontFamily: "'Barlow Condensed'", fontSize: '13px', color: 'var(--gray)', marginTop: '4px', marginBottom: '4px' }}>
+              🎂 {player.fechaNac}
+            </div>
+          )}
 
           <div className="pp-stats-grid">
             <div className="pp-stat-box">

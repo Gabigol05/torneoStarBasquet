@@ -2365,3 +2365,386 @@ body.theme-femenino {
   margin-top: 20px;
   letter-spacing: 1px;
 }
+
+/* ============================================================
+   TEAM PAGE FEM — Página de equipo femenino
+   ============================================================ */
+
+.team-page-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--dark, #080C12);
+  overflow-y: auto;
+  animation: tpFadeIn 0.3s ease;
+}
+
+@keyframes tpFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.team-page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 0 60px 0;
+}
+
+/* --- HEADER --- */
+.team-page-header {
+  background: linear-gradient(180deg, var(--dark2) 0%, var(--dark) 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 24px 28px 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.team-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--gray);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+.team-page-back:hover { color: var(--white); }
+
+.team-page-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.team-page-logo-wrap {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 3px solid var(--color-primary);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--dark4);
+}
+.team-page-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.team-page-hero-info { flex: 1; }
+
+.team-page-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px;
+  color: var(--white);
+  letter-spacing: 2px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.team-page-record {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+.team-page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-page-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--gray);
+}
+
+/* --- TABS --- */
+.team-page-tabs {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin: 0 -28px;
+  padding: 0 28px;
+  overflow-x: auto;
+}
+
+.team-page-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--gray);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 14px 18px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.team-page-tab:hover { color: var(--white); }
+.team-page-tab.active { color: var(--fem); }
+
+/* --- BODY --- */
+.team-page-body {
+  padding: 28px 28px 0 28px;
+}
+
+/* --- JUGADORAS --- */
+.tp-jugadoras-count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.tp-jugadoras-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tp-player-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--dark2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s, border-color 0.2s;
+}
+.tp-player-card:hover {
+  background: var(--dark4);
+  border-color: var(--team-color, var(--fem));
+  transform: translateX(4px);
+}
+
+.tp-player-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--dark5);
+  border: 2px solid var(--team-color, var(--fem));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tp-player-info { flex: 1; min-width: 0; }
+
+.tp-player-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tp-player-dob {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--gray);
+  margin-top: 3px;
+}
+
+.tp-player-stats-mini {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.tp-stat-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tp-stat-mini-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: var(--white);
+  line-height: 1;
+}
+
+.tp-stat-mini-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray);
+  letter-spacing: 1px;
+}
+
+/* --- EMPTY STATE --- */
+.tp-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray);
+}
+.tp-empty-icon { font-size: 48px; margin-bottom: 16px; }
+.tp-empty-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+.tp-empty-sub {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+}
+
+/* --- SECTION LABEL --- */
+.tp-section-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* --- MATCHES --- */
+.tp-matches-list { display: flex; flex-direction: column; gap: 10px; }
+
+.tp-match-card {
+  background: var(--dark2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border-left: 4px solid var(--gray2);
+}
+.tp-match-card.win  { border-left-color: var(--green); }
+.tp-match-card.loss { border-left-color: var(--red); }
+.tp-match-card.upcoming { border-left-color: var(--team-color, var(--fem)); }
+
+.tp-match-date {
+  font-size: 11px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.tp-match-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tp-match-teams {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--white);
+  flex: 1;
+}
+.tp-match-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--white);
+}
+.tp-match-lugar {
+  font-size: 13px;
+  color: var(--gray);
+  flex: 1;
+}
+.tp-match-result {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.tp-match-result.win      { background: rgba(34,208,122,0.15); color: var(--green); }
+.tp-match-result.loss     { background: rgba(240,64,96,0.15);  color: var(--red); }
+.tp-match-result.upcoming { background: rgba(232,24,122,0.15); color: var(--fem2); }
+
+/* --- TABLA / POSICION --- */
+.tp-tabla-logo { display: inline-flex; align-items: center; margin-right: 6px; }
+
+.tp-you-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  color: #000;
+  margin-left: 6px;
+}
+
+.tp-team-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.tp-team-stat-box {
+  background: var(--dark2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.tp-team-stat-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.tp-team-stat-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gray);
+  text-transform: uppercase;
+}
+
+/* --- RESPONSIVE TEAM PAGE --- */
+@media (max-width: 600px) {
+  .team-page-header { padding: 16px 16px 0 16px; }
+  .team-page-body   { padding: 20px 16px 0 16px; }
+  .team-page-tabs   { margin: 0 -16px; padding: 0 16px; }
+  .team-page-name   { font-size: 28px; }
+  .team-page-logo-wrap { width: 72px; height: 72px; }
+  .tp-player-stats-mini { gap: 8px; }
+  .tp-team-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .tp-match-info { gap: 8px; }
+}

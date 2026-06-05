@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useFemeninoStats } from '../hooks/useFemeninoStats';
 import { useTournament } from '../context/TournamentContext';
 import { GameCenterModal } from './GameCenterModal';
 import { UpcomingMatchWidget } from './UpcomingMatchWidget';
@@ -14,10 +15,10 @@ import logoWolves from '../assets/logo_wolves.png';
 import logoQueens from '../assets/logo_queens.png';
 
 // Data real femenino
-import { equiposFemenino } from '../data/femeninoData';
 
 export function TorneoView() {
   const { mode } = useTournament();
+  const { equipos: equiposFemenino, isLoading: isLoadingStats } = useFemeninoStats();
   const [data, setData] = useState({ isLoading: true, category: mode });
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -52,6 +53,7 @@ export function TorneoView() {
         team={selectedTeamFem}
         onBack={() => setSelectedTeamFem(null)}
         allTeams={equiposFemenino}
+        isLoadingStats={isLoadingStats}
       />
     );
   }

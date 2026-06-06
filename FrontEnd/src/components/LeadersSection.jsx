@@ -1,76 +1,91 @@
-/* eslint-disable react/no-unknown-property */
-/* Fragmento fiel al HTML original (ver scripts/build_star_components.py). */
+import { useFemeninoStats } from '../hooks/useFemeninoStats';
+
+// Calcula los top 3 de una stat dada entre todas las jugadoras de todos los equipos
+function calcLiders(equipos, statKey) {
+  const all = [];
+  for (const eq of equipos) {
+    for (const j of eq.jugadoras) {
+      const val = j[statKey] ?? 0;
+      all.push({ nombre: j.nombre, equipo: eq.name, color: eq.color, val });
+    }
+  }
+  return all.sort((a, b) => b.val - a.val).slice(0, 3);
+}
+
+function getInitials(nombre) {
+  return nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+}
+
+function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
+  const lideres = calcLiders(equipos, statKey);
+  const top = lideres[0];
+  const hayDatos = top && top.val > 0;
+
+  return (
+    <div className="leader-card fem">
+      <div className="lc-stat-label">{emoji} {titulo}</div>
+
+      {!hayDatos ? (
+        <div className="lc-empty-state">
+          <div className="lc-empty-icon">📊</div>
+          <div className="lc-empty-txt">Disponible cuando comience el torneo</div>
+        </div>
+      ) : (
+        <>
+          <div className="lc-top">
+            <div className="lc-avatar" style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}55` }}>
+              {getInitials(top.nombre)}
+            </div>
+            <div>
+              <div className="lc-player-name">{top.nombre.split(' ')[0]} {top.nombre.split(' ')[1] ?? ''}</div>
+              <div className="lc-team-name">{top.equipo}</div>
+            </div>
+          </div>
+          <div className="lc-big-num" style={{ color: color ?? 'var(--fem2)' }}>{top.val}</div>
+          <div className="lc-sub">{sub}</div>
+          <div className="lc-list">
+            {lideres.slice(1).map((l, i) => (
+              <div className="lc-row" key={i}>
+                <span className="lc-row-rank">{i + 2}</span>
+                <span>{l.nombre.split(' ')[0]} {l.nombre.split(' ')[1] ?? ''} — {l.equipo}</span>
+                <span className="lc-row-val">{l.val}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function LeadersSection() {
+  const { equipos } = useFemeninoStats();
+
   return (
     <>
       <section className="page-section" id="jugadores">
-        <p className="section-eyebrow" style={{color: "var(--gold)"}}>Estadísticas Individuales</p>
-        <h2 className="section-heading">Líderes <span className="gold">2025</span></h2>
+        <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Estadísticas Individuales</p>
+        <h2 className="section-heading">Líderes <span className="gold">2026</span></h2>
 
-        <div style={{marginBottom: "24px", fontFamily: "'Barlow Condensed'", fontSize: "12px", fontWeight: "700", letterSpacing: "3px", textTransform: "uppercase", color: "var(--gray)"}}>TORNEO FEMENINO</div>
-        <div className="leaders-grid">
-          <div className="leader-card fem">
-            <div className="lc-stat-label">🏆 Líder en Puntos</div>
-            <div className="lc-top"><div className="lc-avatar t-red">VG</div><div><div className="lc-player-name">Valentina G.</div><div className="lc-team-name">Las Leonas</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--fem2)"}}>21.4</div><div className="lc-sub">puntos por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Camila R. — Fuego Divino</span><span className="lc-row-val">20.1</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Lucía M. — Las Panteras</span><span className="lc-row-val">18.6</span></div>
-            </div>
-          </div>
-          <div className="leader-card fem">
-            <div className="lc-stat-label">🔁 Líder en Rebotes</div>
-            <div className="lc-top"><div className="lc-avatar t-orange">AP</div><div><div className="lc-player-name">Agustina F.</div><div className="lc-team-name">Las Leonas</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--fem2)"}}>9.2</div><div className="lc-sub">rebotes por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Sofía P. — Las Águilas</span><span className="lc-row-val">8.9</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Lucía M. — Las Panteras</span><span className="lc-row-val">6.4</span></div>
-            </div>
-          </div>
-          <div className="leader-card fem">
-            <div className="lc-stat-label">🎯 Líder en Asistencias</div>
-            <div className="lc-top"><div className="lc-avatar t-teal">FD</div><div><div className="lc-player-name">Florencia D.</div><div className="lc-team-name">Las Rockets</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--fem2)"}}>7.8</div><div className="lc-sub">asistencias por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Valentina G. — Las Leonas</span><span className="lc-row-val">6.1</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Camila R. — Fuego Divino</span><span className="lc-row-val">4.9</span></div>
-            </div>
-          </div>
+        <div style={{ marginBottom: '24px', fontFamily: "'Barlow Condensed'", fontSize: '12px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--gray)' }}>
+          TORNEO FEMENINO
         </div>
 
-        <div style={{margin: "40px 0 24px", fontFamily: "'Barlow Condensed'", fontSize: "12px", fontWeight: "700", letterSpacing: "3px", textTransform: "uppercase", color: "var(--gray)"}}>TORNEO MASCULINO</div>
         <div className="leaders-grid">
-          <div className="leader-card masc">
-            <div className="lc-stat-label">🏆 Líder en Puntos</div>
-            <div className="lc-top"><div className="lc-avatar t-blue">MH</div><div><div className="lc-player-name">Matías H.</div><div className="lc-team-name">Black Mambas</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--masc2)"}}>24.1</div><div className="lc-sub">puntos por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Nicolás F. — Los Toros</span><span className="lc-row-val">22.4</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Diego L. — Los Gladiadores</span><span className="lc-row-val">21.5</span></div>
-            </div>
-          </div>
-          <div className="leader-card masc">
-            <div className="lc-stat-label">🔁 Líder en Rebotes</div>
-            <div className="lc-top"><div className="lc-avatar t-purple">DL</div><div><div className="lc-player-name">Diego L.</div><div className="lc-team-name">Los Gladiadores</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--masc2)"}}>10.2</div><div className="lc-sub">rebotes por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Ezequiel P. — Los Jaguares</span><span className="lc-row-val">9.1</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Sebastián R. — Los Fenix</span><span className="lc-row-val">8.3</span></div>
-            </div>
-          </div>
-          <div className="leader-card masc">
-            <div className="lc-stat-label">🎯 Líder en Asistencias</div>
-            <div className="lc-top"><div className="lc-avatar t-blue">LM</div><div><div className="lc-player-name">Lucas M.</div><div className="lc-team-name">Black Mambas</div></div></div>
-            <div className="lc-big-num" style={{color: "var(--masc2)"}}>8.4</div><div className="lc-sub">asistencias por partido</div>
-            <div className="lc-list">
-              <div className="lc-row"><span className="lc-row-rank">2</span><span>Matías H. — Black Mambas</span><span className="lc-row-val">7.2</span></div>
-              <div className="lc-row"><span className="lc-row-rank">3</span><span>Rodrigo S. — El Escuadrón</span><span className="lc-row-val">5.1</span></div>
-            </div>
-          </div>
+          <LeaderCard titulo="Líder en Puntos"     emoji="🏆" statKey="pts" sub="puntos por partido"     equipos={equipos} color="var(--fem2)" />
+          <LeaderCard titulo="Líder en Rebotes"    emoji="🔁" statKey="reb" sub="rebotes por partido"    equipos={equipos} color="var(--fem2)" />
+          <LeaderCard titulo="Líder en Asistencias" emoji="🎯" statKey="ast" sub="asistencias por partido" equipos={equipos} color="var(--fem2)" />
+        </div>
+
+        <div style={{ margin: '40px 0 24px', fontFamily: "'Barlow Condensed'", fontSize: '12px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--gray)' }}>
+          TORNEO MASCULINO — Próximamente
+        </div>
+        <div style={{ padding: '40px', textAlign: 'center', background: 'var(--dark2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏀</div>
+          <div style={{ fontFamily: "'Bebas Neue'", fontSize: '20px', color: 'var(--white)', marginBottom: '8px' }}>Estadísticas en camino</div>
+          <div style={{ fontFamily: "'Barlow Condensed'", fontSize: '14px', color: 'var(--gray)' }}>Se publicarán cuando el torneo masculino comience</div>
         </div>
       </section>
-
       <div className="full-rule"></div>
     </>
   );

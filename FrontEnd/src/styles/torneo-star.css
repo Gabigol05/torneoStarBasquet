@@ -3448,3 +3448,140 @@ table tbody tr:hover {
 @media (max-width: 600px) {
   .toast-container { top: 12px; }
 }
+
+/* ============================================================
+   FIX SUPERPOSICIÓN MOBILE + BOTONES SOCIALES
+   ============================================================ */
+
+/* ── FIX: El hero no queda tapado por el top navbar ── */
+@media (max-width: 767px) {
+  /* El nav ya es sticky, el hero necesita saber la altura del nav */
+  .hero { scroll-margin-top: 70px; }
+
+  /* Ocultar botones sociales de texto en mobile — se reemplazan por íconos */
+  .nav-ig        { display: none !important; }
+  .live-badge .live-text { display: none; }
+
+  /* Reducir padding del nav en mobile para que ocupe menos espacio */
+  nav {
+    padding: 0 12px;
+    gap: 8px;
+    height: 56px;
+  }
+
+  /* Logo más pequeño */
+  nav .logo-img { width: 44px !important; }
+}
+
+/* ── BOTÓN YOUTUBE — rediseñado con logo claro ── */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 0, 0, 0.12);
+  border: 1px solid rgba(255, 0, 0, 0.4);
+  color: #ff4444;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.live-badge:hover {
+  background: rgba(255, 0, 0, 0.25);
+  border-color: #ff0000;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.live-dot {
+  width: 7px; height: 7px;
+  background: #ff4444;
+  border-radius: 50%;
+  animation: pulse-red 1.5s infinite;
+  flex-shrink: 0;
+}
+
+/* En mobile: solo ícono de YouTube */
+@media (max-width: 767px) {
+  .live-badge {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  .live-badge .live-text { display: none !important; }
+  /* Mostrar "YT" como label corto */
+  .live-badge::after {
+    content: 'YT';
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+}
+
+/* ── BOTÓN INSTAGRAM — rediseñado ── */
+.nav-ig {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(195, 65, 200, 0.4);
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #c341c8;
+  text-decoration: none;
+  transition: all 0.2s;
+  background: rgba(195, 65, 200, 0.08);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nav-ig:hover {
+  background: rgba(195, 65, 200, 0.2);
+  border-color: #c341c8;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* En mobile: solo ícono */
+@media (max-width: 767px) {
+  .nav-ig {
+    padding: 7px 10px;
+    gap: 0;
+  }
+  .nav-ig span { display: none; } /* ocultar el texto @torneostar.basquet */
+}
+
+/* ── FIX: Bottom nav — no tapar contenido ── */
+@media (max-width: 767px) {
+  /* Aumentar el padding inferior para que el bottom nav no tape nada */
+  #root { padding-bottom: 72px !important; }
+
+  /* El bottom nav debe estar siempre sobre todo */
+  .bottom-nav { z-index: 150; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); }
+
+  /* El team page overlay tampoco debe quedar tapado por el bottom nav */
+  .team-page-overlay { padding-bottom: 72px; }
+
+  /* El pp-modal bottom sheet debe estar sobre el bottom nav */
+  .gc-overlay { z-index: 200; }
+}
+
+/* ── FIX: Nav principal no tapa el hero ── */
+/* El hero section ya tiene padding-top en desktop, en mobile ajustamos */
+@media (max-width: 767px) {
+  /* Aseguramos que el nav no tape la sección */
+  .hero { padding-top: 48px; }
+  section#jugadores { scroll-margin-top: 70px; }
+}
+

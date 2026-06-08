@@ -33,6 +33,7 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedTeamId, setSelectedTeamId] = useState(null); // ID, no objeto
   const [searchJugadoras, setSearchJugadoras] = useState('');
+  const [tappedCard, setTappedCard] = useState(null);
 
   // Lookup reactivo: siempre tiene los datos más frescos del hook
   const selectedTeamFem = selectedTeamId
@@ -293,7 +294,21 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
               <div className="teams-grid">
                 {mode === 'femenino' ? (
                   equiposFemenino.map(team => (
-                    <div className="flip-card reveal-on-scroll" key={team.id} onClick={() => handleSelectTeam(team)}>
+                    <div
+                    className={`flip-card reveal-on-scroll${tappedCard === team.id ? ' tapped' : ''}`}
+                    key={team.id}
+                    onClick={() => {
+                      // En touch: primer tap flipea, segundo navega
+                      const isTouch = window.matchMedia('(hover: none)').matches;
+                      if (isTouch && tappedCard !== team.id) {
+                        setTappedCard(team.id);
+                      } else {
+                        setTappedCard(null);
+                        handleSelectTeam(team);
+                      }
+                    }}
+                    onMouseLeave={() => setTappedCard(null)}
+                  >
                       <div className="flip-card-inner">
                         <div className="flip-card-front">
                           <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
@@ -316,7 +331,15 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
                   ))
                 ) : (
                   TEAMS_MASC.map(team => (
-                    <div className="flip-card reveal-on-scroll" key={team.id}>
+                    <div
+                    className={`flip-card reveal-on-scroll${tappedCard === team.id ? ' tapped' : ''}`}
+                    key={team.id}
+                    onClick={() => {
+                      const isTouch = window.matchMedia('(hover: none)').matches;
+                      if (isTouch) setTappedCard(tappedCard === team.id ? null : team.id);
+                    }}
+                    onMouseLeave={() => setTappedCard(null)}
+                  >
                       <div className="flip-card-inner">
                         <div className="flip-card-front">
                           <div className="fc-logo-wrap" style={{ borderColor: team.color }}>

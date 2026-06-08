@@ -40,6 +40,16 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
     ? equiposFemenino.find(e => e.id === selectedTeamId) ?? null
     : null;
 
+  // Re-activar reveal-on-scroll al cambiar de tab (los elementos no existían antes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      document.querySelectorAll('.reveal-on-scroll:not(.in-view)').forEach(el => {
+        el.classList.add('in-view');
+      });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
   // Escuchar evento del navbar para cambiar tab desde afuera
   useEffect(() => {
     const handler = (e) => {
@@ -295,7 +305,7 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
                 {mode === 'femenino' ? (
                   equiposFemenino.map(team => (
                     <div
-                    className={`flip-card reveal-on-scroll${tappedCard === team.id ? ' tapped' : ''}`}
+                    className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
                     key={team.id}
                     onClick={() => {
                       // En touch: primer tap flipea, segundo navega
@@ -332,7 +342,7 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
                 ) : (
                   TEAMS_MASC.map(team => (
                     <div
-                    className={`flip-card reveal-on-scroll${tappedCard === team.id ? ' tapped' : ''}`}
+                    className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
                     key={team.id}
                     onClick={() => {
                       const isTouch = window.matchMedia('(hover: none)').matches;

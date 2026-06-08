@@ -2966,3 +2966,138 @@ body.theme-femenino {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px; line-height: 1.5;
 }
+
+/* ============================================================
+   MEJORAS 1-6 — Navbar, Hero reactivo, Animaciones, OG
+   ============================================================ */
+
+/* ── 1. NAVBAR STICKY con indicador de sección ── */
+.navbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(8, 12, 18, 0.85);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: border-color 0.3s;
+}
+body.theme-femenino .navbar-sticky {
+  border-bottom-color: rgba(232, 24, 122, 0.15);
+}
+body.theme-masculino .navbar-sticky {
+  border-bottom-color: rgba(24, 120, 232, 0.15);
+}
+
+/* Link Equipos con dot de modo */
+.nav-equipos-link { position: relative; display: inline-flex; align-items: center; gap: 5px; }
+.nav-mode-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+  transition: background 0.4s;
+}
+.nav-mode-dot-femenino  { background: var(--fem2); }
+.nav-mode-dot-masculino { background: var(--masc2); }
+
+/* Indicador de sección activa — underline animado */
+.nav-links a { position: relative; }
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0;
+  width: 0; height: 2px;
+  background: var(--color-primary, var(--gold));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.nav-links a.active::after,
+.nav-links a:hover::after { width: 100%; }
+
+/* ── 2. HERO REACTIVO AL MODO ── */
+.hero-badge-femenino {
+  border-color: rgba(232, 24, 122, 0.4) !important;
+  color: var(--fem2) !important;
+}
+.hero-badge-masculino {
+  border-color: rgba(24, 120, 232, 0.4) !important;
+  color: var(--masc2) !important;
+}
+
+/* Orbs del hero cambian con el modo */
+body.theme-femenino  .hero-orb-2 { background: rgba(232, 24, 122, 0.12); }
+body.theme-femenino  .hero-orb-3 { background: rgba(232, 24, 122, 0.07); }
+body.theme-masculino .hero-orb-2 { background: rgba(24, 120, 232, 0.10); }
+body.theme-masculino .hero-orb-3 { background: rgba(24, 120, 232, 0.07); }
+.hero-orb-2, .hero-orb-3 { transition: background 0.6s ease; }
+
+/* Stats del hero con animación al cambiar modo */
+.hero-stats { animation: fadeUp 0.5s ease both; }
+
+/* ── 3. ANIMACIONES DE ENTRADA (scroll) ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Clase base — invisible hasta entrar al viewport */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal-on-scroll.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Versiones con delay para grids */
+.reveal-on-scroll.delay-1 { transition-delay: 0.08s; }
+.reveal-on-scroll.delay-2 { transition-delay: 0.16s; }
+.reveal-on-scroll.delay-3 { transition-delay: 0.24s; }
+.reveal-on-scroll.delay-4 { transition-delay: 0.32s; }
+.reveal-on-scroll.delay-5 { transition-delay: 0.40s; }
+
+/* ── 4. KPIs — heading reactivo ── */
+.kpi-row .kpi-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.kpi-row .kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* ── 5. Flip cards con reveal ── */
+.flip-card.reveal-on-scroll { transform: translateY(28px) scale(0.97); }
+.flip-card.reveal-on-scroll.in-view { transform: translateY(0) scale(1); }
+
+/* ── 6. Tabla con hover mejorado ── */
+table tbody tr {
+  transition: background 0.15s, transform 0.15s;
+}
+table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+  transform: translateX(2px);
+}
+
+/* ── Skeleton loader genérico ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--dark4) 25%, var(--dark5) 50%, var(--dark4) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+

@@ -22,7 +22,7 @@ function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
   const hayDatos = top && top.val > 0;
 
   return (
-    <div className="leader-card fem">
+    <div className="leader-card fem reveal-on-scroll">
       <div className="lc-stat-label">{emoji} {titulo}</div>
 
       {!hayDatos ? (

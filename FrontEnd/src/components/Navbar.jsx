@@ -1,16 +1,47 @@
 import logo from '../assets/starBasquet.jpg';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { TournamentSelector } from './TournamentSelector';
 import { GlobalSearch } from './GlobalSearch';
 import { PlayerProfileModal } from './PlayerProfileModal';
+import { useTournament } from '../context/TournamentContext';
+import { useActiveSection } from '../hooks/useActiveSection';
+
+// Evento custom para que TorneoView escuche y cambie el tab activo
+function dispatchTabChange(tabKey) {
+  window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
+}
 
 export function Navbar() {
+  const { mode } = useTournament();
+  const activeSection = useActiveSection();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
-  // Cuando se selecciona un equipo desde el buscador, scroll a la sección
-  const handleSelectTeam = (team) => {
+  const closeMobile = () => setIsMobileOpen(false);
+
+  const handleEquiposClick = useCallback((e) => {
+    e.preventDefault();
+    closeMobile();
+    // Scroll a torneo-view
     document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+    // Disparar cambio de tab a "equipos" con pequeño delay para que sea visible
+    setTimeout(() => dispatchTabChange('equipos'), 400);
+  }, []);
+
+  const handleJugadoresClick = useCallback((e) => {
+    e.preventDefault();
+    closeMobile();
+    document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => dispatchTabChange('jugadores'), 400);
+  }, []);
+
+  // Mapeo de sección activa → link del navbar
+  const isActive = (href) => {
+    if (href === '#inicio')    return activeSection === 'inicio';
+    if (href === '#jugadores') return activeSection === 'jugadores' || activeSection === 'torneo-view';
+    if (href === '#equipos')   return activeSection === 'equipos';
+    if (href === '#bracket')   return activeSection === 'bracket';
+    return false;
   };
 
   return (
@@ -21,29 +52,59 @@ export function Navbar() {
         player={selectedPlayer}
       />
 
-      <nav>
-        <a href="#" className="nav-brand">
+      <nav className="navbar-sticky">
+        <a href="#inicio" className="nav-brand" onClick={closeMobile}>
           <img src={logo} alt="logo" className="logo-img" width="60" style={{ borderRadius: '50%' }} />
         </a>
 
         <ul className={`nav-links ${isMobileOpen ? 'mobile-open' : ''}`}>
-          <li><a href="#inicio" className="active" onClick={() => setIsMobileOpen(false)}>Inicio</a></li>
-          <li className="nav-item-selector"><TournamentSelector /></li>
-          <li><a href="#jugadores" onClick={() => setIsMobileOpen(false)}>Jugadores</a></li>
-          <li><a href="#equipos" onClick={() => setIsMobileOpen(false)}>Equipos</a></li>
-          <li><a href="#bracket" onClick={() => setIsMobileOpen(false)}>Playoffs</a></li>
+          <li>
+            <a href="#inicio" className={isActive('#inicio') ? 'active' : ''} onClick={closeMobile}>
+              Inicio
+            </a>
+          </li>
+          <li className="nav-item-selector">
+            <TournamentSelector />
+          </li>
+          <li>
+            <a
+              href="#jugadores"
+              className={isActive('#jugadores') ? 'active' : ''}
+              onClick={handleJugadoresClick}
+            >
+              Jugadores
+            </a>
+          </li>
+          <li>
+            <a
+              href="#equipos"
+              className={`nav-equipos-link ${isActive('#equipos') ? 'active' : ''} nav-mode-${mode}`}
+              onClick={handleEquiposClick}
+              title={`Ver equipos ${mode === 'femenino' ? 'femeninos' : 'masculinos'}`}
+            >
+              Equipos
+              <span className={`nav-mode-dot nav-mode-dot-${mode}`} />
+            </a>
+          </li>
+          <li>
+            <a href="#bracket" className={isActive('#bracket') ? 'active' : ''} onClick={closeMobile}>
+              Playoffs
+            </a>
+          </li>
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* BUSCADOR GLOBAL */}
           <GlobalSearch
             onSelectPlayer={setSelectedPlayer}
-            onSelectTeam={handleSelectTeam}
+            onSelectTeam={() => {
+              document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+              setTimeout(() => dispatchTabChange('equipos'), 400);
+            }}
           />
 
-          <a href="https://www.youtube.com/@TorneoStarBasquet" target="_blank" className="live-badge" title="Mirar partido en vivo">
+          <a href="https://www.youtube.com/@TorneoStarBasquet" target="_blank" className="live-badge" title="Mirar en YouTube">
             <span className="live-dot"></span>
-            <span className="live-text">Youtube</span>
+            <span className="live-text">YouTube</span>
           </a>
 
           <a href="https://www.instagram.com/torneostar.basquet/" target="_blank" className="nav-ig">

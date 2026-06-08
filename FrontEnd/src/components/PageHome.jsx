@@ -1,13 +1,13 @@
 import { useEffect } from "react";
-import { Navbar } from './Navbar.jsx';
-import { Hero } from './Hero.jsx';
-import { SeasonKpis } from './SeasonKpis.jsx';
-import { TorneoView } from './TorneoView.jsx';
-import { LeadersSection } from './LeadersSection.jsx';
-import { PlayoffsBracket } from './PlayoffsBracket.jsx';
-import { Footer } from './Footer.jsx';
+import { Navbar }        from './Navbar.jsx';
+import { Hero }          from './Hero.jsx';
+import { SeasonKpis }    from './SeasonKpis.jsx';
+import { TorneoView }    from './TorneoView.jsx';
+import { LeadersSection }from './LeadersSection.jsx';
+import { PlayoffsBracket}from './PlayoffsBracket.jsx';
+import { Footer }        from './Footer.jsx';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
-// Solo el ticker necesita DOM — tabs y filtros ahora son 100% React
 function duplicateTicker() {
   const t = document.getElementById("ticker");
   if (t && !t.dataset.duplicated) {
@@ -17,6 +17,8 @@ function duplicateTicker() {
 }
 
 export function PageHome() {
+  useScrollReveal();           // activa animaciones de entrada en toda la página
+
   useEffect(() => {
     duplicateTicker();
   }, []);

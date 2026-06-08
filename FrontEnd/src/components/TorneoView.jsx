@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { GameCenterModal } from './GameCenterModal';
 import { UpcomingMatchWidget } from './UpcomingMatchWidget';
@@ -38,6 +38,18 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
   const selectedTeamFem = selectedTeamId
     ? equiposFemenino.find(e => e.id === selectedTeamId) ?? null
     : null;
+
+  // Escuchar evento del navbar para cambiar tab desde afuera
+  useEffect(() => {
+    const handler = (e) => {
+      if (TABS.find(t => t.key === e.detail?.tab)) {
+        setActiveTab(e.detail.tab);
+        setSelectedTeamId(null);
+      }
+    };
+    window.addEventListener('star:tab', handler);
+    return () => window.removeEventListener('star:tab', handler);
+  }, []);
 
   const tabKeys = TABS.map(t => t.key);
 
@@ -281,7 +293,7 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
               <div className="teams-grid">
                 {mode === 'femenino' ? (
                   equiposFemenino.map(team => (
-                    <div className="flip-card" key={team.id} onClick={() => handleSelectTeam(team)}>
+                    <div className="flip-card reveal-on-scroll" key={team.id} onClick={() => handleSelectTeam(team)}>
                       <div className="flip-card-inner">
                         <div className="flip-card-front">
                           <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
@@ -304,7 +316,7 @@ export function TorneoView({ onSelectPlayer: externalSelectPlayer, onSelectTeam:
                   ))
                 ) : (
                   TEAMS_MASC.map(team => (
-                    <div className="flip-card" key={team.id}>
+                    <div className="flip-card reveal-on-scroll" key={team.id}>
                       <div className="flip-card-inner">
                         <div className="flip-card-front">
                           <div className="fc-logo-wrap" style={{ borderColor: team.color }}>

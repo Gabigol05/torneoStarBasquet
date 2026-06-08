@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PlayerProfileModal } from './PlayerProfileModal';
 
 // ── SKELETON para stats mientras cargan ──────────────────────
@@ -20,6 +20,19 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   if (!team) return null;
+
+  // Re-activar reveal-on-scroll cuando cambia el tab o el equipo
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const els = document.querySelectorAll('.reveal-on-scroll:not(.in-view)');
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in-view'); observer.unobserve(e.target); } });
+      }, { threshold: 0.1 });
+      els.forEach(el => observer.observe(el));
+      return () => observer.disconnect();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeTab, team.id]);
 
   const filteredJugadoras = team.jugadoras.filter(j =>
     j.nombre.toLowerCase().includes(searchQuery.toLowerCase())
@@ -124,7 +137,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
                   {filteredJugadoras.map((j) => (
                     <div
                       key={j.id}
-                      className="tp-player-card"
+                      className={`tp-player-card reveal-on-scroll delay-${Math.min((filteredJugadoras.indexOf(j) % 5) + 1, 5)}`}
                       style={{ '--team-color': team.color }}
                       onClick={() => setSelectedPlayer({
                         id:       j.id,

@@ -3846,3 +3846,275 @@ table tbody tr:hover {
     margin: 10px auto 0;
   }
 }
+
+/* ============================================================
+   MEJORAS UX COMPLETAS — chips, favorito, transiciones, empty states
+   ============================================================ */
+
+/* ── SLIDE-IN transición TeamPageFem ── */
+.team-page-overlay {
+  animation: slideInRight 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── FILTER CHIPS ── */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-chips::-webkit-scrollbar { display: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--gray);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.chip:active      { transform: scale(0.95); }
+.chip-active      { background: rgba(255,255,255,0.08); }
+
+/* ── CONTEO JUGADORAS ── */
+.jugadoras-count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--gray);
+  text-transform: uppercase;
+}
+
+/* ── EMPTY STATES ── */
+.empty-state {
+  text-align: center;
+  padding: 52px 20px;
+}
+.empty-icon  { font-size: 44px; margin-bottom: 16px; }
+.empty-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--white);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+.empty-sub {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  color: var(--gray);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.empty-ig-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  background: rgba(195,65,200,0.12);
+  border: 1px solid rgba(195,65,200,0.35);
+  color: #c341c8;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.empty-ig-btn:hover  { background: rgba(195,65,200,0.25); }
+.empty-ig-btn:active { transform: scale(0.96); }
+
+/* ── FAVORITO CARD ── */
+.favorito-card {
+  background: linear-gradient(135deg, var(--dark2), var(--dark4));
+  border: 1px solid var(--fav-color, var(--gold));
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  -webkit-tap-highlight-color: transparent;
+}
+.favorito-card:hover  { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+.favorito-card:active { transform: scale(0.99); }
+
+.fav-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.fav-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.fav-logo-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.fav-logo-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.fav-info { flex: 1; min-width: 0; }
+.fav-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.fav-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fav-stat {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  color: var(--gray);
+}
+.fav-stat strong { color: var(--white); }
+.fav-stat-sep { color: var(--gray2); }
+.fav-proximo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  color: var(--gray);
+  margin-top: 5px;
+}
+.fav-proximo strong { color: var(--white); }
+.fav-arrow { color: var(--gray); font-size: 18px; flex-shrink: 0; }
+
+/* ── BOTÓN FAVORITO en flip cards ── */
+.fc-fav-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 5;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-fav-btn:hover  { background: rgba(255,255,255,0.14); transform: scale(1.1); }
+.fc-fav-btn:active { transform: scale(0.9); }
+.fc-fav-btn.active { background: rgba(250,204,21,0.15); border-color: rgba(250,204,21,0.4); }
+.flip-card-front   { position: relative; }
+
+/* ── FAVORITO STAR en tabla ── */
+.fav-star {
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+/* ── TABLE ROW CLICKABLE — touch target mínimo 48px ── */
+.table-row-clickable {
+  cursor: pointer;
+  min-height: 48px;
+  transition: background 0.15s;
+}
+.table-row-clickable td { padding: 14px 8px; }
+.table-row-clickable:hover  { background: rgba(255,255,255,0.04); }
+.table-row-clickable:active { background: rgba(255,255,255,0.07); }
+
+/* ── TOURNAMENT SELECTOR COMPACT ── */
+.ts-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  background: var(--dark4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 4px;
+  cursor: pointer;
+  position: relative;
+  height: 36px;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.3s;
+}
+.ts-compact-slider {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  bottom: 4px;
+  background: var(--color-primary);
+  border-radius: 14px;
+  transition: transform 0.35s cubic-bezier(0.25,1,0.5,1), background 0.3s;
+  box-shadow: 0 2px 8px var(--shadow-primary);
+}
+.ts-compact.mode-femenino .ts-compact-slider {
+  transform: translateX(calc(100% + 0px));
+  background: var(--fem2);
+}
+.ts-compact-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gray);
+  z-index: 2;
+  transition: color 0.2s;
+  flex: 1;
+  white-space: nowrap;
+}
+.ts-compact-opt.active { color: var(--white); }
+
+/* ── COLOR DE MODO en tab-btn activo ── */
+body.theme-femenino  .tab-btn.active { border-bottom-color: var(--fem2)  !important; color: var(--fem2)  !important; }
+body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6) !important; color: var(--masc2, #3b82f6) !important; }
+
+/* ── FIX buscador teclado virtual (dvh) ── */
+@media (max-width: 600px) {
+  .gs-overlay {
+    height: 100dvh;
+    align-items: flex-end;
+  }
+  .gs-modal {
+    max-height: 70dvh;
+  }
+  .gs-results {
+    max-height: calc(70dvh - 120px);
+    overscroll-behavior: contain;
+  }
+}

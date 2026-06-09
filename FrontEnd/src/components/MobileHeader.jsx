@@ -29,7 +29,7 @@ export function MobileHeader() {
 
         {/* Selector de modo (Masc/Fem) */}
         <div className="mh-selector">
-          <TournamentSelector compact />
+          <TournamentSelector compact={true} />
         </div>
 
         {/* Acciones: búsqueda + redes */}

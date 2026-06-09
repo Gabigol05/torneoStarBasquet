@@ -21,6 +21,12 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
 
   if (!team) return null;
 
+  // Scroll lock — bloquear scroll del fondo al abrir la página
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
   // Re-activar reveal-on-scroll cuando cambia el tab o el equipo
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -71,7 +77,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
             <div className="team-page-hero">
               <div className="team-page-logo-wrap"
                 style={{ borderColor: team.color, boxShadow: `0 0 40px ${team.color}55` }}>
-                <img src={team.logo} alt={team.name} className="team-page-logo-img" />
+                <img src={team.logo} alt={team.name} className="team-page-logo-img" loading="lazy" decoding="async" onError={e => { e.target.style.display='none'; }} />
               </div>
               <div className="team-page-hero-info">
                 <div className="team-page-name">{team.name}</div>

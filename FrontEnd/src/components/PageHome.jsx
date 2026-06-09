@@ -1,15 +1,16 @@
-import { useEffect }       from "react";
-import { Navbar }          from './Navbar.jsx';
-import { Hero }            from './Hero.jsx';
-import { SeasonKpis }      from './SeasonKpis.jsx';
-import { TorneoView }      from './TorneoView.jsx';
-import { LeadersSection }  from './LeadersSection.jsx';
-import { PlayoffsBracket } from './PlayoffsBracket.jsx';
-import { Footer }          from './Footer.jsx';
-import { BottomNav }       from './BottomNav.jsx';
+import { useEffect }        from "react";
+import { Navbar }           from './Navbar.jsx';
+import { MobileHeader }     from './MobileHeader.jsx';
+import { Hero }             from './Hero.jsx';
+import { SeasonKpis }       from './SeasonKpis.jsx';
+import { TorneoView }       from './TorneoView.jsx';
+import { LeadersSection }   from './LeadersSection.jsx';
+import { PlayoffsBracket }  from './PlayoffsBracket.jsx';
+import { Footer }           from './Footer.jsx';
+import { BottomNav }        from './BottomNav.jsx';
 import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx';
 import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
-import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats } from '../hooks/useFemeninoStats';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
 
@@ -28,20 +29,24 @@ export function PageHome() {
   const { toasts, addToast, removeToast } = useToast();
   const { isPulling, isRefreshing } = usePullToRefresh(refetch);
 
-  // Detectar nuevos resultados y mostrar toast
   useResultadosToast(equipos, addToast);
-
   useEffect(() => { duplicateTicker(); }, []);
 
   return (
     <>
-      {/* Toasts — encima de todo */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-
-      {/* Pull to refresh indicator */}
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
 
-      <Navbar />
+      {/* Desktop: navbar top completo */}
+      <div className="desktop-only">
+        <Navbar />
+      </div>
+
+      {/* Mobile: header compacto */}
+      <div className="mobile-only">
+        <MobileHeader />
+      </div>
+
       <Hero />
       <SeasonKpis />
       <div className="full-rule"></div>
@@ -52,7 +57,7 @@ export function PageHome() {
       <PlayoffsBracket />
       <Footer />
 
-      {/* Navbar bottom — solo visible en mobile via CSS */}
+      {/* Bottom nav solo en mobile */}
       <BottomNav />
     </>
   );

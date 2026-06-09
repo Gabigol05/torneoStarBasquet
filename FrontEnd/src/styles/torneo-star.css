@@ -4118,3 +4118,200 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
     overscroll-behavior: contain;
   }
 }
+
+/* ============================================================
+   REDESIGN COMPLETO — Flip cards + Mobile limpio
+   ============================================================ */
+
+/* ── FLIP CARDS — fix hover desktop + tapped mobile ── */
+
+/* Remover el hover genérico que no funciona en touch */
+.flip-card:hover .flip-card-inner { transform: none; }
+
+/* Desktop hover — solo cuando el dispositivo soporta hover real */
+@media (hover: hover) and (pointer: fine) {
+  .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
+}
+
+/* Mobile tap — clase aplicada por React */
+.flip-card.tapped .flip-card-inner { transform: rotateY(180deg); }
+
+/* Flip card back — border con color del equipo via CSS var */
+.flip-card-back {
+  border-color: var(--team-color, var(--color-primary)) !important;
+}
+
+/* ── MOBILE — Ocultar tab nav interno en mobile (va al bottom) ── */
+@media (max-width: 767px) {
+  /* Ocultar tabs de sección (TABLA/FIXTURE/JUGADORAS/EQUIPOS) en mobile */
+  .torneo-section .tab-nav { display: none; }
+  
+  /* Ocultar dots de swipe — reemplazados por bottom nav */
+  .tab-swipe-dots { display: none; }
+  
+  /* Más espacio arriba del contenido */
+  .torneo-inner { padding-top: 8px; }
+  
+  /* Gender header más compacto en mobile */
+  .gender-header { padding: 16px 0 8px; gap: 8px; }
+  .gender-title  { font-size: 36px !important; line-height: 1; }
+  .gender-pill   { font-size: 11px; }
+}
+
+/* ── BOTTOM NAV — ahora maneja TODAS las secciones incluyendo tabs ── */
+@media (max-width: 767px) {
+  .bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 400;
+    background: rgba(8, 12, 18, 0.98);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 0 0 max(8px, env(safe-area-inset-bottom));
+    justify-content: space-around;
+    align-items: stretch;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.6);
+    height: calc(60px + max(8px, env(safe-area-inset-bottom)));
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    flex: 1;
+    border: none;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    color: rgba(255,255,255,0.35);
+    transition: color 0.2s;
+    position: relative;
+    min-height: 52px;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--bnav-color, var(--fem2));
+  }
+
+  /* Línea indicadora arriba del item activo */
+  .bottom-nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: var(--bnav-color, var(--fem2));
+  }
+
+  .bottom-nav-item:active { opacity: 0.7; transform: scale(0.92); }
+
+  .bottom-nav-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+  }
+
+  .bottom-nav-dot {
+    position: absolute;
+    top: -2px; right: -4px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(8,12,18,0.98);
+  }
+
+  .bottom-nav-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  /* Padding del contenido para no quedar tapado */
+  #root { padding-bottom: calc(60px + max(8px, env(safe-area-inset-bottom))) !important; }
+  .team-page-overlay { padding-bottom: calc(60px + max(8px, env(safe-area-inset-bottom))); }
+}
+
+/* ── MOBILE HEADER — más limpio ── */
+@media (max-width: 767px) {
+  .mobile-header {
+    height: 52px;
+    padding: 0 12px;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .mh-title { font-size: 15px; letter-spacing: 1.5px; }
+  .mh-sub   { font-size: 8px;  letter-spacing: 1.5px; }
+  .mh-logo  { width: 32px !important; height: 32px !important; }
+  
+  /* Ocultar en mobile el nav top viejo si quedara */
+  nav:not(.bottom-nav) { display: none; }
+}
+
+/* ── TEAMS GRID — 1 columna en mobile ── */
+@media (max-width: 480px) {
+  .teams-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .flip-card { height: 200px; }
+  .fc-logo-wrap { width: 80px; height: 80px; }
+  .fc-name { font-size: 18px; }
+  .fc-subtitle { font-size: 11px; }
+  .fc-back-logo { width: 40px; height: 40px; }
+  .fc-record-val { font-size: 32px; }
+  .fc-team-name  { font-size: 16px; margin-top: 8px; }
+  .fc-fav-btn { width: 26px; height: 26px; font-size: 12px; top: 6px; right: 6px; }
+}
+
+/* ── TABLA mobile — más legible ── */
+@media (max-width: 767px) {
+  .table-wrap { border-radius: 12px; overflow: hidden; margin: 0 -4px; }
+  table { font-size: 13px; }
+  .table-row-clickable td { padding: 12px 6px; }
+  .team-name-txt { font-size: 12px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ── PLAYER ITEMS — más grande en mobile ── */
+@media (max-width: 767px) {
+  .player-item { padding: 12px 14px; min-height: 56px; }
+  .player-item-name { font-size: 15px; }
+  .player-item-team { font-size: 12px; }
+  .player-item-avatar { width: 40px; height: 40px; }
+}
+
+/* ── FILTER CHIPS — más visible ── */
+@media (max-width: 767px) {
+  .filter-chips { padding: 4px 0 12px; margin: 0 -4px; padding-left: 4px; }
+  .chip { font-size: 12px; padding: 7px 12px; }
+}
+
+/* ── HERO mobile más compacto ── */
+@media (max-width: 767px) {
+  .hero { padding: 24px 16px 20px; min-height: auto; gap: 12px; }
+  .hero-title { font-size: clamp(36px, 11vw, 56px); }
+  .hero-badge { font-size: 10px; padding: 4px 10px; }
+  .hero-stats { grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 4px; }
+  .hero-stat { padding: 8px 4px; border-radius: 8px; }
+  .hero-stat-num { font-size: clamp(20px, 6vw, 28px); }
+  .hero-stat-lbl { font-size: 9px; }
+  .scroll-arrow { display: none; }
+}
+
+/* ── SEASON KPIS mobile ── */
+@media (max-width: 767px) {
+  .kpi-row { grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .kpi-card { padding: 12px 8px; }
+  .kpi-num  { font-size: 28px; }
+  .kpi-label { font-size: 10px; }
+}

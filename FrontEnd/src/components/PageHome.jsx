@@ -1,4 +1,4 @@
-import { useEffect }        from "react";
+import { useEffect, useState } from "react";
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
 import { Hero }             from './Hero.jsx';
@@ -24,12 +24,23 @@ function duplicateTicker() {
 
 export function PageHome() {
   useScrollReveal();
+  const [activeTab, setActiveTab] = useState('inicio');
 
   const { equipos, refetch } = useFemeninoStats();
   const { toasts, addToast, removeToast } = useToast();
   const { isPulling, isRefreshing } = usePullToRefresh(refetch);
 
   useResultadosToast(equipos, addToast);
+
+  // Sincronizar activeTab con eventos del navbar y TorneoView
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.tab) setActiveTab(e.detail.tab);
+    };
+    window.addEventListener('star:tab', handler);
+    return () => window.removeEventListener('star:tab', handler);
+  }, []);
+
   useEffect(() => { duplicateTicker(); }, []);
 
   return (
@@ -37,7 +48,7 @@ export function PageHome() {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
 
-      {/* Desktop: navbar top completo */}
+      {/* Desktop: navbar top */}
       <div className="desktop-only">
         <Navbar />
       </div>
@@ -57,8 +68,11 @@ export function PageHome() {
       <PlayoffsBracket />
       <Footer />
 
-      {/* Bottom nav solo en mobile */}
-      <BottomNav />
+      {/* Bottom nav — solo mobile, con tab activo sincronizado */}
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
     </>
   );
 }

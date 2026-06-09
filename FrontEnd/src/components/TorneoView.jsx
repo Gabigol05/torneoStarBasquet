@@ -392,7 +392,15 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       }}
                       onMouseLeave={() => setTappedCard(null)}
                     >
-                      <div className="flip-card-inner">
+                      {/* Botón favorito FUERA del flip-card-inner para no romper preserve-3d */}
+                    <button
+                      className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
+                      onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
+                      title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}
+                    >
+                      {esFavorito(team.id) ? '⭐' : '☆'}
+                    </button>
+                    <div className="flip-card-inner">
                         <div className="flip-card-front">
                           <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
                             <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
@@ -400,14 +408,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           </div>
                           <h3 className="fc-name">{team.name}</h3>
                           <div className="fc-subtitle">{team.jugadoras.length} jugadoras</div>
-                          {/* Botón favorito */}
-                          <button
-                            className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
-                            onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
-                            title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}
-                          >
-                            {esFavorito(team.id) ? '⭐' : '☆'}
-                          </button>
                         </div>
                         <div className="flip-card-back">
                           <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async" />

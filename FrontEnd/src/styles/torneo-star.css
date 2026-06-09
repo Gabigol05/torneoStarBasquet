@@ -2246,6 +2246,7 @@ body.theme-femenino {
   height: 320px;
   perspective: 1000px;
   cursor: pointer;
+  position: relative; /* Para el botón favorito absoluto */
 }
 
 .flip-card-inner {
@@ -2280,6 +2281,7 @@ body.theme-femenino {
   border: 1px solid rgba(255,255,255,0.1);
   justify-content: center;
   align-items: center;
+  /* position:absolute ya viene del bloque flip-card-front/back */
 }
 
 .fc-logo-wrap {
@@ -3077,8 +3079,8 @@ body.theme-masculino .hero-orb-3 { background: rgba(24, 120, 232, 0.07); }
 }
 
 /* ── 5. Flip cards con reveal ── */
-.flip-card.reveal-on-scroll { transform: translateY(28px) scale(0.97); }
-.flip-card.reveal-on-scroll.in-view { transform: translateY(0) scale(1); }
+.flip-card.reveal-on-scroll { opacity: 0; }
+.flip-card.reveal-on-scroll.in-view { opacity: 1; transition: opacity 0.5s ease; }
 
 /* ── 6. Tabla con hover mejorado ── */
 table tbody tr {
@@ -4017,6 +4019,7 @@ table tbody tr:hover {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 3;
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 50%;
@@ -4034,7 +4037,7 @@ table tbody tr:hover {
 .fc-fav-btn:hover  { background: rgba(255,255,255,0.14); transform: scale(1.1); }
 .fc-fav-btn:active { transform: scale(0.9); }
 .fc-fav-btn.active { background: rgba(250,204,21,0.15); border-color: rgba(250,204,21,0.4); }
-.flip-card-front   { position: relative; }
+
 
 /* ── FAVORITO STAR en tabla ── */
 .fav-star {
@@ -4123,23 +4126,13 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
    REDESIGN COMPLETO — Flip cards + Mobile limpio
    ============================================================ */
 
-/* ── FLIP CARDS — fix hover desktop + tapped mobile ── */
-
-/* Remover el hover genérico que no funciona en touch */
-.flip-card:hover .flip-card-inner { transform: none; }
-
-/* Desktop hover — solo cuando el dispositivo soporta hover real */
+/* ── FLIP CARDS — hover desktop + tapped mobile ── */
+/* Desktop: hover con mouse real */
 @media (hover: hover) and (pointer: fine) {
   .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
 }
-
-/* Mobile tap — clase aplicada por React */
+/* Mobile: tap gestionado por React */
 .flip-card.tapped .flip-card-inner { transform: rotateY(180deg); }
-
-/* Flip card back — border con color del equipo via CSS var */
-.flip-card-back {
-  border-color: var(--team-color, var(--color-primary)) !important;
-}
 
 /* ── MOBILE — Ocultar tab nav interno en mobile (va al bottom) ── */
 @media (max-width: 767px) {

@@ -20,6 +20,12 @@ const TABS = [
   { key: 'equipos',   label: '🏀 Equipos'  },
 ];
 
+// Calcula los últimos N resultados de un equipo desde sus partidos
+function getRacha(partidos, n = 5) {
+  if (!partidos?.length) return [];
+  return partidos.slice(-n).map(p => p.resultado); // 'G' o 'P'
+}
+
 const TEAMS_MASC = [
   { id: 'm1', name: 'Black Mambas', logo: logoMambas,  record: '7 - 0', color: '#3b82f6', pg: 7, pp: 0 },
   { id: 'm2', name: 'Los Toros',    logo: logoToros,   record: '6 - 1', color: '#ef4444', pg: 6, pp: 1 },
@@ -209,11 +215,20 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
                         <th>PJ</th><th>G</th><th>P</th><th>PF</th><th>PC</th><th>DIF</th><th>%</th>
                         <th style={{ color: modeColor }}>PTS</th>
+                        <th className="th-racha">Forma</th>
                       </tr>
                     </thead>
                     <tbody>
                       {mode === 'femenino' ? (
-                        equiposFemenino.map((t, idx) => {
+                        [...equiposFemenino]
+                          .sort((a, b) => {
+                            const ptsA = a.pg * 2, ptsB = b.pg * 2;
+                            if (ptsB !== ptsA) return ptsB - ptsA;           // 1° PTS
+                            const difA = a.pf - a.pc, difB = b.pf - b.pc;
+                            if (difB !== difA) return difB - difA;           // 2° DIF
+                            return b.pf - a.pf;                              // 3° PF
+                          })
+                          .map((t, idx) => {
                           const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
                           const dif = t.pf - t.pc;
                           return (
@@ -251,6 +266,22 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       )}
                     </tbody>
                   </table>
+                  {/* Leyenda de zonas */}
+                  {mode === 'femenino' && (
+                    <div className="tabla-leyenda">
+                      <div className="tabla-leyenda-item">
+                        <div className="tabla-leyenda-dot" style={{ background:'rgba(34,197,94,0.5)' }}></div>
+                        Clasifican a playoffs
+                      </div>
+                      <div className="tabla-leyenda-item">
+                        <div className="tabla-leyenda-dot" style={{ background:'rgba(255,255,255,0.15)' }}></div>
+                        Fase regular
+                      </div>
+                      <div style={{ marginLeft:'auto', fontSize:'11px', color:'var(--gray)' }}>
+                        Desempate: PTS → DIF → PF
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginTop:'48px' }} className="fixture-round-label">Últimos Resultados</div>
                 <div className="matches-grid">

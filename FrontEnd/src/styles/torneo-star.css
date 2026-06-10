@@ -4308,3 +4308,110 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .kpi-num  { font-size: 28px; }
   .kpi-label { font-size: 10px; }
 }
+
+/* ============================================================
+   TABLA — Racha de forma + Zonas playoffs + Desempate
+   ============================================================ */
+
+/* ── RACHA PILLS ── */
+.racha-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.racha-g {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.racha-p {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.racha-nd {
+  color: var(--gray);
+  font-size: 12px;
+}
+
+/* Columna Forma en tabla */
+.th-racha { min-width: 90px; }
+.td-racha {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+/* Ocultar columna Forma en mobile pequeño */
+@media (max-width: 600px) {
+  .th-racha, .td-racha { display: none; }
+}
+
+/* ── ZONAS DE CLASIFICACIÓN ── */
+
+/* Top 4 — zona playoffs */
+table tbody tr:nth-child(-n+4) .pos-num {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Línea divisora después del 4° puesto */
+table tbody tr:nth-child(4) td {
+  border-bottom: 2px solid rgba(34, 197, 94, 0.25) !important;
+  padding-bottom: 12px;
+}
+table tbody tr:nth-child(5) td {
+  padding-top: 12px;
+}
+
+/* Badge "Zona Playoffs" — tooltip en hover */
+.pos-num { position: relative; }
+
+/* Leyenda debajo de la tabla */
+.tabla-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 8px 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--gray);
+  flex-wrap: wrap;
+}
+.tabla-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tabla-leyenda-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── DESEMPATE — nota visual en header de tabla ── */
+.tabla-desempate-note {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--gray);
+  text-transform: uppercase;
+  padding: 6px 0 12px;
+  text-align: right;
+}

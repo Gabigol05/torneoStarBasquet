@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { PlayerProfileModal } from './PlayerProfileModal';
 
+// Últimos N resultados de un equipo
+function getRacha(partidos, n = 5) {
+  if (!partidos?.length) return [];
+  return partidos.slice(-n).map(p => p.resultado);
+}
+
 // ── SKELETON para stats mientras cargan ──────────────────────
 function StatSkeleton() {
   return (
@@ -46,8 +52,11 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
 
   // Posición en la tabla ordenada por victorias → diferencia
   const sortedTeams = [...allTeams].sort((a, b) => {
-    if (b.pg !== a.pg) return b.pg - a.pg;
-    return (b.pf - b.pc) - (a.pf - a.pc);
+    const ptsA = a.pg * 2, ptsB = b.pg * 2;
+    if (ptsB !== ptsA) return ptsB - ptsA;           // 1° PTS
+    const difA = a.pf - a.pc, difB = b.pf - b.pc;
+    if (difB !== difA) return difB - difA;           // 2° DIF (desempate principal)
+    return b.pf - a.pf;                              // 3° PF (más puntos a favor)
   });
   const posicion = sortedTeams.findIndex(t => t.id === team.id) + 1;
   const pct      = team.pj > 0 ? (team.pg / team.pj).toFixed(3) : '.000';
@@ -84,6 +93,14 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
                 <div className="team-page-record" style={{ color: team.color }}>
                   {team.pg}G — {team.pp}P
                 </div>
+                {/* Racha de forma */}
+                {team.partidos?.length > 0 && (
+                  <div style={{ display:'flex', gap:'4px', marginBottom:'8px' }}>
+                    {getRacha(team.partidos).map((r, i) => (
+                      <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="team-page-meta">
                   <span className="team-page-badge">♀ Torneo Femenino</span>
                   <span className="team-page-badge"
@@ -284,7 +301,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
                       <tr>
                         <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
                         <th>PJ</th><th>G</th><th>P</th>
-                        <th>PF</th><th>PC</th><th>DIF</th><th>%</th>
+                        <th>PF</th><th>PC</th><th>DIF</th><th>%</th><th className="th-racha">Forma</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -315,6 +332,12 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
                               {tDif > 0 ? `+${tDif}` : tDif}
                             </td>
                             <td className="pct-td">{tPct}</td>
+                            <td className="td-racha">
+                              {getRacha(t.partidos).map((r, i) => (
+                                <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
+                              ))}
+                              {!t.partidos?.length && <span className="racha-nd">–</span>}
+                            </td>
                           </tr>
                         );
                       })}

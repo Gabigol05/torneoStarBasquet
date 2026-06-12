@@ -54,7 +54,7 @@ function EmptyState({ icon, title, sub, showIG = true }) {
 
 export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extSelectTeam }) {
   const { mode } = useTournament();
-  const { equipos: equiposFemenino, isLoading: isLoadingStats, error: statsError } = useFemeninoStats();
+  const { equipos: equiposFemenino, isLoading: isLoadingStats, error: statsError, partidos, fechas, statsPorPartido } = useFemeninoStats();
   const { toggleFavorito, esFavorito } = useFavorito();
 
   const [activeTab, setActiveTab]           = useState('tabla');
@@ -129,6 +129,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         onBack={() => setSelectedTeamId(null)}
         allTeams={equiposFemenino}
         isLoadingStats={isLoadingStats}
+        statsPorPartido={statsPorPartido}
+        partidos={partidos}
+        fechas={fechas}
         onSelectPlayer={handleSelectPlayer}
       />
     );
@@ -137,7 +140,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   return (
     <>
       <GameCenterModal isOpen={!!selectedMatch} onClose={() => setSelectedMatch(null)} mode={mode} />
-      <PlayerProfileModal isOpen={!!selectedPlayer} onClose={() => setSelectedPlayer(null)} player={selectedPlayer} />
+      <PlayerProfileModal isOpen={!!selectedPlayer} onClose={() => setSelectedPlayer(null)} player={selectedPlayer} statsPorPartido={statsPorPartido} partidos={partidos} fechas={fechas} />
 
       <div className="torneo-section" id="torneo-view">
         <div className="torneo-inner">

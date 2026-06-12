@@ -1,264 +1,154 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
-// ============================================================
-// CONFIGURACIÓN
-// Supabase se usa como fuente de datos directa.
-// Cuando haya un backend propio, configurá VITE_API_URL
-// y ese endpoint tiene prioridad sobre Supabase.
-// ============================================================
-const SUPABASE_URL     = import.meta.env.VITE_SUPABASE_URL  ?? '';
-const SUPABASE_ANON    = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
-const API_BASE_URL     = import.meta.env.VITE_API_URL ?? '';
-
-// Tiempo entre refetches automáticos (5 minutos).
-// Bajalo a 60000 (1 min) cuando el torneo esté en vivo.
-const REFETCH_INTERVAL = 5 * 60 * 1000;
-
-// ============================================================
-// STATS DEFAULT
-// ============================================================
-const DEFAULT_PLAYER_STATS = {
-  pj: 0, pts: 0, reb: 0, ast: 0,
-  rob: 0, tap: 0, fgp: 0, tpp: 0, tlp: 0,
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const DEFAULT_STATS = {
+  pj:0, pts_prom:0, reb_prom:0, ast_prom:0, rob_prom:0,
+  tap_prom:0, per_prom:0, val_prom:0,
+  pct_simples:0, pct_dobles:0, pct_triples:0,
+  pts_total:0, reb_total:0, ast_total:0,
+  mejor_pts:0, mejor_pts_rival:null,
 };
 
-const DEFAULT_TEAM_STATS = {
-  pj: 0, pg: 0, pp: 0, pf: 0, pc: 0,
-};
+// ─── Fetch principal ──────────────────────────────────────────────────────────
+async function fetchTodo() {
+  const [
+    { data: statsRows },
+    { data: partidosRows },
+    { data: fechasRows },
+    { data: statsPartidoRows },
+  ] = await Promise.all([
+    supabase.from('estadisticas_femenino').select('*'),
+    supabase.from('partidos_femenino').select('*').order('fecha_id', { ascending: true }),
+    supabase.from('fechas_femenino').select('*').order('numero', { ascending: true }),
+    supabase.from('stats_partido_femenino').select('*'),
+  ]);
 
-// ============================================================
-// MERGE — combina datos estáticos del plantel con stats
-// ============================================================
-function mergeData(apiResponse) {
-  const statsMap         = {};
-  const jugadoraStatsMap = {};
-  const partidosMap      = {};
-  const proximosMap      = {};
+  // Mapa stats por jugadora
+  const statsMap = {};
+  for (const r of statsRows ?? []) statsMap[r.jugadora_id] = r;
 
-  if (apiResponse?.equipos) {
-    for (const eq of apiResponse.equipos) {
-      statsMap[eq.equipoId] = {
-        pj: eq.pj ?? 0, pg: eq.pg ?? 0, pp: eq.pp ?? 0,
-        pf: eq.pf ?? 0, pc: eq.pc ?? 0,
-      };
-      if (eq.jugadoras) {
-        for (const j of eq.jugadoras) {
-          jugadoraStatsMap[j.jugadoraId] = {
-            pj:  j.pj  ?? 0, pts: j.pts ?? 0, reb: j.reb ?? 0,
-            ast: j.ast ?? 0, rob: j.rob ?? 0, tap: j.tap ?? 0,
-            fgp: j.fgp ?? 0, tpp: j.tpp ?? 0, tlp: j.tlp ?? 0,
-          };
-        }
-      }
-    }
+  // Mapa stats por partido y jugadora: { partidoId: { jugadoraId: stats } }
+  const statsPorPartido = {};
+  for (const r of statsPartidoRows ?? []) {
+    if (!statsPorPartido[r.partido_id]) statsPorPartido[r.partido_id] = {};
+    statsPorPartido[r.partido_id][r.jugadora_id] = r;
   }
 
-  if (apiResponse?.partidos) {
-    for (const p of apiResponse.partidos) {
-      if (!partidosMap[p.equipoId]) partidosMap[p.equipoId] = [];
-      partidosMap[p.equipoId].push(p);
-    }
+  // Calcular posiciones: pg/pp/pf/pc desde partidos finalizados
+  const posMap = {};
+  for (const p of partidosRows ?? []) {
+    if (p.estado !== 'finalizado') continue;
+    const li = p.equipo_local_id, vi = p.equipo_visit_id;
+    if (!posMap[li]) posMap[li] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
+    if (!posMap[vi]) posMap[vi] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
+    posMap[li].pj++; posMap[vi].pj++;
+    posMap[li].pf += p.puntos_local ?? 0; posMap[li].pc += p.puntos_visit ?? 0;
+    posMap[vi].pf += p.puntos_visit ?? 0; posMap[vi].pc += p.puntos_local ?? 0;
+    if ((p.puntos_local ?? 0) > (p.puntos_visit ?? 0)) { posMap[li].pg++; posMap[vi].pp++; }
+    else { posMap[vi].pg++; posMap[li].pp++; }
   }
 
-  if (apiResponse?.proximos) {
-    for (const p of apiResponse.proximos) {
-      if (!proximosMap[p.equipoId]) proximosMap[p.equipoId] = [];
-      proximosMap[p.equipoId].push(p);
-    }
-  }
+  // Armar equipos con todo
+  const equipos = equiposFemenino.map(eq => {
+    const pos = posMap[eq.id] ?? { pj:0,pg:0,pp:0,pf:0,pc:0 };
 
-  return equiposFemenino.map(equipo => ({
-    ...equipo,
-    ...(statsMap[equipo.id] ?? DEFAULT_TEAM_STATS),
-    partidos: partidosMap[equipo.id] ?? [],
-    proximos: proximosMap[equipo.id] ?? [],
-    jugadoras: equipo.jugadoras.map(j => ({
-      ...j,
-      ...(jugadoraStatsMap[j.id] ?? DEFAULT_PLAYER_STATS),
-    })),
-  }));
-}
-
-// ============================================================
-// FETCH DESDE SUPABASE DIRECTO
-// Lee estadisticas_femenino y arma la estructura que mergeData espera.
-// Cuando tengas backend propio, este bloque queda como fallback.
-// ============================================================
-async function fetchFromSupabase() {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
-
-  const headers = {
-    'apikey': SUPABASE_ANON,
-    'Authorization': `Bearer ${SUPABASE_ANON}`,
-  };
-
-  // Traemos todas las estadísticas en una sola query
-  const statsRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/estadisticas_femenino?select=*`,
-    { headers }
-  );
-  if (!statsRes.ok) throw new Error(`Supabase stats: HTTP ${statsRes.status}`);
-  const statsRows = await statsRes.json();
-
-  // Traemos partidos finalizados
-  const partidosRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/partidos_femenino?estado=eq.finalizado&select=*&order=fecha.desc`,
-    { headers }
-  );
-  const partidosRows = partidosRes.ok ? await partidosRes.json() : [];
-
-  // Traemos próximos partidos
-  const proximosRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/partidos_femenino?estado=eq.pendiente&select=*&order=fecha.asc`,
-    { headers }
-  );
-  const proximosRows = proximosRes.ok ? await proximosRes.json() : [];
-
-  // Convertimos al formato que mergeData espera
-  // Agrupamos stats por equipo usando femeninoData como referencia
-  const statsPerEquipo = {};
-  for (const row of statsRows) {
-    // Extraemos el equipo_id del jugadora_id (ej: f_bm_01 → buscar en femeninoData)
-    const equipo = equiposFemenino.find(eq =>
-      eq.jugadoras.some(j => j.id === row.jugadora_id)
-    );
-    if (!equipo) continue;
-
-    if (!statsPerEquipo[equipo.id]) {
-      statsPerEquipo[equipo.id] = { equipoId: equipo.id, jugadoras: [] };
-    }
-    statsPerEquipo[equipo.id].jugadoras.push({
-      jugadoraId: row.jugadora_id,
-      pj:  row.pj  ?? 0, pts: row.pts ?? 0, reb: row.reb ?? 0,
-      ast: row.ast ?? 0, rob: row.rob ?? 0, tap: row.tap ?? 0,
-      fgp: row.fgp ?? 0, tpp: row.tpp ?? 0, tlp: row.tlp ?? 0,
-    });
-  }
-
-  // Calculamos stats de equipo sumando/promediando jugadoras
-  for (const eq of Object.values(statsPerEquipo)) {
-    if (eq.jugadoras.length === 0) continue;
-    const pjMax = Math.max(...eq.jugadoras.map(j => j.pj));
-    eq.pj = pjMax;
-    // pg/pp/pf/pc vendrán de partidos cuando haya datos
-  }
-
-  // Partidos finalizados → historial por equipo
-  const partidos = [];
-  for (const p of partidosRows) {
-    if (p.equipo_local_id) {
-      partidos.push({
-        equipoId: p.equipo_local_id,
-        fecha:    p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : '',
-        rival:    equiposFemenino.find(e => e.id === p.equipo_visit_id)?.name ?? p.equipo_visit_id,
-        pf:       p.puntos_local  ?? 0,
-        pc:       p.puntos_visit  ?? 0,
-        resultado: (p.puntos_local ?? 0) >= (p.puntos_visit ?? 0) ? 'G' : 'P',
+    // Historial de partidos del equipo
+    const historial = (partidosRows ?? [])
+      .filter(p => p.estado === 'finalizado' && (p.equipo_local_id === eq.id || p.equipo_visit_id === eq.id))
+      .map(p => {
+        const esLocal = p.equipo_local_id === eq.id;
+        const rivalId = esLocal ? p.equipo_visit_id : p.equipo_local_id;
+        const rival   = equiposFemenino.find(e => e.id === rivalId)?.nombre ?? rivalId;
+        const pf      = esLocal ? (p.puntos_local ?? 0) : (p.puntos_visit ?? 0);
+        const pc      = esLocal ? (p.puntos_visit ?? 0) : (p.puntos_local ?? 0);
+        return { partidoId: p.id, rival, pf, pc, resultado: pf > pc ? 'G' : 'P', fechaId: p.fecha_id };
       });
-    }
-    if (p.equipo_visit_id) {
-      partidos.push({
-        equipoId: p.equipo_visit_id,
-        fecha:    p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : '',
-        rival:    equiposFemenino.find(e => e.id === p.equipo_local_id)?.name ?? p.equipo_local_id,
-        pf:       p.puntos_visit ?? 0,
-        pc:       p.puntos_local ?? 0,
-        resultado: (p.puntos_visit ?? 0) >= (p.puntos_local ?? 0) ? 'G' : 'P',
-      });
-    }
-  }
 
-  // Próximos partidos
-  const proximos = [];
-  for (const p of proximosRows) {
-    if (p.equipo_local_id) {
-      proximos.push({
-        equipoId: p.equipo_local_id,
-        fecha:    p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : 'A confirmar',
-        rival:    equiposFemenino.find(e => e.id === p.equipo_visit_id)?.name ?? p.equipo_visit_id,
-        lugar:    p.lugar ?? '',
+    // Próximos partidos
+    const proximos = (partidosRows ?? [])
+      .filter(p => p.estado === 'pendiente' && (p.equipo_local_id === eq.id || p.equipo_visit_id === eq.id))
+      .map(p => {
+        const esLocal = p.equipo_local_id === eq.id;
+        const rivalId = esLocal ? p.equipo_visit_id : p.equipo_local_id;
+        const rival   = equiposFemenino.find(e => e.id === rivalId)?.nombre ?? rivalId;
+        const fecha   = fechasRows?.find(f => f.id === p.fecha_id);
+        return { rival, fechaNum: fecha?.numero, fechaDesc: fecha?.descripcion, lugar: p.lugar };
       });
-    }
-    if (p.equipo_visit_id) {
-      proximos.push({
-        equipoId: p.equipo_visit_id,
-        fecha:    p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : 'A confirmar',
-        rival:    equiposFemenino.find(e => e.id === p.equipo_local_id)?.name ?? p.equipo_local_id,
-        lugar:    p.lugar ?? '',
-      });
-    }
-  }
 
-  return {
-    equipos:  Object.values(statsPerEquipo),
-    partidos,
-    proximos,
-  };
-}
-
-// ============================================================
-// FETCH DESDE BACKEND PROPIO (cuando VITE_API_URL esté seteado)
-// Este es el contrato que el backend debe cumplir:
-// GET /api/femenino/stats → { equipos, partidos, proximos }
-// ============================================================
-async function fetchFromBackend() {
-  const res = await fetch(`${API_BASE_URL}/api/femenino/stats`, {
-    headers: { 'Content-Type': 'application/json' },
+    return {
+      ...eq,
+      ...pos,
+      historial,
+      proximos,
+      jugadoras: eq.jugadoras.map(j => ({
+        ...j,
+        ...(statsMap[j.id] ?? DEFAULT_STATS),
+        // Alias para compatibilidad con componentes existentes
+        pts: statsMap[j.id]?.pts_prom ?? 0,
+        reb: statsMap[j.id]?.reb_prom ?? 0,
+        ast: statsMap[j.id]?.ast_prom ?? 0,
+        rob: statsMap[j.id]?.rob_prom ?? 0,
+        tap: statsMap[j.id]?.tap_prom ?? 0,
+        fgp: statsMap[j.id]?.pct_dobles ?? 0,
+        tpp: statsMap[j.id]?.pct_triples ?? 0,
+        tlp: statsMap[j.id]?.pct_simples ?? 0,
+      })),
+    };
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-  return res.json();
+
+  return { equipos, partidos: partidosRows ?? [], fechas: fechasRows ?? [], statsPorPartido };
 }
 
-// ============================================================
-// HOOK PRINCIPAL
-// ============================================================
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useFemeninoStats() {
-  const [equipos, setEquipos]         = useState(() => mergeData(null));
-  const [isLoading, setIsLoading]     = useState(false);
-  const [error, setError]             = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [equipos,         setEquipos]         = useState(() => equiposFemenino.map(e => ({
+    ...e,
+    pj:0, pg:0, pp:0, pf:0, pc:0,
+    historial:[], proximos:[],
+    jugadoras: e.jugadoras.map(j => ({ ...j, ...DEFAULT_STATS, pts:0, reb:0, ast:0, rob:0, tap:0, fgp:0, tpp:0, tlp:0 })),
+  })));
+  const [partidos,        setPartidos]        = useState([]);
+  const [fechas,          setFechas]          = useState([]);
+  const [statsPorPartido, setStatsPorPartido] = useState({});
+  const [isLoading,       setIsLoading]       = useState(true);
+  const [error,           setError]           = useState(null);
+  const [lastUpdated,     setLastUpdated]     = useState(null);
 
-  const fetchStats = useCallback(async () => {
-    const hasBackend  = Boolean(API_BASE_URL);
-    const hasSupabase = Boolean(SUPABASE_URL && SUPABASE_ANON);
-
-    if (!hasBackend && !hasSupabase) {
-      console.info('[useFemeninoStats] Sin backend ni Supabase — usando datos locales (stats en 0)');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
+  const refresh = useCallback(async () => {
     try {
-      // Prioridad: backend propio > Supabase directo
-      const data = hasBackend
-        ? await fetchFromBackend()
-        : await fetchFromSupabase();
-
-      setEquipos(mergeData(data));
+      setIsLoading(true);
+      const data = await fetchTodo();
+      setEquipos(data.equipos);
+      setPartidos(data.partidos);
+      setFechas(data.fechas);
+      setStatsPorPartido(data.statsPorPartido);
       setLastUpdated(new Date());
+      setError(null);
     } catch (err) {
-      console.error('[useFemeninoStats] Error al fetchear stats:', err);
+      console.error('[useFemeninoStats]', err);
       setError(err.message);
-      // No pisamos los datos anteriores en caso de error
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, REFETCH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchStats]);
+  // Fetch inicial
+  useEffect(() => { refresh(); }, [refresh]);
 
-  return {
-    equipos,
-    isLoading,
-    error,
-    lastUpdated,
-    refetch: fetchStats,
-  };
+  // Realtime — se actualiza solo cuando cambia algo en la DB
+  useEffect(() => {
+    const channel = supabase
+      .channel('torneo-femenino-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'estadisticas_femenino'  }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos_femenino'       }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stats_partido_femenino'  }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fechas_femenino'         }, refresh)
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [refresh]);
+
+  return { equipos, partidos, fechas, statsPorPartido, isLoading, error, lastUpdated, refetch: refresh };
 }

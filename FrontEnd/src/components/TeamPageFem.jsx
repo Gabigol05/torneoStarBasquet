@@ -20,7 +20,7 @@ function StatSkeleton() {
   );
 }
 
-export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
+export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPartido, partidos, fechas }) {
   const [activeTab, setActiveTab]     = useState('jugadoras');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +68,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats }) {
         isOpen={!!selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
         player={selectedPlayer}
+        statsPorPartido={statsPorPartido}
+        partidos={partidos}
+        fechas={fechas}
       />
 
       <div className="team-page-overlay">

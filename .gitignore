@@ -16,3 +16,7 @@ frontend/dist/
 # Entorno
 .env
 Backend/.env
+-e 
+# Supabase keys
+FrontEnd/.env
+FrontEnd/.env.local

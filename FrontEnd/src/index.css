@@ -44,3 +44,14 @@
     margin: 10px 0;
   }
 }
+
+/* ══ ADMIN PANEL ══════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  [data-admin-sidebar] { display: none !important; }
+  [data-admin-mobilebar] { display: flex !important; }
+  [data-admin-main] { margin-left: 0 !important; padding-top: 60px !important; }
+}
+@media (min-width: 641px) {
+  [data-admin-mobilebar] { display: none !important; }
+  [data-admin-drawer] { display: none !important; }
+}

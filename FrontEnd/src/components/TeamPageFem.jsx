@@ -97,9 +97,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   {team.pg}G — {team.pp}P
                 </div>
                 {/* Racha de forma */}
-                {team.partidos?.length > 0 && (
+                {team.historial?.length > 0 && (
                   <div style={{ display:'flex', gap:'4px', marginBottom:'8px' }}>
-                    {getRacha(team.partidos).map((r, i) => (
+                    {getRacha(team.historial).map((r, i) => (
                       <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
                     ))}
                   </div>
@@ -232,33 +232,74 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
             {/* ── RESULTADOS ── */}
             {activeTab === 'resultados' && (
               <div>
-                <div className="tp-section-label">Últimos Partidos</div>
-                {team.partidos.length === 0 ? (
+                <div className="tp-section-label">Historial de Partidos</div>
+                {team.historial.length === 0 ? (
                   <div className="tp-empty-state">
                     <div className="tp-empty-icon">🏀</div>
                     <div className="tp-empty-text">Aún no hay partidos jugados</div>
-                    <div className="tp-empty-sub">
-                      Los resultados aparecerán aquí cuando comience el torneo
-                    </div>
+                    <div className="tp-empty-sub">Los resultados aparecerán aquí cuando comience el torneo</div>
                   </div>
                 ) : (
                   <div className="tp-matches-list">
-                    {team.partidos.map((p, idx) => (
-                      <div
-                        key={idx}
-                        className={`tp-match-card ${p.resultado === 'G' ? 'win' : 'loss'}`}
-                        style={{ '--team-color': team.color }}
-                      >
-                        <div className="tp-match-date">{p.fecha}</div>
-                        <div className="tp-match-info">
-                          <span className="tp-match-teams">{team.name} vs {p.rival}</span>
-                          <span className="tp-match-score">{p.pf} – {p.pc}</span>
-                          <span className={`tp-match-result ${p.resultado === 'G' ? 'win' : 'loss'}`}>
-                            {p.resultado === 'G' ? 'GANÓ' : 'PERDIÓ'}
-                          </span>
+                    {team.historial.map((h, idx) => {
+                      // Buscar el partido completo para los parciales
+                      const partidoFull = partidos?.find(p => p.id === h.partidoId);
+                      const esLocal     = partidoFull?.equipo_local_id === team.id;
+                      const fechaObj    = fechas?.find(f => f.id === h.fechaId);
+                      return (
+                        <div key={idx}
+                          className={`tp-match-card ${h.resultado === 'G' ? 'win' : 'loss'}`}
+                          style={{ '--team-color': team.color }}>
+                          <div className="tp-match-header">
+                            <span className="tp-match-date">
+                              {fechaObj ? `Fecha ${fechaObj.numero}` : ''}
+                            </span>
+                            <span className={`tp-match-result ${h.resultado === 'G' ? 'win' : 'loss'}`}>
+                              {h.resultado === 'G' ? 'GANÓ' : 'PERDIÓ'}
+                            </span>
+                          </div>
+                          <div className="tp-match-info">
+                            <span className="tp-match-teams">vs {h.rival}</span>
+                            <span className="tp-match-score"
+                              style={{ color: h.resultado === 'G' ? '#22D07A' : '#F04060' }}>
+                              {h.pf} – {h.pc}
+                            </span>
+                          </div>
+                          {/* Parciales */}
+                          {partidoFull && (
+                            <div className="tp-match-parciales">
+                              {['q1','q2','q3','q4'].map(q => {
+                                const mio   = esLocal ? partidoFull[`${q}_local`] : partidoFull[`${q}_visit`];
+                                const rival = esLocal ? partidoFull[`${q}_visit`] : partidoFull[`${q}_local`];
+                                const ganoQ = mio > rival;
+                                return (
+                                  <div key={q} className="tp-parcial">
+                                    <span className="tp-parcial-lbl">{q.toUpperCase()}</span>
+                                    <span className="tp-parcial-val"
+                                      style={{ color: ganoQ ? '#22D07A' : '#EEF2F8' }}>
+                                      {mio??0}
+                                    </span>
+                                    <span className="tp-parcial-sep">-</span>
+                                    <span className="tp-parcial-val"
+                                      style={{ color: !ganoQ ? '#22D07A' : '#6B7A99' }}>
+                                      {rival??0}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {(esLocal ? partidoFull.ot_local : partidoFull.ot_visit) > 0 && (
+                                <div className="tp-parcial">
+                                  <span className="tp-parcial-lbl">OT</span>
+                                  <span className="tp-parcial-val">{esLocal ? partidoFull.ot_local : partidoFull.ot_visit}</span>
+                                  <span className="tp-parcial-sep">-</span>
+                                  <span className="tp-parcial-val">{esLocal ? partidoFull.ot_visit : partidoFull.ot_local}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -271,21 +312,23 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                 {team.proximos.length === 0 ? (
                   <div className="tp-empty-state">
                     <div className="tp-empty-icon">📅</div>
-                    <div className="tp-empty-text">Fixture pendiente de publicación</div>
-                    <div className="tp-empty-sub">
-                      Los próximos partidos aparecerán aquí
-                    </div>
+                    <div className="tp-empty-text">Fixture pendiente</div>
+                    <div className="tp-empty-sub">Los próximos partidos aparecerán aquí</div>
                   </div>
                 ) : (
                   <div className="tp-matches-list">
                     {team.proximos.map((p, idx) => (
                       <div key={idx} className="tp-match-card upcoming"
                         style={{ '--team-color': team.color }}>
-                        <div className="tp-match-date">{p.fecha}</div>
-                        <div className="tp-match-info">
-                          <span className="tp-match-teams">{team.name} vs {p.rival}</span>
-                          <span className="tp-match-lugar">{p.lugar ?? 'A confirmar'}</span>
+                        <div className="tp-match-header">
+                          <span className="tp-match-date">
+                            {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
+                          </span>
                           <span className="tp-match-result upcoming">PRÓXIMO</span>
+                        </div>
+                        <div className="tp-match-info">
+                          <span className="tp-match-teams">vs {p.rival}</span>
+                          {p.lugar && <span className="tp-match-lugar">📍 {p.lugar}</span>}
                         </div>
                       </div>
                     ))}
@@ -336,7 +379,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                             </td>
                             <td className="pct-td">{tPct}</td>
                             <td className="td-racha">
-                              {getRacha(t.partidos).map((r, i) => (
+                              {getRacha(t.historial).map((r, i) => (
                                 <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
                               ))}
                               {!t.partidos?.length && <span className="racha-nd">–</span>}

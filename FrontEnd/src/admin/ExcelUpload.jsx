@@ -265,6 +265,16 @@ export default function ExcelUpload() {
           .upsert(statsRows, { onConflict:'partido_id,jugadora_id' });
         if (sErr) throw new Error(`Stats: ${sErr.message}`);
 
+        // Calcular MVP: jugadora con mayor VAL del partido
+        const mvp = statsRows.reduce((best, r) => !best || r.val > best.val ? r : best, null);
+        if (mvp) {
+          await supabase.from('partidos_femenino')
+            .update({ mvp_jugadora_id: mvp.jugadora_id })
+            .eq('id', pd.id);
+          const mvpNombre = parsed.jugadoras.find(j => j.jugadora?.id === mvp.jugadora_id)?.jugadora?.nombre ?? mvp.jugadora_id;
+          addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
+        }
+
         addLog('🔄 Recalculando promedios...');
         await recalcularPromedios(statsRows.map(r=>r.jugadora_id));
         addLog('✅ Promedios actualizados');

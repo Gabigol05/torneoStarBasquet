@@ -4415,3 +4415,211 @@ table tbody tr:nth-child(5) td {
   padding: 6px 0 12px;
   text-align: right;
 }
+
+/* ══ FECHA CHIPS ══════════════════════════════════════════════ */
+.fecha-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.fecha-chip {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid #1C2535;
+  border-radius: 20px;
+  color: #6B7A99;
+  cursor: pointer;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+.fecha-chip:hover { border-color: #4A566E; color: #EEF2F8; }
+.fecha-chip.active { font-weight: 700; }
+
+/* ══ RESULT CARDS ═════════════════════════════════════════════ */
+.results-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.result-card {
+  background: #0E1420;
+  border: 1px solid #1C2535;
+  border-radius: 14px;
+  padding: 16px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.result-card:hover {
+  border-color: #2C3A52;
+  transform: translateY(-1px);
+}
+.rc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.rc-fecha { color: #6B7A99; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
+.rc-estado { font-size: 11px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; }
+.rc-estado.finalizado { background: rgba(34,208,122,0.1); color: #22D07A; }
+.rc-estado.en-vivo    { background: rgba(240,64,96,0.15); color: #F04060; animation: pulse-vivo 1.5s ease-in-out infinite; }
+@keyframes pulse-vivo { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+.rc-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rc-equipo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  text-align: center;
+}
+.rc-equipo-visit { flex-direction: column; }
+.rc-equipo.ganador .rc-nombre { color: #EEF2F8; }
+.rc-logo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.rc-nombre { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; color: #6B7A99; letter-spacing: .5px; }
+.rc-pts { font-family: 'Bebas Neue', sans-serif; font-size: 42px; line-height: 1; }
+.rc-sep { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: #4A566E; }
+
+.rc-parciales {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.rc-parcial {
+  background: #141C2A;
+  border-radius: 6px;
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+}
+.rc-parcial-lbl { font-size: 9px; color: #4A566E; letter-spacing: 1px; font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; }
+.rc-parcial-vals { font-family: 'Bebas Neue', sans-serif; font-size: 16px; display: flex; gap: 4px; align-items: center; }
+.rc-parcial-sep { color: #4A566E; font-size: 12px; }
+
+.rc-pct-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid #1C2535;
+}
+.rc-pct-item { display: flex; align-items: center; gap: 4px; font-size: 12px; font-family: 'Barlow Condensed', sans-serif; }
+.rc-pct-lbl { color: #4A566E; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; margin-right: 2px; }
+.rc-pct-sep { color: #4A566E; }
+
+/* MVP badge */
+.rc-mvp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(240,180,41,0.08);
+  border: 1px solid rgba(240,180,41,0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 10px;
+}
+.rc-mvp-label { font-size: 10px; color: #F0B429; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.rc-mvp-name  { font-size: 14px; color: #EEF2F8; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
+.rc-mvp-pts   { font-size: 13px; color: #F0B429; font-family: 'Bebas Neue', sans-serif; margin-left: auto; }
+
+/* ══ FIXTURE CARDS ════════════════════════════════════════════ */
+.fixture-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fixture-card {
+  background: #0E1420;
+  border: 1px solid #1C2535;
+  border-radius: 14px;
+  padding: 16px;
+}
+.fc2-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.fc2-fecha { color: #F0B429; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-family: 'Bebas Neue', sans-serif; }
+.fc2-lugar { color: #6B7A99; font-size: 12px; }
+.fc2-body  { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fc2-equipo { display: flex; align-items: center; gap: 10px; flex: 1; }
+.fc2-equipo-right { flex-direction: row-reverse; justify-content: flex-start; }
+.fc2-logo  { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.fc2-nombre { font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: .5px; }
+.fc2-vs    { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: #4A566E; letter-spacing: 2px; padding: 0 8px; flex-shrink: 0; }
+
+/* ══ PLAYER ITEM STATS (mini stats en card de jugadora) ═══════ */
+.player-item-stats {
+  font-size: 11px;
+  color: #6B7A99;
+  margin-top: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: .3px;
+}
+
+/* ══ TABLA FORMA (racha pills) ════════════════════════════════ */
+.td-racha { white-space: nowrap; }
+.racha-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.racha-g { background: rgba(34,208,122,0.15); color: #22D07A; }
+.racha-p { background: rgba(240,64,96,0.12);  color: #F04060; }
+.racha-nd { color: #4A566E; font-size: 12px; }
+
+/* ══ MOBILE ══════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .rc-logo { width: 36px; height: 36px; }
+  .rc-pts  { font-size: 34px; }
+  .rc-nombre { font-size: 12px; }
+  .rc-parciales { gap: 4px; }
+  .rc-parcial { padding: 3px 7px; min-width: 36px; }
+}
+
+/* ══ TEAMPAGE MATCH CARD UPDATES ═════════════════════════════ */
+.tp-match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.tp-match-parciales {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tp-parcial {
+  background: rgba(255,255,255,0.04);
+  border-radius: 5px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.tp-parcial-lbl { color: #4A566E; font-size: 9px; font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; margin-right: 2px; letter-spacing: .5px; }
+.tp-parcial-val { font-family: 'Bebas Neue', sans-serif; font-size: 14px; }
+.tp-parcial-sep { color: #4A566E; font-size: 10px; }

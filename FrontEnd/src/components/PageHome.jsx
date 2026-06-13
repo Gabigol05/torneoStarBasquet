@@ -26,7 +26,7 @@ export function PageHome() {
   useScrollReveal();
   const [activeTab, setActiveTab] = useState('inicio');
 
-  const { equipos, isLoading, refetch } = useFemeninoStats();
+  const { equipos, partidos, isLoading, refetch } = useFemeninoStats();
   const { toasts, addToast, removeToast } = useToast();
   const { isPulling, isRefreshing } = usePullToRefresh(refetch);
 
@@ -59,7 +59,7 @@ export function PageHome() {
       </div>
 
       <Hero />
-      <SeasonKpis />
+      <SeasonKpis equipos={equipos} partidos={partidos} />
       <div className="full-rule"></div>
       <TorneoView />
       <div className="full-rule"></div>

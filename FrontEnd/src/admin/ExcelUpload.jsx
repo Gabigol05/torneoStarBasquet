@@ -4,490 +4,435 @@ import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
-// ─── Índice de jugadoras para fuzzy matching ──────────────────────────────────
+// ─── Índice fuzzy de jugadoras ────────────────────────────────────────────────
 const TODAS_JUGADORAS = equiposFemenino.flatMap(eq =>
   eq.jugadoras.map(j => ({
-    id:       j.id,
-    nombre:   j.nombre,
-    equipoId: eq.id,
-    equipo:   eq.nombre,
-    // Apellido = último token (formato "Nombre Apellido" o "Apellido" solo)
+    id: j.id, nombre: j.nombre,
+    equipoId: eq.id, equipo: eq.nombre,
     apellido: j.nombre.split(' ').slice(-1)[0],
   }))
 );
-
-const fuse = new Fuse(TODAS_JUGADORAS, {
-  keys: ['nombre', 'apellido'],
-  threshold: 0.4,
-  minMatchCharLength: 2,
+const fuseJug = new Fuse(TODAS_JUGADORAS, {
+  keys: ['nombre','apellido'], threshold: 0.4, minMatchCharLength: 2,
 });
+const fuseEq = new Fuse(equiposFemenino, { keys: ['nombre'], threshold: 0.4 });
 
 function resolverJugadora(nombreRaw, equipoHint) {
   if (!nombreRaw) return null;
   const clean = String(nombreRaw).trim();
-  const resultados = fuse.search(clean);
-
-  // Intentar primero dentro del equipo correcto
+  const hits  = fuseJug.search(clean);
+  if (!hits.length) return null;
   if (equipoHint) {
     const hint = equipoHint.toLowerCase().split(' ')[0];
-    const enEquipo = resultados.filter(r =>
-      r.item.equipo.toLowerCase().includes(hint)
-    );
-    if (enEquipo.length > 0) return enEquipo[0].item;
+    const enEq = hits.filter(r => r.item.equipo.toLowerCase().includes(hint));
+    if (enEq.length) return enEq[0].item;
   }
-  return resultados.length > 0 ? resultados[0].item : null;
+  return hits[0].item;
 }
 
 // ─── Índices exactos de columnas (mapeados del Excel real) ────────────────────
 const C = {
-  // Jugadoras (fila 16 = headers)
-  equipo: 0, partido: 3, numero: 6, nombre: 9,
-  sc: 17, sf: 20, dc: 23, df: 25, tc: 27, tf: 29,
-  as_: 31, rd: 33, ro: 35, fp: 36, ft: 38, fa: 40,
-  rb: 44, tp: 46, pe: 47, ca: 51, pts: 52, val: 55,
+  equipo:0, partido:3, numero:6, nombre:9,
+  sc:17, sf:20, dc:23, df:25, tc:27, tf:29,
+  as_:31, rd:33, ro:35, fp:36, ft:38, fa:40,
+  rb:44, tp:46, pe:47, ca:51, pts:52, val:55,
 };
-const M = { equipo: 2, q1: 7, q2: 11, q3: 12, q4: 13, ot: 14, total: 16 };
-const P = { equipo: 2, simples: 7, dobles: 15, triples: 24 };
+const M = { equipo:2, q1:7, q2:11, q3:12, q4:13, ot:14, total:16 };
+const P = { equipo:2, simples:7, dobles:15, triples:24 };
+const n = v => (typeof v === 'number' ? v : 0);
 
-function num(v) { return typeof v === 'number' ? v : 0; }
-
-// ─── Parser principal ─────────────────────────────────────────────────────────
+// ─── Parser ───────────────────────────────────────────────────────────────────
 function parsearExcel(wb) {
   const ws   = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
 
   const res = {
-    equipoLocal: null, equipoVisit: null,
-    marcador: {
-      local: { q1:0, q2:0, q3:0, q4:0, ot:0, total:0 },
-      visit: { q1:0, q2:0, q3:0, q4:0, ot:0, total:0 },
-    },
-    pct: {
-      local: { simples:0, dobles:0, triples:0 },
-      visit: { simples:0, dobles:0, triples:0 },
-    },
-    jugadoras: [],
-    errores: [],
-    warnings: [],
+    equipoLocal:null, equipoVisit:null,
+    marcador:{ local:{q1:0,q2:0,q3:0,q4:0,ot:0,total:0}, visit:{q1:0,q2:0,q3:0,q4:0,ot:0,total:0} },
+    pct:{ local:{simples:0,dobles:0,triples:0}, visit:{simples:0,dobles:0,triples:0} },
+    jugadoras:[], errores:[], warnings:[],
   };
 
-  // ── 1. Marcador (buscar fila con 'Equipo' en col 2 y '1º' en col 7) ──
-  let marcadorHeaderRow = -1;
-  let statsHeaderRow    = -1;
-  let pctHeaderRow      = -1;
-
-  for (let i = 0; i < rows.length; i++) {
+  let marcRow=-1, statsRow=-1, pctRow=-1;
+  for (let i=0; i<rows.length; i++) {
     const r = rows[i];
     if (!r) continue;
-
-    // Fila marcador header: col2='Equipo', col7 contiene '1'
-    if (r[M.equipo] === 'Equipo' && String(r[M.q1] ?? '').includes('1')) {
-      marcadorHeaderRow = i;
-    }
-    // Fila stats header: col0='Equipo', col3='Partido'
-    if (r[C.equipo] === 'Equipo' && r[C.partido] === 'Partido') {
-      statsHeaderRow = i;
-    }
-    // Fila % tiro header: col2='Equipo', col7 contiene '%'
-    if (r[P.equipo] === 'Equipo' && String(r[P.simples] ?? '').includes('%')) {
-      pctHeaderRow = i;
-    }
+    if (r[M.equipo]==='Equipo' && String(r[M.q1]??'').includes('1')) marcRow=i;
+    if (r[C.equipo]==='Equipo' && r[C.partido]==='Partido')           statsRow=i;
+    if (r[P.equipo]==='Equipo' && String(r[P.simples]??'').includes('%')) pctRow=i;
   }
 
-  if (marcadorHeaderRow === -1) {
-    res.errores.push('No se encontró la sección de marcador. Verificá que el archivo sea la planilla correcta.');
-    return res;
-  }
-  if (statsHeaderRow === -1) {
-    res.errores.push('No se encontró la sección de estadísticas. Verificá la estructura del archivo.');
-    return res;
-  }
+  if (marcRow===-1) { res.errores.push('No se encontró la sección de marcador.'); return res; }
+  if (statsRow===-1){ res.errores.push('No se encontró la sección de estadísticas.'); return res; }
 
-  // ── 2. Leer marcador ──
-  const rLocal = rows[marcadorHeaderRow + 1];
-  const rVisit = rows[marcadorHeaderRow + 2];
-
-  if (rLocal) {
-    res.equipoLocal = String(rLocal[M.equipo] ?? '').trim();
-    res.marcador.local = {
-      q1: num(rLocal[M.q1]), q2: num(rLocal[M.q2]),
-      q3: num(rLocal[M.q3]), q4: num(rLocal[M.q4]),
-      ot: num(rLocal[M.ot]), total: num(rLocal[M.total]),
-    };
+  // Marcador
+  const rL=rows[marcRow+1], rV=rows[marcRow+2];
+  if (rL) {
+    res.equipoLocal = String(rL[M.equipo]??'').trim();
+    res.marcador.local = { q1:n(rL[M.q1]),q2:n(rL[M.q2]),q3:n(rL[M.q3]),q4:n(rL[M.q4]),ot:n(rL[M.ot]),total:n(rL[M.total]) };
   }
-  if (rVisit) {
-    res.equipoVisit = String(rVisit[M.equipo] ?? '').trim();
-    res.marcador.visit = {
-      q1: num(rVisit[M.q1]), q2: num(rVisit[M.q2]),
-      q3: num(rVisit[M.q3]), q4: num(rVisit[M.q4]),
-      ot: num(rVisit[M.ot]), total: num(rVisit[M.total]),
-    };
+  if (rV) {
+    res.equipoVisit = String(rV[M.equipo]??'').trim();
+    res.marcador.visit = { q1:n(rV[M.q1]),q2:n(rV[M.q2]),q3:n(rV[M.q3]),q4:n(rV[M.q4]),ot:n(rV[M.ot]),total:n(rV[M.total]) };
   }
 
   if (!res.equipoLocal || !res.equipoVisit) {
-    res.errores.push('No se pudieron leer los equipos del marcador.');
-    return res;
+    res.errores.push('No se pudieron leer los nombres de los equipos.'); return res;
   }
 
-  // ── 3. Leer stats jugadoras ──
+  // Validar que marcador cierra (suma cuartos = total)
+  const sumaL = res.marcador.local.q1+res.marcador.local.q2+res.marcador.local.q3+res.marcador.local.q4+res.marcador.local.ot;
+  const sumaV = res.marcador.visit.q1+res.marcador.visit.q2+res.marcador.visit.q3+res.marcador.visit.q4+res.marcador.visit.ot;
+  if (res.marcador.local.total > 0 && sumaL !== res.marcador.local.total)
+    res.warnings.push(`⚠️ Marcador local: suma de cuartos (${sumaL}) ≠ total (${res.marcador.local.total})`);
+  if (res.marcador.visit.total > 0 && sumaV !== res.marcador.visit.total)
+    res.warnings.push(`⚠️ Marcador visitante: suma de cuartos (${sumaV}) ≠ total (${res.marcador.visit.total})`);
+
+  // Stats jugadoras
   let equipoActual = res.equipoLocal;
-
-  for (let i = statsHeaderRow + 1; i < rows.length; i++) {
+  for (let i=statsRow+1; i<rows.length; i++) {
     const r = rows[i];
-    if (!r) continue;
-
-    // Fila vacía total → fin de datos
-    if (r.every(v => v === null)) continue;
-
-    // Detectar cambio de equipo: col 0 tiene texto de equipo
-    if (r[C.equipo] && typeof r[C.equipo] === 'string' && r[C.equipo].trim()) {
+    if (!r || r.every(v=>v===null)) continue;
+    if (r[C.equipo] && typeof r[C.equipo]==='string' && r[C.equipo].trim()) {
       const eq = r[C.equipo].trim();
-      // Si es header de % tiro, terminar
-      if (eq === 'Equipo') break;
-      if (eq === res.equipoLocal || eq === res.equipoVisit) {
-        equipoActual = eq;
-      }
+      if (eq==='Equipo') break;
+      if (eq===res.equipoLocal || eq===res.equipoVisit) equipoActual=eq;
     }
-
-    // Fila de TOTALES: col numero = '' o null y col nombre = '' o null → skip
     const nombre = r[C.nombre];
-    const numero = r[C.numero];
-    if (nombre === null || nombre === '' || String(nombre).trim() === '') continue;
-    if (typeof nombre !== 'string') continue;
+    if (!nombre || typeof nombre!=='string' || !nombre.trim()) continue;
 
-    // Resolver jugadora con fuzzy matching
-    const jugadora = resolverJugadora(nombre, equipoActual);
-    if (!jugadora) {
-      res.warnings.push(`"${nombre}" (${equipoActual}) → no encontrada en el plantel, se ignorará`);
-    }
+    const jug = resolverJugadora(nombre, equipoActual);
+    if (!jug) res.warnings.push(`"${nombre.trim()}" (${equipoActual}) → no encontrada en el plantel`);
+
+    // Validar PTS vs suma de tiros
+    const ptsCal = n(r[C.sc])*1 + n(r[C.dc])*2 + n(r[C.tc])*3;
+    const ptsExcel = n(r[C.pts]);
+    if (ptsExcel > 0 && ptsCal !== ptsExcel)
+      res.warnings.push(`"${nombre.trim()}": PTS planilla (${ptsExcel}) ≠ calculado desde tiros (${ptsCal})`);
 
     res.jugadoras.push({
-      nombreRaw:  String(nombre).trim(),
-      equipoRaw:  equipoActual,
-      jugadora,
-      numero:     typeof numero === 'number' ? numero : null,
-      sc:  num(r[C.sc]),  sf:  num(r[C.sf]),
-      dc:  num(r[C.dc]),  df:  num(r[C.df]),
-      tc:  num(r[C.tc]),  tf:  num(r[C.tf]),
-      as_: num(r[C.as_]),
-      rd:  num(r[C.rd]),  ro:  num(r[C.ro]),
-      fp:  num(r[C.fp]),  ft:  num(r[C.ft]),  fa: num(r[C.fa]),
-      rb:  num(r[C.rb]),  tp:  num(r[C.tp]),  pe: num(r[C.pe]),
-      ca:  num(r[C.ca]),
-      pts: num(r[C.pts]),
-      val: num(r[C.val]),
+      nombreRaw: nombre.trim(), equipoRaw: equipoActual, jugadora: jug,
+      numero: typeof r[C.numero]==='number' ? r[C.numero] : null,
+      sc:n(r[C.sc]), sf:n(r[C.sf]), dc:n(r[C.dc]), df:n(r[C.df]),
+      tc:n(r[C.tc]), tf:n(r[C.tf]), as_:n(r[C.as_]),
+      rd:n(r[C.rd]), ro:n(r[C.ro]),
+      fp:n(r[C.fp]), ft:n(r[C.ft]), fa:n(r[C.fa]),
+      rb:n(r[C.rb]), tp:n(r[C.tp]), pe:n(r[C.pe]), ca:n(r[C.ca]),
+      pts:ptsExcel, val:n(r[C.val]),
+      ptsOk: ptsCal===ptsExcel || ptsExcel===0,
     });
   }
 
-  // ── 4. Leer % tiro ──
-  if (pctHeaderRow !== -1) {
-    const pLocal = rows[pctHeaderRow + 1];
-    const pVisit = rows[pctHeaderRow + 2];
-    if (pLocal) res.pct.local = { simples: num(pLocal[P.simples]), dobles: num(pLocal[P.dobles]), triples: num(pLocal[P.triples]) };
-    if (pVisit) res.pct.visit = { simples: num(pVisit[P.simples]), dobles: num(pVisit[P.dobles]), triples: num(pVisit[P.triples]) };
+  // % tiro
+  if (pctRow!==-1) {
+    const pL=rows[pctRow+1], pV=rows[pctRow+2];
+    if (pL) res.pct.local  = { simples:n(pL[P.simples]),dobles:n(pL[P.dobles]),triples:n(pL[P.triples]) };
+    if (pV) res.pct.visit  = { simples:n(pV[P.simples]),dobles:n(pV[P.dobles]),triples:n(pV[P.triples]) };
   }
 
-  if (res.jugadoras.length === 0) {
-    res.errores.push('No se encontraron jugadoras. Verificá la estructura del archivo.');
-  }
-
+  if (res.jugadoras.length===0) res.errores.push('No se encontraron jugadoras en el archivo.');
   return res;
 }
 
-// ─── Recalcular promedios acumulados ──────────────────────────────────────────
+// ─── Recalcular promedios ─────────────────────────────────────────────────────
 async function recalcularPromedios(jugadoraIds) {
-  const ids = [...new Set(jugadoraIds)];
-  for (const jugId of ids) {
-    const { data: allStats, error } = await supabase
+  for (const jugId of [...new Set(jugadoraIds)]) {
+    const { data, error } = await supabase
       .from('stats_partido_femenino')
-      .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
+      .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf,partido_id')
       .eq('jugadora_id', jugId);
 
-    if (error || !allStats?.length) continue;
-    const n = allStats.length;
+    if (error || !data?.length) continue;
+    const k   = data.length;
+    const sum = key => data.reduce((a,r)=>a+(r[key]??0),0);
+    const avg = key => +(sum(key)/k).toFixed(1);
 
-    const sum = (key) => allStats.reduce((a, r) => a + (r[key] ?? 0), 0);
-    const avg = (key) => +(sum(key) / n).toFixed(1);
+    const tsc=sum('sc'),tsf=sum('sf');
+    const tdc=sum('dc'),tdf=sum('df');
+    const ttc=sum('tc'),ttf=sum('tf');
 
-    const totalSC = sum('sc'), totalSF = sum('sf');
-    const totalDC = sum('dc'), totalDF = sum('df');
-    const totalTC = sum('tc'), totalTF = sum('tf');
-
-    const pctSimp  = totalSC + totalSF > 0 ? +((totalSC / (totalSC + totalSF)) * 100).toFixed(1) : 0;
-    const pctDob   = totalDC + totalDF > 0 ? +((totalDC / (totalDC + totalDF)) * 100).toFixed(1) : 0;
-    const pctTrip  = totalTC + totalTF > 0 ? +((totalTC / (totalTC + totalTF)) * 100).toFixed(1) : 0;
-    const mejorPts = Math.max(...allStats.map(r => r.pts ?? 0));
+    const pctS = tsc+tsf>0 ? +((tsc/(tsc+tsf))*100).toFixed(1) : 0;
+    const pctD = tdc+tdf>0 ? +((tdc/(tdc+tdf))*100).toFixed(1) : 0;
+    const pctT = ttc+ttf>0 ? +((ttc/(ttc+ttf))*100).toFixed(1) : 0;
 
     await supabase.from('estadisticas_femenino').upsert({
-      jugadora_id: jugId,
-      pj:          n,
-      pts_prom:    avg('pts'),
-      reb_prom:    +((sum('rd') + sum('ro')) / n).toFixed(1),
-      ast_prom:    avg('as_'),
-      rob_prom:    avg('rb'),
-      tap_prom:    avg('tp'),
-      per_prom:    avg('pe'),
-      val_prom:    avg('val'),
-      pct_simples: pctSimp,
-      pct_dobles:  pctDob,
-      pct_triples: pctTrip,
-      pts_total:   sum('pts'),
-      reb_total:   sum('rd') + sum('ro'),
-      ast_total:   sum('as_'),
-      mejor_pts:   mejorPts,
-      updated_at:  new Date().toISOString(),
-    }, { onConflict: 'jugadora_id' });
+      jugadora_id:jugId, pj:k,
+      pts_prom:avg('pts'), reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
+      ast_prom:avg('as_'), rob_prom:avg('rb'), tap_prom:avg('tp'),
+      per_prom:avg('pe'),  val_prom:avg('val'),
+      pct_simples:pctS, pct_dobles:pctD, pct_triples:pctT,
+      pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
+      mejor_pts:Math.max(...data.map(r=>r.pts??0)),
+      updated_at:new Date().toISOString(),
+    }, { onConflict:'jugadora_id' });
   }
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
+const STEPS = ['archivo','preview','publicando','listo'];
+
 export default function ExcelUpload() {
+  const [step,      setStep]      = useState('archivo');
   const [parsed,    setParsed]    = useState(null);
   const [fileName,  setFileName]  = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [published, setPublished] = useState(false);
   const [jornada,   setJornada]   = useState('');
   const [lugar,     setLugar]     = useState('');
+  const [progress,  setProgress]  = useState('');
+  const [log,       setLog]       = useState([]);
   const fileRef = useRef();
 
-  const reset = () => { setParsed(null); setFileName(''); setPublished(false); };
+  const reset = () => { setStep('archivo'); setParsed(null); setFileName(''); setProgress(''); setLog([]); };
 
-  const handleFile = (e) => {
+  const addLog = msg => setLog(l => [...l, msg]);
+
+  const handleFile = e => {
     const file = (e.dataTransfer?.files ?? e.target.files)[0];
     if (!file) return;
-    reset();
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = ev => {
       try {
-        const wb  = XLSX.read(ev.target.result, { type: 'binary' });
-        setParsed(parsearExcel(wb));
-      } catch (err) {
-        setParsed({ errores: [`Error al leer el archivo: ${err.message}`], warnings: [], jugadoras: [], marcador: null, pct: null });
+        const wb = XLSX.read(ev.target.result, { type:'binary' });
+        const result = parsearExcel(wb);
+        setParsed(result);
+        if (result.errores.length === 0) setStep('preview');
+      } catch(err) {
+        setParsed({ errores:[`Error al leer: ${err.message}`], warnings:[], jugadoras:[], marcador:null, pct:null });
       }
     };
     reader.readAsBinaryString(file);
   };
 
   const handlePublish = async () => {
-    if (!parsed || !jornada) { alert('Ingresá el número de fecha antes de publicar'); return; }
-    setLoading(true);
+    if (!parsed || !jornada) { alert('Ingresá el número de fecha'); return; }
+    setStep('publicando');
+    setLog([]);
+
     try {
-      // 1. Upsert fecha
-      const { data: fechaData, error: fErr } = await supabase
+      addLog('📅 Creando/actualizando fecha...');
+      const { data:fd, error:fErr } = await supabase
         .from('fechas_femenino')
-        .upsert({ numero: Number(jornada), descripcion: `Fecha ${jornada}` }, { onConflict: 'numero' })
+        .upsert({ numero:Number(jornada), descripcion:`Fecha ${jornada}` }, { onConflict:'numero' })
         .select('id').single();
-      if (fErr) throw fErr;
+      if (fErr) throw new Error(`Fecha: ${fErr.message}`);
 
-      // 2. Resolver IDs de equipos (fuzzy sobre nombre)
-      const fuseEq = new Fuse(equiposFemenino, { keys: ['nombre'], threshold: 0.4 });
-      const eqLocalMatch = fuseEq.search(parsed.equipoLocal);
-      const eqVisitMatch = fuseEq.search(parsed.equipoVisit);
-      if (!eqLocalMatch.length || !eqVisitMatch.length)
-        throw new Error(`Equipos no encontrados: "${parsed.equipoLocal}" / "${parsed.equipoVisit}"`);
+      addLog(`✅ Fecha ${jornada} OK`);
 
-      const eqLocalId = eqLocalMatch[0].item.id;
-      const eqVisitId = eqVisitMatch[0].item.id;
-      const m = parsed.marcador;
-      const p = parsed.pct;
+      // Resolver equipos
+      const mL = fuseEq.search(parsed.equipoLocal);
+      const mV = fuseEq.search(parsed.equipoVisit);
+      if (!mL.length) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
+      if (!mV.length) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
 
-      // 3. Insertar partido
-      const { data: partidoData, error: pErr } = await supabase
+      const eqLId = mL[0].item.id;
+      const eqVId = mV[0].item.id;
+      addLog(`✅ Equipos: ${mL[0].item.nombre} vs ${mV[0].item.nombre}`);
+
+      // Insertar partido
+      addLog('🏀 Insertando partido...');
+      const m=parsed.marcador, p=parsed.pct;
+      const { data:pd, error:pErr } = await supabase
         .from('partidos_femenino')
         .insert({
-          fecha_id:        fechaData.id,
-          equipo_local_id: eqLocalId,
-          equipo_visit_id: eqVisitId,
-          q1_local: m.local.q1, q2_local: m.local.q2,
-          q3_local: m.local.q3, q4_local: m.local.q4, ot_local: m.local.ot,
-          q1_visit: m.visit.q1, q2_visit: m.visit.q2,
-          q3_visit: m.visit.q3, q4_visit: m.visit.q4, ot_visit: m.visit.ot,
-          pct_simples_local: p.local.simples, pct_dobles_local: p.local.dobles, pct_triples_local: p.local.triples,
-          pct_simples_visit: p.visit.simples, pct_dobles_visit: p.visit.dobles, pct_triples_visit: p.visit.triples,
-          lugar:  lugar || null,
-          estado: 'finalizado',
+          fecha_id:fd.id, equipo_local_id:eqLId, equipo_visit_id:eqVId,
+          q1_local:m.local.q1, q2_local:m.local.q2, q3_local:m.local.q3,
+          q4_local:m.local.q4, ot_local:m.local.ot,
+          q1_visit:m.visit.q1, q2_visit:m.visit.q2, q3_visit:m.visit.q3,
+          q4_visit:m.visit.q4, ot_visit:m.visit.ot,
+          pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
+          pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
+          lugar:lugar||null, estado:'finalizado',
         })
         .select('id').single();
-      if (pErr) throw pErr;
+      if (pErr) throw new Error(`Partido: ${pErr.message}`);
+      addLog(`✅ Partido ID ${pd.id} creado (${m.local.total}-${m.visit.total})`);
 
-      // 4. Insertar stats de jugadoras (solo las que resolvieron)
-      const statsRows = parsed.jugadoras
-        .filter(j => j.jugadora)
-        .map(j => ({
-          partido_id:  partidoData.id,
-          jugadora_id: j.jugadora.id,
-          equipo_id:   j.jugadora.equipoId,
-          numero: j.numero,
-          sc: j.sc, sf: j.sf, dc: j.dc, df: j.df,
-          tc: j.tc, tf: j.tf, as_: j.as_,
-          rd: j.rd, ro: j.ro,
-          fp: j.fp, ft: j.ft, fa: j.fa,
-          rb: j.rb, tp: j.tp, pe: j.pe, ca: j.ca,
-          pts: j.pts, val: j.val,
+      // Stats jugadoras
+      const jugOk  = parsed.jugadoras.filter(j=>j.jugadora);
+      const jugSkip = parsed.jugadoras.filter(j=>!j.jugadora);
+      addLog(`📊 Insertando stats de ${jugOk.length} jugadoras...`);
+
+      if (jugOk.length > 0) {
+        const statsRows = jugOk.map(j=>({
+          partido_id:pd.id, jugadora_id:j.jugadora.id, equipo_id:j.jugadora.equipoId,
+          numero:j.numero, sc:j.sc, sf:j.sf, dc:j.dc, df:j.df,
+          tc:j.tc, tf:j.tf, as_:j.as_,
+          rd:j.rd, ro:j.ro, fp:j.fp, ft:j.ft, fa:j.fa,
+          rb:j.rb, tp:j.tp, pe:j.pe, ca:j.ca, pts:j.pts, val:j.val,
         }));
-
-      if (statsRows.length > 0) {
-        const { error: sErr } = await supabase
+        const { error:sErr } = await supabase
           .from('stats_partido_femenino')
-          .upsert(statsRows, { onConflict: 'partido_id,jugadora_id' });
-        if (sErr) throw sErr;
+          .upsert(statsRows, { onConflict:'partido_id,jugadora_id' });
+        if (sErr) throw new Error(`Stats: ${sErr.message}`);
+
+        addLog('🔄 Recalculando promedios...');
+        await recalcularPromedios(statsRows.map(r=>r.jugadora_id));
+        addLog('✅ Promedios actualizados');
       }
 
-      // 5. Recalcular promedios
-      await recalcularPromedios(statsRows.map(r => r.jugadora_id));
+      // Guardar log
+      await supabase.from('upload_log').insert({
+        fecha_id:fd.id, partido_id:pd.id,
+        archivo_nombre:fileName,
+        equipo_local:parsed.equipoLocal, equipo_visit:parsed.equipoVisit,
+        jugadoras_ok:jugOk.length, jugadoras_skip:jugSkip.length,
+        warnings:parsed.warnings,
+      });
 
-      setPublished(true);
-    } catch (err) {
-      alert(`Error al publicar: ${err.message}`);
+      addLog(`🎉 ¡Todo listo! El sitio ya se actualizó.`);
+      setStep('listo');
+    } catch(err) {
+      addLog(`❌ ERROR: ${err.message}`);
       console.error(err);
-    } finally {
-      setLoading(false);
+      // Volvemos a preview para no perder el estado
+      setStep('preview');
     }
   };
 
-  const localJugs = parsed?.jugadoras.filter(j => j.equipoRaw === parsed?.equipoLocal) ?? [];
-  const visitJugs = parsed?.jugadoras.filter(j => j.equipoRaw === parsed?.equipoVisit) ?? [];
+  const localJugs = parsed?.jugadoras.filter(j=>j.equipoRaw===parsed?.equipoLocal) ?? [];
+  const visitJugs = parsed?.jugadoras.filter(j=>j.equipoRaw===parsed?.equipoVisit) ?? [];
+  const hayErrores = parsed?.errores?.length > 0;
 
   return (
     <div>
       <h2 style={s.title}>📊 Cargar partido desde Excel</h2>
-      <p style={s.hint}>
-        Subí la planilla "Torneo Live Basketball". El sistema detecta automáticamente
-        equipos, marcador por cuartos, % de tiro y estadísticas de cada jugadora.
-      </p>
 
-      {/* Meta */}
-      <div style={s.metaRow}>
-        <div style={s.metaGroup}>
-          <label style={s.label}>N° de Fecha *</label>
-          <input type="number" min="1" value={jornada}
-            onChange={e => setJornada(e.target.value)}
-            style={s.input} placeholder="1" />
-        </div>
-        <div style={s.metaGroup}>
-          <label style={s.label}>Lugar (opcional)</label>
-          <input type="text" value={lugar}
-            onChange={e => setLugar(e.target.value)}
-            style={s.input} placeholder="Club, cancha..." />
-        </div>
+      {/* Stepper */}
+      <div style={s.stepper}>
+        {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([n,l],i)=>{
+          const steps=['archivo','preview','publicando','listo'];
+          const cur=steps.indexOf(step);
+          const active=i===cur, done=i<cur;
+          return (
+            <div key={n} style={s.stepWrap}>
+              <div style={{ ...s.stepDot, background:done?'#22D07A':active?'#F0B429':'#1C2535', color:done||active?'#080C12':'#4A566E' }}>{done?'✓':n}</div>
+              <div style={{ color:active?'#F0B429':done?'#22D07A':'#4A566E', fontSize:12 }}>{l}</div>
+              {i<3 && <div style={{ ...s.stepLine, background:done?'#22D07A':'#1C2535' }}/>}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Drop zone */}
-      {!published && (
-        <div style={s.dropZone}
-          onClick={() => fileRef.current.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); handleFile(e); }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📁</div>
-          <p style={{ color: '#EEF2F8', margin: 0 }}>
-            {fileName || 'Arrastrá el Excel o hacé click para seleccionar'}
-          </p>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls"
-            onChange={handleFile} style={{ display: 'none' }} />
-        </div>
+      {/* PASO 1: Archivo */}
+      {step==='archivo' && (
+        <>
+          <div style={s.metaRow}>
+            <div style={s.metaGroup}>
+              <label style={s.label}>N° de Fecha *</label>
+              <input type="number" min="1" value={jornada}
+                onChange={e=>setJornada(e.target.value)} style={s.input} placeholder="1"/>
+            </div>
+            <div style={s.metaGroup}>
+              <label style={s.label}>Lugar (opcional)</label>
+              <input type="text" value={lugar}
+                onChange={e=>setLugar(e.target.value)} style={s.input} placeholder="Club, cancha..."/>
+            </div>
+          </div>
+
+          <div style={s.dropZone}
+            onClick={()=>fileRef.current.click()}
+            onDragOver={e=>e.preventDefault()}
+            onDrop={e=>{e.preventDefault();handleFile(e);}}>
+            <div style={{fontSize:48,marginBottom:8}}>📁</div>
+            <p style={{color:'#EEF2F8',margin:0,fontSize:16}}>
+              {fileName||'Arrastrá el Excel o hacé click para seleccionar'}
+            </p>
+            <p style={{color:'#4A566E',fontSize:12,marginTop:6}}>
+              Formato: planilla Torneo Live Basketball (.xlsx)
+            </p>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls"
+              onChange={handleFile} style={{display:'none'}}/>
+          </div>
+
+          {hayErrores && (
+            <div style={s.errBox}>
+              {parsed.errores.map((e,i)=><p key={i} style={{margin:'4px 0'}}>❌ {e}</p>)}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Errores */}
-      {parsed?.errores?.length > 0 && (
-        <div style={s.errBox}>
-          {parsed.errores.map((e, i) => <p key={i} style={{ margin: '4px 0' }}>❌ {e}</p>)}
-        </div>
-      )}
-
-      {/* Preview */}
-      {parsed && parsed.errores.length === 0 && !published && (
+      {/* PASO 2: Preview */}
+      {step==='preview' && parsed && !hayErrores && (
         <>
           {/* Marcador */}
           <div style={s.marcadorCard}>
-            {[
-              { eq: parsed.equipoLocal, m: parsed.marcador.local },
-              { eq: parsed.equipoVisit, m: parsed.marcador.visit },
-            ].map(({ eq, m }, side) => (
-              <div key={side} style={s.marcadorSide}>
-                <div style={s.marcadorNombre}>{eq}</div>
-                <div style={s.marcadorTotal}>{m.total}</div>
+            {[{label:parsed.equipoLocal,m:parsed.marcador.local},{label:parsed.equipoVisit,m:parsed.marcador.visit}].map(({label,m},i)=>(
+              <div key={i} style={s.marcSide}>
+                <div style={s.marcNombre}>{label}</div>
+                <div style={s.marcTotal}>{m.total}</div>
                 <div style={s.parciales}>
-                  {['q1','q2','q3','q4'].map(q => (
-                    <span key={q} style={s.parcial}>{m[q]}</span>
+                  {['q1','q2','q3','q4'].map(q=>(
+                    <span key={q} style={s.parcial}><span style={{color:'#4A566E',fontSize:9}}>{q.toUpperCase()} </span>{m[q]}</span>
                   ))}
-                  {m.ot > 0 && <span style={s.parcial}>OT:{m.ot}</span>}
+                  {m.ot>0&&<span style={s.parcial}><span style={{color:'#4A566E',fontSize:9}}>OT </span>{m.ot}</span>}
                 </div>
               </div>
             ))}
             <div style={s.vs}>VS</div>
           </div>
 
-          {/* % Tiro */}
+          {/* % tiro */}
           <div style={s.pctRow}>
-            {['simples','dobles','triples'].map(t => (
-              <div key={t} style={s.pctCard}>
-                <div style={s.pctLabel}>% {t.charAt(0).toUpperCase()+t.slice(1)}</div>
-                <div style={s.pctVals}>
-                  <span style={{ color:'#F0B429' }}>{parsed.pct.local[t]}%</span>
-                  <span style={{ color:'#4A566E', fontSize:11 }}>vs</span>
-                  <span style={{ color:'#60A5FA' }}>{parsed.pct.visit[t]}%</span>
+            {[{l:'% Simples',k:'simples',c:'#22D07A'},{l:'% Dobles',k:'dobles',c:'#F0B429'},{l:'% Triples',k:'triples',c:'#60A5FA'}].map(t=>(
+              <div key={t.k} style={s.pctCard}>
+                <div style={{color:'#6B7A99',fontSize:11,marginBottom:4,textTransform:'uppercase',letterSpacing:.5}}>{t.l}</div>
+                <div style={{display:'flex',gap:8,justifyContent:'center',alignItems:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:20}}>
+                  <span style={{color:'#F0B429'}}>{parsed.pct.local[t.k]}%</span>
+                  <span style={{color:'#4A566E',fontSize:10}}>vs</span>
+                  <span style={{color:'#60A5FA'}}>{parsed.pct.visit[t.k]}%</span>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Warnings */}
-          {parsed.warnings.length > 0 && (
+          {parsed.warnings.length>0&&(
             <div style={s.warnBox}>
-              <p style={{ margin:'0 0 6px', fontWeight:600 }}>
-                ⚠️ {parsed.warnings.length} jugadora(s) no encontradas — se ignorarán
-              </p>
-              {parsed.warnings.map((w,i) => <p key={i} style={{ margin:'2px 0', fontSize:13 }}>{w}</p>)}
+              <p style={{margin:'0 0 6px',fontWeight:600}}>⚠️ {parsed.warnings.length} advertencia(s)</p>
+              {parsed.warnings.map((w,i)=><p key={i} style={{margin:'2px 0',fontSize:13}}>{w}</p>)}
             </div>
           )}
 
           {/* Resumen */}
-          <div style={s.resumenRow}>
-            <span style={{ color:'#22D07A', fontWeight:600 }}>
-              ✅ {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras listas
-            </span>
-            {parsed.jugadoras.filter(j=>!j.jugadora).length > 0 && (
-              <span style={{ color:'#F0B429', fontSize:13 }}>
-                · {parsed.jugadoras.filter(j=>!j.jugadora).length} sin resolver
-              </span>
+          <div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap'}}>
+            <span style={{color:'#22D07A',fontWeight:600}}>✅ {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras OK</span>
+            {parsed.jugadoras.filter(j=>!j.jugadora).length>0&&(
+              <span style={{color:'#F0B429'}}>⚠️ {parsed.jugadoras.filter(j=>!j.jugadora).length} sin resolver (se ignoran)</span>
+            )}
+            {parsed.jugadoras.filter(j=>!j.ptsOk).length>0&&(
+              <span style={{color:'#F04060'}}>⚠️ {parsed.jugadoras.filter(j=>!j.ptsOk).length} con PTS inconsistente</span>
             )}
           </div>
 
-          {/* Tablas por equipo */}
-          {[
-            { label: parsed.equipoLocal, jugs: localJugs },
-            { label: parsed.equipoVisit, jugs: visitJugs },
-          ].map(({ label, jugs }) => (
-            <div key={label} style={{ marginBottom: 28 }}>
-              <div style={s.teamLabel}>{label}</div>
-              <div style={{ overflowX: 'auto' }}>
+          {/* Tablas */}
+          {[{label:parsed.equipoLocal,jugs:localJugs},{label:parsed.equipoVisit,jugs:visitJugs}].map(({label,jugs})=>(
+            <div key={label} style={{marginBottom:28}}>
+              <div style={s.teamLabel}>{label} <span style={{color:'#4A566E',fontSize:13,fontFamily:'Barlow Condensed'}}>{jugs.length} jugadoras</span></div>
+              <div style={{overflowX:'auto'}}>
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      {['#','Nombre','PTS','VAL','SC/SF','DC/DF','TC/TF','AS','RD','RO','ROB','TAP','PÉR','FP'].map(h => (
+                      {['#','Nombre','PTS','VAL','SC/SF','DC/DF','TC/TF','AS','RD+RO','ROB','TAP','PÉR','FP'].map(h=>(
                         <th key={h} style={s.th}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {jugs.map((j, i) => (
-                      <tr key={i} style={{
-                        background: i%2===0 ? '#0E1420':'#141C2A',
-                        opacity: j.jugadora ? 1 : 0.4,
-                      }}>
-                        <td style={s.td}>{j.numero ?? '–'}</td>
-                        <td style={{...s.td, textAlign:'left', color: j.jugadora ? '#EEF2F8':'#F04060', minWidth:130}}>
-                          {j.jugadora ? j.jugadora.nombre : `⚠️ ${j.nombreRaw}`}
+                    {jugs.map((j,i)=>(
+                      <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:j.jugadora?1:0.4}}>
+                        <td style={s.td}>{j.numero??'–'}</td>
+                        <td style={{...s.td,textAlign:'left',color:j.jugadora?(j.ptsOk?'#EEF2F8':'#FCD34D'):'#F04060',minWidth:140}}>
+                          {j.jugadora?j.jugadora.nombre:`⚠️ ${j.nombreRaw}`}
+                          {!j.ptsOk&&j.jugadora&&<span title="PTS no coincide con suma de tiros" style={{marginLeft:4,fontSize:10}}>⚡</span>}
                         </td>
-                        <td style={{...s.td, color:'#F0B429', fontWeight:700}}>{j.pts}</td>
-                        <td style={{...s.td, color: j.val >= 0 ? '#22D07A':'#F04060'}}>{j.val}</td>
+                        <td style={{...s.td,color:'#F0B429',fontWeight:700}}>{j.pts}</td>
+                        <td style={{...s.td,color:j.val>=0?'#22D07A':'#F04060'}}>{j.val}</td>
                         <td style={s.td}>{j.sc}/{j.sf}</td>
                         <td style={s.td}>{j.dc}/{j.df}</td>
                         <td style={s.td}>{j.tc}/{j.tf}</td>
                         <td style={s.td}>{j.as_}</td>
-                        <td style={s.td}>{j.rd}</td>
-                        <td style={s.td}>{j.ro}</td>
+                        <td style={s.td}>{j.rd+j.ro}</td>
                         <td style={s.td}>{j.rb}</td>
                         <td style={s.td}>{j.tp}</td>
                         <td style={s.td}>{j.pe}</td>
@@ -500,31 +445,48 @@ export default function ExcelUpload() {
             </div>
           ))}
 
-          <div style={{ display:'flex', gap:12, marginTop:4 }}>
-            <button onClick={handlePublish} disabled={loading || !jornada} style={{
-              ...s.btnPublish, opacity: (!loading && jornada) ? 1 : 0.5
-            }}>
-              {loading ? 'Publicando...' : '🚀 PUBLICAR PARTIDO'}
+          <div style={{display:'flex',gap:12,marginTop:8}}>
+            <button onClick={handlePublish} disabled={!jornada} style={{...s.btnPublish,opacity:jornada?1:0.5}}>
+              🚀 PUBLICAR PARTIDO
             </button>
-            <button onClick={reset} style={s.btnCancel}>Cancelar</button>
+            <button onClick={reset} style={s.btnCancel}>← Volver</button>
           </div>
         </>
       )}
 
-      {/* Éxito */}
-      {published && (
+      {/* PASO 3: Publicando */}
+      {step==='publicando' && (
+        <div style={s.logBox}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:'#F0B429',marginBottom:16}}>
+            Publicando partido...
+          </div>
+          {log.map((l,i)=>(
+            <div key={i} style={{padding:'4px 0',fontSize:14,color:l.startsWith('❌')?'#F04060':l.startsWith('✅')||l.startsWith('🎉')?'#22D07A':'#EEF2F8'}}>
+              {l}
+            </div>
+          ))}
+          <div style={{marginTop:12,color:'#4A566E',fontSize:12}}>Por favor no cerrés esta ventana...</div>
+        </div>
+      )}
+
+      {/* PASO 4: Listo */}
+      {step==='listo' && parsed && (
         <div style={s.successBox}>
-          <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
-          <h3 style={{ color:'#22D07A', margin:'0 0 8px' }}>¡Partido publicado!</h3>
-          <p style={{ color:'#6B7A99', margin:'0 0 4px' }}>
-            {parsed.equipoLocal} <strong style={{ color:'#F0B429' }}>{parsed.marcador.local.total}</strong>
+          <div style={{fontSize:56,marginBottom:12}}>🎉</div>
+          <h3 style={{color:'#22D07A',margin:'0 0 8px',fontFamily:"'Bebas Neue',sans-serif",fontSize:28,letterSpacing:1}}>
+            ¡PARTIDO PUBLICADO!
+          </h3>
+          <p style={{color:'#EEF2F8',margin:'0 0 4px',fontSize:18}}>
+            {parsed.equipoLocal} <strong style={{color:'#F0B429'}}>{parsed.marcador.local.total}</strong>
             {' — '}
-            <strong style={{ color:'#F0B429' }}>{parsed.marcador.visit.total}</strong> {parsed.equipoVisit}
+            <strong style={{color:'#F0B429'}}>{parsed.marcador.visit.total}</strong> {parsed.equipoVisit}
           </p>
-          <p style={{ color:'#6B7A99', margin:'0 0 20px', fontSize:13 }}>
-            {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras · promedios actualizados · el sitio ya refleja los cambios
+          <p style={{color:'#6B7A99',margin:'0 0 24px',fontSize:13}}>
+            {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras · promedios actualizados · el sitio ya refleja los cambios en vivo
           </p>
-          <button onClick={reset} style={s.btnCancel}>Cargar otro partido</button>
+          <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+            <button onClick={reset} style={s.btnPublish}>+ Cargar otro partido</button>
+          </div>
         </div>
       )}
     </div>
@@ -532,32 +494,33 @@ export default function ExcelUpload() {
 }
 
 const s = {
-  title:    { color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:24, letterSpacing:1, marginBottom:8 },
-  hint:     { color:'#6B7A99', fontSize:13, marginBottom:20, lineHeight:1.6 },
-  metaRow:  { display:'flex', gap:16, marginBottom:20, flexWrap:'wrap' },
-  metaGroup:{ display:'flex', flexDirection:'column', gap:6, flex:1, minWidth:140 },
-  label:    { color:'#6B7A99', fontSize:11, letterSpacing:0.5, textTransform:'uppercase' },
-  input:    { padding:'10px 12px', background:'#141C2A', border:'1px solid #1C2535', borderRadius:8, color:'#EEF2F8', fontSize:14, outline:'none' },
-  dropZone: { border:'2px dashed #1C2535', borderRadius:12, padding:'2rem 1rem', textAlign:'center', cursor:'pointer', marginBottom:20 },
-  errBox:   { background:'rgba(240,64,96,0.1)', border:'1px solid rgba(240,64,96,0.3)', borderRadius:8, padding:'12px 16px', marginBottom:16, color:'#F04060', fontSize:14 },
-  warnBox:  { background:'rgba(240,180,41,0.08)', border:'1px solid rgba(240,180,41,0.25)', borderRadius:8, padding:'12px 16px', marginBottom:16, color:'#F0B429', fontSize:14 },
-  marcadorCard: { background:'#0E1420', border:'1px solid #1C2535', borderRadius:12, padding:'1.5rem', display:'flex', alignItems:'center', justifyContent:'space-around', marginBottom:16, gap:16, flexWrap:'wrap' },
-  marcadorSide: { flex:1, textAlign:'center', minWidth:120 },
-  marcadorNombre: { fontFamily:"'Bebas Neue',sans-serif", fontSize:17, letterSpacing:1, color:'#EEF2F8', marginBottom:4 },
-  marcadorTotal:  { fontFamily:"'Bebas Neue',sans-serif", fontSize:56, color:'#F0B429', lineHeight:1 },
-  parciales: { display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' },
-  parcial:   { background:'#141C2A', padding:'2px 8px', borderRadius:4, fontSize:12, color:'#6B7A99' },
-  vs:        { fontFamily:"'Bebas Neue',sans-serif", fontSize:24, color:'#4A566E', letterSpacing:2 },
-  pctRow:    { display:'flex', gap:12, marginBottom:20, flexWrap:'wrap' },
-  pctCard:   { flex:1, minWidth:90, background:'#0E1420', border:'1px solid #1C2535', borderRadius:8, padding:'10px 12px', textAlign:'center' },
-  pctLabel:  { color:'#6B7A99', fontSize:11, marginBottom:4, textTransform:'uppercase', letterSpacing:0.5 },
-  pctVals:   { display:'flex', gap:8, justifyContent:'center', alignItems:'center', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 },
-  resumenRow:{ display:'flex', gap:12, alignItems:'center', marginBottom:16 },
-  teamLabel: { fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:1, color:'#EEF2F8', marginBottom:10, paddingBottom:8, borderBottom:'1px solid #1C2535' },
-  table:     { width:'100%', borderCollapse:'collapse', fontSize:13 },
-  th:        { background:'#141C2A', color:'#6B7A99', padding:'8px 10px', textAlign:'center', fontSize:11, whiteSpace:'nowrap' },
-  td:        { padding:'7px 10px', textAlign:'center', color:'#EEF2F8', borderBottom:'1px solid #1C2535' },
-  btnPublish:{ flex:1, padding:'13px', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', border:'none', borderRadius:10, color:'#080C12', fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:1, cursor:'pointer' },
-  btnCancel: { padding:'10px 20px', background:'transparent', border:'1px solid #4A566E', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:14 },
-  successBox:{ textAlign:'center', padding:'3rem 1rem', background:'rgba(34,208,122,0.05)', border:'1px solid rgba(34,208,122,0.2)', borderRadius:12 },
+  title:      { color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:26, letterSpacing:1, marginBottom:20 },
+  stepper:    { display:'flex', alignItems:'center', marginBottom:28, gap:0 },
+  stepWrap:   { display:'flex', alignItems:'center', gap:6, flex:1 },
+  stepDot:    { width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, flexShrink:0 },
+  stepLine:   { flex:1, height:2, borderRadius:1 },
+  metaRow:    { display:'flex', gap:16, marginBottom:20, flexWrap:'wrap' },
+  metaGroup:  { display:'flex', flexDirection:'column', gap:6, flex:1, minWidth:140 },
+  label:      { color:'#6B7A99', fontSize:11, letterSpacing:.5, textTransform:'uppercase' },
+  input:      { padding:'10px 12px', background:'#141C2A', border:'1px solid #1C2535', borderRadius:8, color:'#EEF2F8', fontSize:14, outline:'none' },
+  dropZone:   { border:'2px dashed #1C2535', borderRadius:12, padding:'2.5rem 1rem', textAlign:'center', cursor:'pointer', marginBottom:20, transition:'border-color .2s' },
+  errBox:     { background:'rgba(240,64,96,.1)', border:'1px solid rgba(240,64,96,.3)', borderRadius:8, padding:'12px 16px', marginBottom:16, color:'#F04060', fontSize:14 },
+  warnBox:    { background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.25)', borderRadius:8, padding:'12px 16px', marginBottom:16, color:'#F0B429', fontSize:14 },
+  marcadorCard:{ background:'#0E1420', border:'1px solid #1C2535', borderRadius:12, padding:'1.5rem', display:'flex', alignItems:'center', justifyContent:'space-around', marginBottom:16, gap:16, flexWrap:'wrap' },
+  marcSide:   { flex:1, textAlign:'center', minWidth:120 },
+  marcNombre: { fontFamily:"'Bebas Neue',sans-serif", fontSize:17, letterSpacing:1, color:'#EEF2F8', marginBottom:4 },
+  marcTotal:  { fontFamily:"'Bebas Neue',sans-serif", fontSize:60, color:'#F0B429', lineHeight:1 },
+  parciales:  { display:'flex', gap:6, justifyContent:'center', marginTop:6, flexWrap:'wrap' },
+  parcial:    { background:'#141C2A', padding:'3px 8px', borderRadius:4, fontSize:13, color:'#EEF2F8' },
+  vs:         { fontFamily:"'Bebas Neue',sans-serif", fontSize:24, color:'#4A566E', letterSpacing:2 },
+  pctRow:     { display:'flex', gap:12, marginBottom:20, flexWrap:'wrap' },
+  pctCard:    { flex:1, minWidth:90, background:'#0E1420', border:'1px solid #1C2535', borderRadius:8, padding:'10px 12px', textAlign:'center' },
+  teamLabel:  { fontFamily:"'Bebas Neue',sans-serif", fontSize:19, letterSpacing:1, color:'#EEF2F8', marginBottom:10, paddingBottom:8, borderBottom:'1px solid #1C2535' },
+  table:      { width:'100%', borderCollapse:'collapse', fontSize:13 },
+  th:         { background:'#141C2A', color:'#6B7A99', padding:'8px 10px', textAlign:'center', fontSize:11, whiteSpace:'nowrap' },
+  td:         { padding:'7px 10px', textAlign:'center', color:'#EEF2F8', borderBottom:'1px solid #1C2535' },
+  btnPublish: { flex:1, maxWidth:280, padding:'13px', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', border:'none', borderRadius:10, color:'#080C12', fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:1, cursor:'pointer' },
+  btnCancel:  { padding:'10px 20px', background:'transparent', border:'1px solid #4A566E', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:14 },
+  logBox:     { background:'#0E1420', border:'1px solid #1C2535', borderRadius:12, padding:'1.5rem', minHeight:200 },
+  successBox: { textAlign:'center', padding:'3rem 1rem', background:'rgba(34,208,122,.05)', border:'1px solid rgba(34,208,122,.2)', borderRadius:12 },
 };

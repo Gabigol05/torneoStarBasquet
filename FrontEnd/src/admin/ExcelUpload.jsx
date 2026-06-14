@@ -4,56 +4,67 @@ import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
-// ─── Índice fuzzy — indexamos nombre completo + apellido + variantes ──────────
+// ─── Índice fuzzy — todos los tokens + normalización sin tildes/apóstrofes ─────
+const normStr = s => s.normalize('NFD').replace(/[\u0300-\u036f']/g,'').toLowerCase();
+
 const TODAS_JUGADORAS = equiposFemenino.flatMap(eq =>
   eq.jugadoras.map(j => {
     const partes = j.nombre.trim().split(/\s+/);
     return {
-      id:       j.id,
-      nombre:   j.nombre,
-      equipoId: eq.id,
-      equipo:   eq.nombre,
-      // Apellido = último token (formato "Nombre Apellido" o "Apellido Nombre")
-      apellido:   partes[partes.length - 1],
-      primerNombre: partes[0],
+      id:         j.id,
+      nombre:     j.nombre,
+      nombreNorm: normStr(j.nombre),
+      equipoId:   eq.id,
+      equipo:     eq.nombre,
+      numero:     j.numero,
+      // Indexamos todos los tokens para capturar apellido en cualquier posición
+      t0: normStr(partes[0] ?? ''),
+      t1: normStr(partes[1] ?? ''),
+      t2: normStr(partes[2] ?? ''),
+      t3: normStr(partes[3] ?? ''),
     };
   })
 );
 
-// Dos índices: uno por apellido (más específico) y uno por nombre completo
-const fuseApellido = new Fuse(TODAS_JUGADORAS, {
-  keys: ['apellido','primerNombre'],
-  threshold: 0.35,
+const fuseJugadoras = new Fuse(TODAS_JUGADORAS, {
+  keys: [
+    { name:'t0', weight:0.35 },
+    { name:'t1', weight:0.35 },
+    { name:'t2', weight:0.2  },
+    { name:'t3', weight:0.1  },
+    { name:'nombreNorm', weight:0.4 },
+  ],
+  threshold:          0.38,
   minMatchCharLength: 2,
+  includeScore:       true,
 });
-const fuseNombre = new Fuse(TODAS_JUGADORAS, {
-  keys: ['nombre'],
-  threshold: 0.4,
-  minMatchCharLength: 2,
-});
+
 const fuseEq = new Fuse(equiposFemenino, { keys: ['nombre'], threshold: 0.4 });
 
-function resolverJugadora(nombreRaw, equipoHint) {
+function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
   if (!nombreRaw) return null;
-  const clean = String(nombreRaw).trim();
+  const clean      = normStr(String(nombreRaw).trim());
+  const resultados = fuseJugadoras.search(clean);
 
-  // 1. Buscar por apellido dentro del equipo correcto
-  const byApellido = fuseApellido.search(clean);
+  // Filtrar por equipo si hay hint
+  let candidatos = resultados;
   if (equipoHint) {
-    const hint = equipoHint.toLowerCase().split(/\s+/)[0];
-    const enEq  = byApellido.filter(r => r.item.equipo.toLowerCase().includes(hint));
-    if (enEq.length > 0) return { ...enEq[0].item, matchScore: enEq[0].score, matchMethod: 'apellido+equipo' };
+    const hint = normStr(equipoHint.split(/\s+/)[0]);
+    const enEq  = resultados.filter(r => normStr(r.item.equipo).includes(hint));
+    if (enEq.length > 0) candidatos = enEq;
   }
-  if (byApellido.length > 0) return { ...byApellido[0].item, matchScore: byApellido[0].score, matchMethod: 'apellido' };
 
-  // 2. Fallback: nombre completo
-  const byNombre = fuseNombre.search(clean);
-  if (equipoHint) {
-    const hint = equipoHint.toLowerCase().split(/\s+/)[0];
-    const enEq  = byNombre.filter(r => r.item.equipo.toLowerCase().includes(hint));
-    if (enEq.length > 0) return { ...enEq[0].item, matchScore: enEq[0].score, matchMethod: 'nombre+equipo' };
+  if (candidatos.length === 0) return null;
+
+  // Desambiguar por número de camiseta si hay empate (ej: dos Giraudo)
+  const top    = candidatos[0];
+  const second = candidatos[1];
+  if (second && Math.abs((top.score ?? 1) - (second.score ?? 1)) < 0.05 && numeroJugadora != null) {
+    const byNum = candidatos.find(r => r.item.numero === numeroJugadora);
+    if (byNum) return { ...byNum.item, matchScore: byNum.score, matchMethod: 'numero' };
   }
-  return byNombre.length > 0 ? { ...byNombre[0].item, matchScore: byNombre[0].score, matchMethod: 'nombre' } : null;
+
+  return { ...top.item, matchScore: top.score, matchMethod: 'fuzzy' };
 }
 
 // ─── Índices exactos de columnas (mapeados del Excel real Torneo Live Basketball)
@@ -150,7 +161,8 @@ function parsearExcel(wb) {
     if (!nombre) continue;
 
     // Resolver jugadora con doble fuzzy
-    const jugadora = resolverJugadora(nomStr, equipoActual);
+    const numParsed = typeof numero === 'number' ? numero : (parseInt(numStr) || null);
+    const jugadora  = resolverJugadora(nomStr, equipoActual, numParsed);
     if (!jugadora) {
       res.warnings.push(`"${nomStr}" (${equipoActual}) → no encontrada en el plantel`);
     } else if ((jugadora.matchScore ?? 0) > 0.25) {
@@ -166,7 +178,7 @@ function parsearExcel(wb) {
 
     res.jugadoras.push({
       nombreRaw: nomStr, equipoRaw: equipoActual, jugadora,
-      numero:    typeof numero==='number' ? numero : (parseInt(numStr)||null),
+      numero:    numParsed,
       sc:scv, sf:n(r[C.sf]), dc:dcv, df:n(r[C.df]),
       tc:tcv, tf:n(r[C.tf]), as_:n(r[C.as_]),
       rd:n(r[C.rd]), ro:n(r[C.ro]),

@@ -50,9 +50,9 @@ export const equiposFemenino = [
     logo: logoPilar,
     color: '#ef4444',
     jugadoras: [
-      { id: 'f_psc_01', nombre: 'Giraudo María Jose',  fechaNac: '17/06/1985' },
+      { id: 'f_psc_01', nombre: 'María Jose Giraudo',  fechaNac: '17/06/1985' },
       { id: 'f_psc_02', nombre: 'Serra Estefania',     fechaNac: '07/11/1989' },
-      { id: 'f_psc_03', nombre: 'Giraudo Ivana',       fechaNac: '19/08/1991' },
+      { id: 'f_psc_03', nombre: 'Ivana Giraudo',       fechaNac: '19/08/1991' },
       { id: 'f_psc_04', nombre: 'Wolfel Stefania',     fechaNac: '11/07/1988' },
       { id: 'f_psc_05', nombre: 'Diaz Abigail',        fechaNac: '20/07/1991' },
       { id: 'f_psc_06', nombre: 'Bergia Carolina',     fechaNac: '09/03/1984' },
@@ -119,6 +119,7 @@ export const equiposFemenino = [
       { id: 'f_tl_10', nombre: 'Maria Julieta Re',          fechaNac: '19/10/1986' },
       { id: 'f_tl_11', nombre: 'Paloma Abad',               fechaNac: '23/03/2004' },
       { id: 'f_tl_12', nombre: 'Rosario Farias',            fechaNac: '26/09/2003' },
+      { id: 'f_tl_13', nombre: 'Julieta Re Teloni',        fechaNac: '19/10/1986' },
     ],
   },
   {

@@ -4623,3 +4623,43 @@ table tbody tr:nth-child(5) td {
 .tp-parcial-lbl { color: #4A566E; font-size: 9px; font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; margin-right: 2px; letter-spacing: .5px; }
 .tp-parcial-val { font-family: 'Bebas Neue', sans-serif; font-size: 14px; }
 .tp-parcial-sep { color: #4A566E; font-size: 10px; }
+
+/* ══ SHIMMER SKELETON ═════════════════════════════════════════ */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ══ GAME CENTER MODAL — STAT BARS ═══════════════════════════ */
+.gc-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.gc-stat-val-a, .gc-stat-val-b {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  min-width: 36px;
+  text-align: center;
+}
+.gc-stat-val-b { text-align: right; }
+.gc-stat-center { flex: 1; }
+.gc-stat-label {
+  text-align: center;
+  font-size: 10px;
+  color: #6B7A99;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.gc-stat-bar-track {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #1C2535;
+}
+.gc-stat-bar-a { height: 100%; border-radius: 3px 0 0 3px; transition: width 0.6s ease; }
+.gc-stat-bar-b { height: 100%; border-radius: 0 3px 3px 0; transition: width 0.6s ease; }

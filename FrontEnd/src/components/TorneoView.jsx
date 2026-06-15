@@ -1,4 +1,38 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function Skel({ w='100%', h=16, radius=6, mb=8 }) {
+  return <div style={{ width:w, height:h, borderRadius:radius, marginBottom:mb,
+    background:'linear-gradient(90deg,#1C2535 25%,#243048 50%,#1C2535 75%)',
+    backgroundSize:'200% 100%', animation:'shimmer 1.4s infinite' }}/>;
+}
+function TableSkeleton() {
+  return (
+    <div style={{ padding:'8px 0' }}>
+      {Array.from({length:6}).map((_,i) => (
+        <div key={i} style={{ display:'flex', gap:12, padding:'12px 16px', borderBottom:'1px solid #1C2535', alignItems:'center' }}>
+          <Skel w={28} h={28} radius={14} mb={0}/>
+          <Skel w={120} h={14} mb={0}/>
+          <div style={{ flex:1 }}/>
+          {[40,30,30,30,40,50].map((w,j)=><Skel key={j} w={w} h={14} mb={0}/>)}
+        </div>
+      ))}
+    </div>
+  );
+}
+function CardsSkeleton() {
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:12 }}>
+      {Array.from({length:8}).map((_,i)=>(
+        <div key={i} style={{ background:'#0E1420', border:'1px solid #1C2535', borderRadius:12, padding:16 }}>
+          <Skel w={60} h={60} radius={30} style={{ margin:'0 auto 12px' }}/>
+          <Skel h={16} mb={6}/>
+          <Skel w="60%" h={12} mb={0}/>
+        </div>
+      ))}
+    </div>
+  );
+}
 import { useTournament } from '../context/TournamentContext';
 import { GameCenterModal } from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
@@ -189,7 +223,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const { toggleFavorito, esFavorito } = useFavorito();
 
   const [activeTab,      setActiveTab]      = useState('tabla');
-  const [selectedMatch,  setSelectedMatch]  = useState(null);
+  const [selectedMatch,  setSelectedMatch]  = useState(null); // partido completo o solo ID
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [searchJugadoras,setSearchJugadoras]= useState('');
@@ -308,7 +342,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   return (
     <>
-      <GameCenterModal isOpen={!!selectedMatch} onClose={() => setSelectedMatch(null)} mode={mode}/>
+      <GameCenterModal
+        isOpen={!!selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+        partidoId={selectedMatch}
+        mode={mode}
+      />
       <PlayerProfileModal
         isOpen={!!selectedPlayer} onClose={() => setSelectedPlayer(null)}
         player={selectedPlayer} statsPorPartido={statsPorPartido}
@@ -462,8 +501,21 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   <>
                     <FechaChips modo="resultados"/>
                     {isLoadingStats ? (
-                      <div style={{ textAlign:'center', padding:'3rem', color:'#6B7A99' }}>
-                        Cargando resultados...
+                      <div style={{ padding:'8px 0' }}>
+                        {Array.from({length:3}).map((_,i)=>(
+                          <div key={i} style={{ background:'#0E1420', border:'1px solid #1C2535', borderRadius:14, padding:16, marginBottom:12 }}>
+                            <Skel w={80} h={12} mb={12}/>
+                            <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                              <Skel w={44} h={44} radius={22} mb={0}/>
+                              <div style={{ flex:1 }}/>
+                              <Skel w={60} h={40} mb={0}/>
+                              <Skel w={24} h={28} mb={0}/>
+                              <Skel w={60} h={40} mb={0}/>
+                              <div style={{ flex:1 }}/>
+                              <Skel w={44} h={44} radius={22} mb={0}/>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : partidosFinalizados.length === 0 ? (
                       <EmptyState icon="🏀" title="Sin resultados todavía"
@@ -492,8 +544,21 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   <>
                     <FechaChips modo="fixture"/>
                     {isLoadingStats ? (
-                      <div style={{ textAlign:'center', padding:'3rem', color:'#6B7A99' }}>
-                        Cargando fixture...
+                      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                        {Array.from({length:3}).map((_,i)=>(
+                          <div key={i} style={{ background:'#0E1420', border:'1px solid #1C2535', borderRadius:14, padding:16 }}>
+                            <Skel w={80} h={12} mb={12}/>
+                            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                              <Skel w={40} h={40} radius={20} mb={0}/>
+                              <Skel w={90} h={16} mb={0}/>
+                              <div style={{ flex:1 }}/>
+                              <Skel w={40} h={20} mb={0}/>
+                              <div style={{ flex:1 }}/>
+                              <Skel w={90} h={16} mb={0}/>
+                              <Skel w={40} h={40} radius={20} mb={0}/>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : partidosPendientes.length === 0 ? (
                       <EmptyState icon="📅" title="Fixture pendiente de publicación"

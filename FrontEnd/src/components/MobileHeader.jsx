@@ -1,4 +1,4 @@
-import logo from '../assets/starBasquet.jpg';
+import logo from '../assets/logo_torneo.jpg';
 import { GlobalSearch } from './GlobalSearch';
 import { TournamentSelector } from './TournamentSelector';
 import { PlayerProfileModal } from './PlayerProfileModal';

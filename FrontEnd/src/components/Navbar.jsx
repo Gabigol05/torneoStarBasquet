@@ -1,4 +1,4 @@
-import logo from '../assets/starBasquet.jpg';
+import logo from '../assets/logo_torneo.jpg';
 import { useState, useCallback } from 'react';
 import { TournamentSelector } from './TournamentSelector';
 import { GlobalSearch } from './GlobalSearch';

@@ -255,3 +255,120 @@ LEFT JOIN equipos_femenino  el ON el.id = p.equipo_local_id
 LEFT JOIN equipos_femenino  ev ON ev.id = p.equipo_visit_id
 LEFT JOIN jugadoras_femenino j  ON j.id  = p.mvp_jugadora_id
 ORDER BY f.numero DESC, p.id DESC;
+
+-- ═══════════════════════════════════════════════════════════════
+-- TRIGGER: Recalcula promedios automáticamente en Postgres
+-- Se ejecuta después de cada INSERT/UPDATE/DELETE en stats_partido_femenino
+-- Garantiza consistencia aunque el browser se cierre a mitad de carga
+-- ═══════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION fn_recalcular_promedios()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_jugadora_id TEXT;
+  v_pj          INT;
+  v_pts_prom    NUMERIC;
+  v_reb_prom    NUMERIC;
+  v_ast_prom    NUMERIC;
+  v_rob_prom    NUMERIC;
+  v_tap_prom    NUMERIC;
+  v_per_prom    NUMERIC;
+  v_val_prom    NUMERIC;
+  v_pct_simples NUMERIC;
+  v_pct_dobles  NUMERIC;
+  v_pct_triples NUMERIC;
+  v_pts_total   INT;
+  v_reb_total   INT;
+  v_ast_total   INT;
+  v_mejor_pts   INT;
+  v_tsc INT; v_tsf INT;
+  v_tdc INT; v_tdf INT;
+  v_ttc INT; v_ttf INT;
+BEGIN
+  -- Determinar qué jugadora cambió
+  IF TG_OP = 'DELETE' THEN
+    v_jugadora_id := OLD.jugadora_id;
+  ELSE
+    v_jugadora_id := NEW.jugadora_id;
+  END IF;
+
+  -- Calcular agregados desde todos los partidos de esa jugadora
+  SELECT
+    COUNT(*),
+    ROUND(AVG(pts)::NUMERIC, 1),
+    ROUND(AVG(rd + ro)::NUMERIC, 1),
+    ROUND(AVG(as_)::NUMERIC, 1),
+    ROUND(AVG(rb)::NUMERIC, 1),
+    ROUND(AVG(tp)::NUMERIC, 1),
+    ROUND(AVG(pe)::NUMERIC, 1),
+    ROUND(AVG(val)::NUMERIC, 1),
+    SUM(pts),
+    SUM(rd + ro),
+    SUM(as_),
+    MAX(pts),
+    SUM(sc), SUM(sf),
+    SUM(dc), SUM(df),
+    SUM(tc), SUM(tf)
+  INTO
+    v_pj, v_pts_prom, v_reb_prom, v_ast_prom,
+    v_rob_prom, v_tap_prom, v_per_prom, v_val_prom,
+    v_pts_total, v_reb_total, v_ast_total, v_mejor_pts,
+    v_tsc, v_tsf, v_tdc, v_tdf, v_ttc, v_ttf
+  FROM stats_partido_femenino
+  WHERE jugadora_id = v_jugadora_id;
+
+  -- Calcular porcentajes
+  v_pct_simples := CASE WHEN v_tsc + v_tsf > 0 THEN ROUND((v_tsc::NUMERIC / (v_tsc + v_tsf)) * 100, 1) ELSE 0 END;
+  v_pct_dobles  := CASE WHEN v_tdc + v_tdf > 0 THEN ROUND((v_tdc::NUMERIC / (v_tdc + v_tdf)) * 100, 1) ELSE 0 END;
+  v_pct_triples := CASE WHEN v_ttc + v_ttf > 0 THEN ROUND((v_ttc::NUMERIC / (v_ttc + v_ttf)) * 100, 1) ELSE 0 END;
+
+  IF v_pj > 0 THEN
+    -- Upsert en estadisticas_femenino
+    INSERT INTO estadisticas_femenino (
+      jugadora_id, pj, pts_prom, reb_prom, ast_prom, rob_prom,
+      tap_prom, per_prom, val_prom, pct_simples, pct_dobles, pct_triples,
+      pts_total, reb_total, ast_total, mejor_pts, updated_at
+    ) VALUES (
+      v_jugadora_id, v_pj, COALESCE(v_pts_prom,0), COALESCE(v_reb_prom,0),
+      COALESCE(v_ast_prom,0), COALESCE(v_rob_prom,0), COALESCE(v_tap_prom,0),
+      COALESCE(v_per_prom,0), COALESCE(v_val_prom,0),
+      v_pct_simples, v_pct_dobles, v_pct_triples,
+      COALESCE(v_pts_total,0), COALESCE(v_reb_total,0), COALESCE(v_ast_total,0),
+      COALESCE(v_mejor_pts,0), now()
+    )
+    ON CONFLICT (jugadora_id) DO UPDATE SET
+      pj          = EXCLUDED.pj,
+      pts_prom    = EXCLUDED.pts_prom,
+      reb_prom    = EXCLUDED.reb_prom,
+      ast_prom    = EXCLUDED.ast_prom,
+      rob_prom    = EXCLUDED.rob_prom,
+      tap_prom    = EXCLUDED.tap_prom,
+      per_prom    = EXCLUDED.per_prom,
+      val_prom    = EXCLUDED.val_prom,
+      pct_simples = EXCLUDED.pct_simples,
+      pct_dobles  = EXCLUDED.pct_dobles,
+      pct_triples = EXCLUDED.pct_triples,
+      pts_total   = EXCLUDED.pts_total,
+      reb_total   = EXCLUDED.reb_total,
+      ast_total   = EXCLUDED.ast_total,
+      mejor_pts   = EXCLUDED.mejor_pts,
+      updated_at  = now();
+  ELSE
+    -- Sin partidos → limpiar stats
+    UPDATE estadisticas_femenino
+    SET pj=0, pts_prom=0, reb_prom=0, ast_prom=0, rob_prom=0,
+        tap_prom=0, per_prom=0, val_prom=0, pct_simples=0,
+        pct_dobles=0, pct_triples=0, pts_total=0, reb_total=0,
+        ast_total=0, mejor_pts=0, updated_at=now()
+    WHERE jugadora_id = v_jugadora_id;
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Crear trigger en stats_partido_femenino
+DROP TRIGGER IF EXISTS trg_recalcular_promedios ON stats_partido_femenino;
+CREATE TRIGGER trg_recalcular_promedios
+  AFTER INSERT OR UPDATE OR DELETE ON stats_partido_femenino
+  FOR EACH ROW EXECUTE FUNCTION fn_recalcular_promedios();

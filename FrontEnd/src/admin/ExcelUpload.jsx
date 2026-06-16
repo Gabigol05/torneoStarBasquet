@@ -1,92 +1,114 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
-// ─── Índice fuzzy — todos los tokens + normalización sin tildes/apóstrofes ─────
-const normStr = s => s.normalize('NFD').replace(/[\u0300-\u036f']/g,'').toLowerCase();
+// ─── Normalización ────────────────────────────────────────────────────────────
+const normStr = s => s.normalize('NFD').replace(/[\u0300-\u036f'`]/g,'').toLowerCase().trim();
 
+// ─── Índice fuzzy completo ────────────────────────────────────────────────────
 const TODAS_JUGADORAS = equiposFemenino.flatMap(eq =>
   eq.jugadoras.map(j => {
     const partes = j.nombre.trim().split(/\s+/);
     return {
-      id:         j.id,
-      nombre:     j.nombre,
-      nombreNorm: normStr(j.nombre),
-      equipoId:   eq.id,
-      equipo:     eq.nombre,
-      numero:     j.numero,
-      // Indexamos todos los tokens para capturar apellido en cualquier posición
-      t0: normStr(partes[0] ?? ''),
-      t1: normStr(partes[1] ?? ''),
-      t2: normStr(partes[2] ?? ''),
-      t3: normStr(partes[3] ?? ''),
+      id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
+      equipoId: eq.id, equipo: eq.nombre, equipoNorm: normStr(eq.nombre),
+      t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
+      t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
     };
   })
 );
 
 const fuseJugadoras = new Fuse(TODAS_JUGADORAS, {
   keys: [
-    { name:'t0', weight:0.35 },
-    { name:'t1', weight:0.35 },
-    { name:'t2', weight:0.2  },
-    { name:'t3', weight:0.1  },
+    { name:'t0', weight:0.35 }, { name:'t1', weight:0.35 },
+    { name:'t2', weight:0.2  }, { name:'t3', weight:0.1  },
     { name:'nombreNorm', weight:0.4 },
   ],
-  threshold:          0.38,
-  minMatchCharLength: 2,
-  includeScore:       true,
+  threshold: 0.38, minMatchCharLength: 2, includeScore: true,
 });
 
-const fuseEq = new Fuse(equiposFemenino, { keys: ['nombre'], threshold: 0.4 });
+const fuseEq = new Fuse(equiposFemenino, {
+  keys: [{ name:'nombre', weight:1 }], threshold: 0.4,
+});
 
-function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
-  if (!nombreRaw) return null;
-  const clean      = normStr(String(nombreRaw).trim());
-  const resultados = fuseJugadoras.search(clean);
+// ─── Resolver jugadora: aliases → fuzzy ──────────────────────────────────────
+let aliasesCache = null; // cache en memoria de la sesión
 
-  // Filtrar por equipo si hay hint
-  let candidatos = resultados;
-  if (equipoHint) {
-    const hint = normStr(equipoHint.split(/\s+/)[0]);
-    const enEq  = resultados.filter(r => normStr(r.item.equipo).includes(hint));
-    if (enEq.length > 0) candidatos = enEq;
-  }
-
-  if (candidatos.length === 0) return null;
-
-  // Desambiguar por número de camiseta si hay empate (ej: dos Giraudo)
-  const top    = candidatos[0];
-  const second = candidatos[1];
-  if (second && Math.abs((top.score ?? 1) - (second.score ?? 1)) < 0.05 && numeroJugadora != null) {
-    const byNum = candidatos.find(r => r.item.numero === numeroJugadora);
-    if (byNum) return { ...byNum.item, matchScore: byNum.score, matchMethod: 'numero' };
-  }
-
-  return { ...top.item, matchScore: top.score, matchMethod: 'fuzzy' };
+async function cargarAliases() {
+  if (aliasesCache) return aliasesCache;
+  const { data } = await supabase.from('nombre_aliases').select('*');
+  aliasesCache = data ?? [];
+  return aliasesCache;
 }
 
-// ─── Índices exactos de columnas (mapeados del Excel real Torneo Live Basketball)
+async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
+  if (!nombreRaw) return { jugadora: null, method: 'empty', score: 1 };
+  const clean    = normStr(String(nombreRaw));
+  const aliases  = await cargarAliases();
+  const eqMatch  = equipoHint ? fuseEq.search(equipoHint)[0]?.item : null;
+  const equipoId = eqMatch?.id;
+
+  // 1️⃣ Lookup exacto en tabla de aliases (prioridad máxima)
+  const aliasExacto = aliases.find(a =>
+    a.alias_norm === clean && (!equipoId || a.equipo_id === equipoId)
+  );
+  if (aliasExacto) {
+    const jug = TODAS_JUGADORAS.find(j => j.id === aliasExacto.jugadora_id);
+    if (jug) return { jugadora: jug, method: 'alias', score: 0 };
+  }
+
+  // 2️⃣ Fuzzy matching con filtro de equipo
+  const resultados = fuseJugadoras.search(clean);
+  let candidatos   = resultados;
+  if (equipoId) {
+    const enEq = resultados.filter(r => r.item.equipoId === equipoId);
+    if (enEq.length > 0) candidatos = enEq;
+  }
+  if (candidatos.length === 0) return { jugadora: null, method: 'not_found', score: 1 };
+
+  // 3️⃣ Desambiguar por número de camiseta si hay empate
+  const top    = candidatos[0];
+  const second = candidatos[1];
+  if (second && Math.abs((top.score??1) - (second.score??1)) < 0.05 && numeroJugadora != null) {
+    // Para Giraudo: nro 10 = María Jose, nro 12 = Ivana
+    const NUMERO_MAP = {
+      'f_pilar': { 10: 'f_psc_01', 12: 'f_psc_03' },
+    };
+    const byNum = NUMERO_MAP[equipoId]?.[numeroJugadora];
+    if (byNum) {
+      const jug = TODAS_JUGADORAS.find(j => j.id === byNum);
+      if (jug) return { jugadora: jug, method: 'numero', score: 0.1 };
+    }
+  }
+
+  return { jugadora: top.item, method: 'fuzzy', score: top.score ?? 0.5 };
+}
+
+// ─── Guardar alias nuevo si es un match fuzzy confirmado ─────────────────────
+async function guardarAlias(alias, jugadoraId, equipoId) {
+  const aliasNorm = normStr(alias);
+  await supabase.from('nombre_aliases').upsert({
+    alias, alias_norm: aliasNorm, jugadora_id: jugadoraId,
+    equipo_id: equipoId, confirmado: true,
+  }, { onConflict: 'alias_norm,equipo_id', ignoreDuplicates: true });
+  aliasesCache = null; // invalidar cache
+}
+
+// ─── Índices exactos de columnas ──────────────────────────────────────────────
 const C = {
   equipo:0, partido:3, numero:6, nombre:9,
   sc:17, sf:20, dc:23, df:25, tc:27, tf:29,
   as_:31, rd:33, ro:35, fp:36, ft:38, fa:40,
   rb:44, tp:46, pe:47, ca:51, pts:52, val:55,
 };
-// Marcador: los cuartos son ACUMULADOS — hay que convertir a parciales
 const M = { equipo:2, q1:7, q2acum:11, q3acum:12, q4acum:13, ot:14, total:16 };
 const P = { equipo:2, simples:7, dobles:15, triples:24 };
 const n = v => (typeof v === 'number' ? v : 0);
 
-// Convierte cuartos acumulados a parciales
 function acumAParcial(q1, q2acum, q3acum, q4acum) {
-  return {
-    q1: q1,
-    q2: q2acum - q1,
-    q3: q3acum - q2acum,
-    q4: q4acum - q3acum,
-  };
+  return { q1, q2: q2acum-q1, q3: q3acum-q2acum, q4: q4acum-q3acum };
 }
 
 // ─── Parser principal ─────────────────────────────────────────────────────────
@@ -98,7 +120,7 @@ function parsearExcel(wb) {
     equipoLocal:null, equipoVisit:null,
     marcador:{ local:{q1:0,q2:0,q3:0,q4:0,ot:0,total:0}, visit:{q1:0,q2:0,q3:0,q4:0,ot:0,total:0} },
     pct:{ local:{simples:0,dobles:0,triples:0}, visit:{simples:0,dobles:0,triples:0} },
-    jugadoras:[], errores:[], warnings:[],
+    jugadorasBruto:[], errores:[], warnings:[],
   };
 
   let marcRow=-1, statsRow=-1, pctRow=-1;
@@ -113,218 +135,194 @@ function parsearExcel(wb) {
   if (marcRow===-1) { res.errores.push('No se encontró la sección de marcador.'); return res; }
   if (statsRow===-1){ res.errores.push('No se encontró la sección de estadísticas.'); return res; }
 
-  // ── Marcador: convertir acumulados a parciales ──
+  // Marcador (acumulados → parciales)
   const rL=rows[marcRow+1], rV=rows[marcRow+2];
   if (rL) {
     res.equipoLocal = String(rL[M.equipo]??'').trim();
-    const par = acumAParcial(n(rL[M.q1]), n(rL[M.q2acum]), n(rL[M.q3acum]), n(rL[M.q4acum]));
+    const par = acumAParcial(n(rL[M.q1]),n(rL[M.q2acum]),n(rL[M.q3acum]),n(rL[M.q4acum]));
     res.marcador.local = { ...par, ot:n(rL[M.ot]), total:n(rL[M.total]) };
   }
   if (rV) {
     res.equipoVisit = String(rV[M.equipo]??'').trim();
-    const par = acumAParcial(n(rV[M.q1]), n(rV[M.q2acum]), n(rV[M.q3acum]), n(rV[M.q4acum]));
+    const par = acumAParcial(n(rV[M.q1]),n(rV[M.q2acum]),n(rV[M.q3acum]),n(rV[M.q4acum]));
     res.marcador.visit = { ...par, ot:n(rV[M.ot]), total:n(rV[M.total]) };
   }
+  if (!res.equipoLocal||!res.equipoVisit) { res.errores.push('No se leyeron los equipos.'); return res; }
 
-  if (!res.equipoLocal || !res.equipoVisit) {
-    res.errores.push('No se pudieron leer los nombres de los equipos.'); return res;
-  }
+  // Validar suma cuartos
+  const sumaL = res.marcador.local.q1+res.marcador.local.q2+res.marcador.local.q3+res.marcador.local.q4+res.marcador.local.ot;
+  const sumaV = res.marcador.visit.q1+res.marcador.visit.q2+res.marcador.visit.q3+res.marcador.visit.q4+res.marcador.visit.ot;
+  if (res.marcador.local.total>0 && sumaL!==res.marcador.local.total)
+    res.warnings.push(`⚠️ Cuartos local suman ${sumaL} ≠ total ${res.marcador.local.total}`);
+  if (res.marcador.visit.total>0 && sumaV!==res.marcador.visit.total)
+    res.warnings.push(`⚠️ Cuartos visitante suman ${sumaV} ≠ total ${res.marcador.visit.total}`);
 
-  // Validar que parciales suman = total
-  const sumaL = res.marcador.local.q1 + res.marcador.local.q2 + res.marcador.local.q3 + res.marcador.local.q4 + res.marcador.local.ot;
-  const sumaV = res.marcador.visit.q1 + res.marcador.visit.q2 + res.marcador.visit.q3 + res.marcador.visit.q4 + res.marcador.visit.ot;
-  if (res.marcador.local.total > 0 && sumaL !== res.marcador.local.total)
-    res.warnings.push(`⚠️ Parciales local suman ${sumaL} pero el total es ${res.marcador.local.total}`);
-  if (res.marcador.visit.total > 0 && sumaV !== res.marcador.visit.total)
-    res.warnings.push(`⚠️ Parciales visitante suman ${sumaV} pero el total es ${res.marcador.visit.total}`);
-
-  // ── Stats jugadoras ──
+  // Stats jugadoras (sin resolver aún — se resuelve async después)
   let equipoActual = res.equipoLocal;
   for (let i=statsRow+1; i<rows.length; i++) {
     const r = rows[i];
-    if (!r || r.every(v => v===null || v==='')) continue;
-
-    // Detectar cambio de equipo (col 0 tiene nombre del equipo)
+    if (!r || r.every(v => v===null||v==='')) continue;
     if (r[C.equipo] && typeof r[C.equipo]==='string' && r[C.equipo].trim()) {
       const eq = r[C.equipo].trim();
-      if (eq==='Equipo') break; // llegamos a la sección de % tiro
-      if (eq===res.equipoLocal || eq===res.equipoVisit) equipoActual=eq;
+      if (eq==='Equipo') break;
+      if (eq===res.equipoLocal||eq===res.equipoVisit) equipoActual=eq;
     }
-
-    // Skip fila de totales: col numero y col nombre son vacíos o string vacío
-    const numero = r[C.numero];
     const nombre = r[C.nombre];
-    const numStr = String(numero??'').trim();
+    const numero = r[C.numero];
     const nomStr = String(nombre??'').trim();
-    if (nomStr==='' || nomStr==='null') continue;
-    if (typeof nombre !== 'string' && nombre !== null && typeof nombre !== 'string') continue;
-    if (!nombre) continue;
+    if (!nomStr || nomStr==='null' || typeof nombre==='number') continue;
 
-    // Resolver jugadora con doble fuzzy
-    const numParsed = typeof numero === 'number' ? numero : (parseInt(numStr) || null);
-    const jugadora  = resolverJugadora(nomStr, equipoActual, numParsed);
-    if (!jugadora) {
-      res.warnings.push(`"${nomStr}" (${equipoActual}) → no encontrada en el plantel`);
-    } else if ((jugadora.matchScore ?? 0) > 0.25) {
-      res.warnings.push(`"${nomStr}" → identificada como "${jugadora.nombre}" (confianza media, verificar)`);
-    }
+    const numParsed = typeof numero==='number' ? numero : (parseInt(String(numero??''))||null);
+    const ptsCal   = n(r[C.sc])+n(r[C.dc])*2+n(r[C.tc])*3;
+    const ptsXls   = n(r[C.pts]);
 
-    // Validar PTS: SC*1 + DC*2 + TC*3
-    const scv=n(r[C.sc]), dcv=n(r[C.dc]), tcv=n(r[C.tc]);
-    const ptsCal = scv + dcv*2 + tcv*3;
-    const ptsXls = n(r[C.pts]);
-    const ptsOk  = ptsXls===0 || ptsCal===ptsXls;
-    if (!ptsOk) res.warnings.push(`"${nomStr}": PTS planilla (${ptsXls}) ≠ calculado (${ptsCal})`);
-
-    res.jugadoras.push({
-      nombreRaw: nomStr, equipoRaw: equipoActual, jugadora,
-      numero:    numParsed,
-      sc:scv, sf:n(r[C.sf]), dc:dcv, df:n(r[C.df]),
-      tc:tcv, tf:n(r[C.tf]), as_:n(r[C.as_]),
+    res.jugadorasBruto.push({
+      nombreRaw: nomStr, equipoRaw: equipoActual,
+      numero: numParsed,
+      sc:n(r[C.sc]), sf:n(r[C.sf]), dc:n(r[C.dc]), df:n(r[C.df]),
+      tc:n(r[C.tc]), tf:n(r[C.tf]), as_:n(r[C.as_]),
       rd:n(r[C.rd]), ro:n(r[C.ro]),
       fp:n(r[C.fp]), ft:n(r[C.ft]), fa:n(r[C.fa]),
       rb:n(r[C.rb]), tp:n(r[C.tp]), pe:n(r[C.pe]), ca:n(r[C.ca]),
-      pts:ptsXls, val:n(r[C.val]), ptsOk,
+      pts:ptsXls, val:n(r[C.val]),
+      ptsOk: ptsXls===0||ptsCal===ptsXls, ptsCal,
     });
   }
 
-  // ── % tiro ──
+  // % tiro
   if (pctRow!==-1) {
     const pL=rows[pctRow+1], pV=rows[pctRow+2];
     if (pL) res.pct.local  = { simples:n(pL[P.simples]),dobles:n(pL[P.dobles]),triples:n(pL[P.triples]) };
     if (pV) res.pct.visit  = { simples:n(pV[P.simples]),dobles:n(pV[P.dobles]),triples:n(pV[P.triples]) };
   }
 
-  if (res.jugadoras.length===0) res.errores.push('No se encontraron jugadoras. Verificá la estructura del archivo.');
+  if (res.jugadorasBruto.length===0) res.errores.push('No se encontraron jugadoras.');
   return res;
 }
 
-// ─── Recalcular promedios acumulados ──────────────────────────────────────────
+// ─── Resolver todas las jugadoras async ───────────────────────────────────────
+async function resolverJugadoras(bruto) {
+  const resolved = [];
+  for (const j of bruto) {
+    const { jugadora, method, score } = await resolverJugadora(j.nombreRaw, j.equipoRaw, j.numero);
+    resolved.push({ ...j, jugadora, matchMethod: method, matchScore: score });
+  }
+  return resolved;
+}
+
+// ─── Recalcular promedios (fallback si el trigger no está activo) ─────────────
 async function recalcularPromedios(jugadoraIds) {
   for (const jugId of [...new Set(jugadoraIds)]) {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('stats_partido_femenino')
       .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
       .eq('jugadora_id', jugId);
-    if (error || !data?.length) continue;
-    const k   = data.length;
-    const sum = key => data.reduce((a,r)=>a+(r[key]??0),0);
-    const avg = key => +(sum(key)/k).toFixed(1);
+    if (!data?.length) continue;
+    const k=data.length, sum=key=>data.reduce((a,r)=>a+(r[key]??0),0), avg=key=>+(sum(key)/k).toFixed(1);
     const tsc=sum('sc'),tsf=sum('sf'),tdc=sum('dc'),tdf=sum('df'),ttc=sum('tc'),ttf=sum('tf');
     await supabase.from('estadisticas_femenino').upsert({
       jugadora_id:jugId, pj:k,
-      pts_prom:avg('pts'),
-      reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
+      pts_prom:avg('pts'), reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
       ast_prom:avg('as_'), rob_prom:avg('rb'), tap_prom:avg('tp'),
-      per_prom:avg('pe'),  val_prom:avg('val'),
-      pct_simples: tsc+tsf>0 ? +((tsc/(tsc+tsf))*100).toFixed(1) : 0,
-      pct_dobles:  tdc+tdf>0 ? +((tdc/(tdc+tdf))*100).toFixed(1) : 0,
-      pct_triples: ttc+ttf>0 ? +((ttc/(ttc+ttf))*100).toFixed(1) : 0,
+      per_prom:avg('pe'), val_prom:avg('val'),
+      pct_simples: tsc+tsf>0?+((tsc/(tsc+tsf))*100).toFixed(1):0,
+      pct_dobles:  tdc+tdf>0?+((tdc/(tdc+tdf))*100).toFixed(1):0,
+      pct_triples: ttc+ttf>0?+((ttc/(ttc+ttf))*100).toFixed(1):0,
       pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
-      mejor_pts:Math.max(...data.map(r=>r.pts??0)),
-      updated_at:new Date().toISOString(),
+      mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),
     }, { onConflict:'jugadora_id' });
   }
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function ExcelUpload() {
-  const [step,       setStep]       = useState('archivo');
-  const [parsed,     setParsed]     = useState(null);
-  const [fileName,   setFileName]   = useState('');
-  const [jornada,    setJornada]    = useState('');
-  const [lugar,      setLugar]      = useState('');
-  const [log,        setLog]        = useState([]);
-  const [duplicate,  setDuplicate]  = useState(null); // info del partido duplicado
+  const [step,      setStep]      = useState('archivo');
+  const [parsed,    setParsed]    = useState(null);    // datos del parser (sin resolver)
+  const [jugadoras, setJugadoras] = useState([]);      // jugadoras resueltas
+  const [resolving, setResolving] = useState(false);
+  const [fileName,  setFileName]  = useState('');
+  const [jornada,   setJornada]   = useState('');
+  const [lugar,     setLugar]     = useState('');
+  const [log,       setLog]       = useState([]);
+  const [duplicate, setDuplicate] = useState(null);
   const fileRef = useRef();
 
-  const reset = () => { setStep('archivo'); setParsed(null); setFileName(''); setLog([]); setDuplicate(null); };
+  const reset = () => {
+    setStep('archivo'); setParsed(null); setJugadoras([]);
+    setFileName(''); setLog([]); setDuplicate(null); aliasesCache=null;
+  };
   const addLog = msg => setLog(l => [...l, msg]);
 
-  const handleFile = e => {
+  const handleFile = async (e) => {
     const file = (e.dataTransfer?.files ?? e.target.files)[0];
     if (!file) return;
+    reset();
     setFileName(file.name);
-    setDuplicate(null);
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async (ev) => {
       try {
-        const wb = XLSX.read(ev.target.result, { type:'binary' });
+        const wb     = XLSX.read(ev.target.result, { type:'binary' });
         const result = parsearExcel(wb);
-        setParsed(result);
-        if (result.errores.length === 0) setStep('preview');
+        if (result.errores.length > 0) { setParsed(result); return; }
+
+        setResolving(true);
+        const resolved = await resolverJugadoras(result.jugadorasBruto);
+        setParsed({ ...result, jugadoras: resolved });
+        setJugadoras(resolved);
+        setResolving(false);
+        setStep('preview');
       } catch(err) {
-        setParsed({ errores:[`Error al leer el archivo: ${err.message}`], warnings:[], jugadoras:[], marcador:null, pct:null });
+        setParsed({ errores:[`Error al leer: ${err.message}`], warnings:[], jugadorasBruto:[], jugadoras:[] });
       }
     };
     reader.readAsBinaryString(file);
   };
 
-  // ── Verificar duplicado antes de publicar ──
+  // ── Verificar duplicado ──
   const checkDuplicate = async (eqLId, eqVId, fechaNum) => {
-    const { data } = await supabase
-      .from('partidos_femenino')
-      .select('id, fecha_id, estado, puntos_local, puntos_visit, fechas_femenino(numero)')
-      .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`)
-      .eq('fechas_femenino.numero', fechaNum);  // join check
-
-    // También chequear por fecha_id directamente
     const { data: fechaData } = await supabase
       .from('fechas_femenino')
       .select('id')
-      .eq('numero', fechaNum)
-      .single();
-
-    if (fechaData) {
-      const { data: dupes } = await supabase
-        .from('partidos_femenino')
-        .select('id, puntos_local, puntos_visit, estado')
-        .eq('fecha_id', fechaData.id)
-        .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
-
-      if (dupes?.length > 0) return dupes[0];
-    }
-    return null;
+      .eq('numero', Number(fechaNum))
+      .maybeSingle();
+    if (!fechaData) return null;
+    const { data: dupes } = await supabase
+      .from('partidos_femenino')
+      .select('id, puntos_local, puntos_visit, estado')
+      .eq('fecha_id', fechaData.id)
+      .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
+    return dupes?.length > 0 ? dupes[0] : null;
   };
 
   const handlePublish = async (forceOverwrite = false) => {
     if (!parsed || !jornada) { alert('Ingresá el número de fecha'); return; }
     setStep('publicando');
     setLog([]);
-
     try {
-      // 1. Resolver equipos
+      // Resolver equipos
       const mL = fuseEq.search(parsed.equipoLocal);
       const mV = fuseEq.search(parsed.equipoVisit);
       if (!mL.length) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
       if (!mV.length) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
-      const eqLId = mL[0].item.id;
-      const eqVId = mV[0].item.id;
+      const eqLId = mL[0].item.id, eqVId = mV[0].item.id;
+      addLog(`✅ ${mL[0].item.nombre} vs ${mV[0].item.nombre}`);
 
-      addLog(`✅ Equipos: ${mL[0].item.nombre} vs ${mV[0].item.nombre}`);
-
-      // 2. Verificar duplicado
+      // Check duplicado
       if (!forceOverwrite) {
-        addLog('🔍 Verificando si el partido ya fue cargado...');
+        addLog('🔍 Verificando duplicados...');
         const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
-        if (dupe) {
-          setDuplicate(dupe);
-          setStep('duplicado');
-          return;
-        }
+        if (dupe) { setDuplicate(dupe); setStep('duplicado'); return; }
         addLog('✅ Sin duplicados');
       } else {
-        // Eliminar partido anterior si se está sobreescribiendo
-        addLog('🗑️ Eliminando partido anterior...');
         const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
         if (dupe) {
           await supabase.from('partidos_femenino').delete().eq('id', dupe.id);
-          addLog(`✅ Partido anterior (ID ${dupe.id}) eliminado`);
+          addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
         }
       }
 
-      // 3. Upsert fecha
-      addLog('📅 Creando/actualizando fecha...');
+      // Fecha
+      addLog('📅 Creando fecha...');
       const { data:fd, error:fErr } = await supabase
         .from('fechas_femenino')
         .upsert({ numero:Number(jornada), descripcion:`Fecha ${jornada}` }, { onConflict:'numero' })
@@ -332,7 +330,7 @@ export default function ExcelUpload() {
       if (fErr) throw new Error(`Fecha: ${fErr.message}`);
       addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
 
-      // 4. Insertar partido
+      // Partido
       addLog('🏀 Insertando partido...');
       const m=parsed.marcador, p=parsed.pct;
       const { data:pd, error:pErr } = await supabase
@@ -350,16 +348,16 @@ export default function ExcelUpload() {
         .select('id').single();
       if (pErr) throw new Error(`Partido: ${pErr.message}`);
       addLog(`✅ Partido ID ${pd.id} — ${m.local.total}-${m.visit.total}`);
-      addLog(`   Parciales L: ${m.local.q1}-${m.local.q2}-${m.local.q3}-${m.local.q4}`);
-      addLog(`   Parciales V: ${m.visit.q1}-${m.visit.q2}-${m.visit.q3}-${m.visit.q4}`);
+      addLog(`   Local:  Q1=${m.local.q1} Q2=${m.local.q2} Q3=${m.local.q3} Q4=${m.local.q4}`);
+      addLog(`   Visita: Q1=${m.visit.q1} Q2=${m.visit.q2} Q3=${m.visit.q3} Q4=${m.visit.q4}`);
 
-      // 5. Stats jugadoras
-      const jugOk   = parsed.jugadoras.filter(j=>j.jugadora);
-      const jugSkip = parsed.jugadoras.filter(j=>!j.jugadora);
-      addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length>0?` (${jugSkip.length} ignoradas)`:''}...`);
+      // Stats
+      const jugOk   = jugadoras.filter(j => j.jugadora);
+      const jugSkip = jugadoras.filter(j => !j.jugadora);
+      addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length>0?` (${jugSkip.length} no resueltas)`:''}...`);
 
       if (jugOk.length > 0) {
-        const statsRows = jugOk.map(j=>({
+        const statsRows = jugOk.map(j => ({
           partido_id:pd.id, jugadora_id:j.jugadora.id, equipo_id:j.jugadora.equipoId,
           numero:j.numero, sc:j.sc, sf:j.sf, dc:j.dc, df:j.df,
           tc:j.tc, tf:j.tf, as_:j.as_,
@@ -371,84 +369,95 @@ export default function ExcelUpload() {
           .upsert(statsRows, { onConflict:'partido_id,jugadora_id' });
         if (sErr) throw new Error(`Stats: ${sErr.message}`);
 
-        // MVP: jugadora con mayor VAL
-        const mvp = statsRows.reduce((best,r) => !best||r.val>best.val ? r : best, null);
+        // Guardar aliases fuzzy como confirmados
+        const fuzzyMatches = jugOk.filter(j => j.matchMethod==='fuzzy' && j.matchScore<0.35);
+        for (const j of fuzzyMatches) {
+          await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId);
+        }
+        if (fuzzyMatches.length>0) addLog(`💾 ${fuzzyMatches.length} aliases guardados para futuras cargas`);
+
+        // MVP
+        const mvp = statsRows.reduce((b,r) => !b||r.val>b.val?r:b, null);
         if (mvp) {
           await supabase.from('partidos_femenino').update({ mvp_jugadora_id:mvp.jugadora_id }).eq('id',pd.id);
           const mvpNombre = jugOk.find(j=>j.jugadora?.id===mvp.jugadora_id)?.jugadora?.nombre??'';
           addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
         }
 
-        addLog('🔄 Recalculando promedios acumulados...');
+        addLog('🔄 Recalculando promedios...');
         await recalcularPromedios(statsRows.map(r=>r.jugadora_id));
         addLog('✅ Promedios actualizados');
       }
 
-      // 6. Log de carga
+      // Log de carga
       await supabase.from('upload_log').insert({
         fecha_id:fd.id, partido_id:pd.id, archivo_nombre:fileName,
         equipo_local:parsed.equipoLocal, equipo_visit:parsed.equipoVisit,
         jugadoras_ok:jugOk.length, jugadoras_skip:jugSkip.length,
-        warnings:parsed.warnings,
+        warnings:[...(parsed.warnings??[]), ...jugSkip.map(j=>`Sin resolver: "${j.nombreRaw}"`)],
       });
 
-      addLog('🎉 ¡Todo listo! El sitio ya se actualizó automáticamente.');
+      addLog('🎉 ¡Publicado! El sitio ya está actualizado.');
       setStep('listo');
     } catch(err) {
       addLog(`❌ ERROR: ${err.message}`);
-      console.error(err);
       setStep('preview');
     }
   };
 
-  const localJugs = parsed?.jugadoras.filter(j=>j.equipoRaw===parsed?.equipoLocal) ?? [];
-  const visitJugs = parsed?.jugadoras.filter(j=>j.equipoRaw===parsed?.equipoVisit) ?? [];
+  const localJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoLocal);
+  const visitJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoVisit);
+  const jugOkCount = jugadoras.filter(j => j.jugadora).length;
+  const jugNoCount = jugadoras.filter(j => !j.jugadora).length;
+  const jugWarnCount = jugadoras.filter(j => j.jugadora && j.matchScore > 0.25).length;
 
   return (
     <div>
-      <h2 style={s.title}>📊 Cargar partido desde Excel</h2>
-
       {/* Stepper */}
       <div style={s.stepper}>
         {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([num,lbl],i)=>{
-          const stepArr=['archivo','preview','publicando','listo'];
-          const cur=stepArr.indexOf(step==='duplicado'?'publicando':step);
+          const arr=['archivo','preview','publicando','listo'];
+          const cur=arr.indexOf(step==='duplicado'?'publicando':step);
           const done=i<cur, active=i===cur;
           return (
             <div key={num} style={s.stepWrap}>
               <div style={{...s.stepDot,background:done?'#22D07A':active?'#F0B429':'#1C2535',color:done||active?'#080C12':'#4A566E'}}>
                 {done?'✓':num}
               </div>
-              <div style={{color:active?'#F0B429':done?'#22D07A':'#4A566E',fontSize:12}}>{lbl}</div>
+              <div style={{color:active?'#F0B429':done?'#22D07A':'#4A566E',fontSize:12,whiteSpace:'nowrap'}}>{lbl}</div>
               {i<3&&<div style={{...s.stepLine,background:done?'#22D07A':'#1C2535'}}/>}
             </div>
           );
         })}
       </div>
 
-      {/* PASO 1: Archivo */}
+      {/* ── PASO 1: Archivo ── */}
       {step==='archivo' && (
         <>
           <div style={s.metaRow}>
             <div style={s.metaGroup}>
-              <label style={s.label}>N° de Fecha *</label>
-              <input type="number" min="1" value={jornada} onChange={e=>setJornada(e.target.value)} style={s.input} placeholder="1"/>
+              <label style={s.label}>N° DE FECHA *</label>
+              <input type="number" min="1" value={jornada}
+                onChange={e=>setJornada(e.target.value)} style={s.input} placeholder="1"/>
             </div>
             <div style={s.metaGroup}>
-              <label style={s.label}>Lugar (opcional)</label>
-              <input type="text" value={lugar} onChange={e=>setLugar(e.target.value)} style={s.input} placeholder="Club, cancha..."/>
+              <label style={s.label}>LUGAR (opcional)</label>
+              <input type="text" value={lugar}
+                onChange={e=>setLugar(e.target.value)} style={s.input} placeholder="Club, cancha..."/>
             </div>
           </div>
           <div style={s.dropZone} onClick={()=>fileRef.current.click()}
             onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e);}}>
-            <div style={{fontSize:48,marginBottom:8}}>📁</div>
-            <p style={{color:'#EEF2F8',margin:0,fontSize:16}}>
-              {fileName||'Arrastrá el Excel o hacé click para seleccionar'}
+            <div style={{fontSize:52,marginBottom:10}}>📁</div>
+            <p style={{color:'#EEF2F8',margin:'0 0 4px',fontSize:17,fontWeight:600}}>
+              {resolving ? 'Resolviendo jugadoras...' : fileName || 'Arrastrá el Excel o hacé click'}
             </p>
-            <p style={{color:'#4A566E',fontSize:12,marginTop:6}}>Planilla Torneo Live Basketball (.xlsx)</p>
+            <p style={{color:'#4A566E',fontSize:12,margin:0}}>
+              Planilla Torneo Live Basketball (.xlsx)
+            </p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} style={{display:'none'}}/>
           </div>
-          {parsed?.errores?.length>0&&(
+          {parsed?.errores?.length>0 && (
             <div style={s.errBox}>
               {parsed.errores.map((e,i)=><p key={i} style={{margin:'4px 0'}}>❌ {e}</p>)}
             </div>
@@ -456,14 +465,14 @@ export default function ExcelUpload() {
         </>
       )}
 
-      {/* PASO 2: Preview */}
+      {/* ── PASO 2: Preview ── */}
       {step==='preview' && parsed && (
         <>
           {/* Marcador */}
           <div style={s.marcadorCard}>
-            {[{label:parsed.equipoLocal,m:parsed.marcador.local},{label:parsed.equipoVisit,m:parsed.marcador.visit}].map(({label,m},i)=>(
+            {[{lbl:parsed.equipoLocal,m:parsed.marcador.local},{lbl:parsed.equipoVisit,m:parsed.marcador.visit}].map(({lbl,m},i)=>(
               <div key={i} style={s.marcSide}>
-                <div style={s.marcNombre}>{label}</div>
+                <div style={s.marcNombre}>{lbl}</div>
                 <div style={s.marcTotal}>{m.total}</div>
                 <div style={s.parciales}>
                   {['q1','q2','q3','q4'].map(q=>(
@@ -471,20 +480,20 @@ export default function ExcelUpload() {
                       <span style={{color:'#4A566E',fontSize:9}}>{q.toUpperCase()} </span>{m[q]}
                     </span>
                   ))}
-                  {m.ot>0&&<span style={s.parcial}><span style={{color:'#4A566E',fontSize:9}}>OT </span>{m.ot}</span>}
+                  {m.ot>0&&<span style={s.parcial}><span style={{color:'#F0B429',fontSize:9}}>OT </span>{m.ot}</span>}
                 </div>
               </div>
             ))}
-            <div style={s.vs}>VS</div>
+            <div style={s.vs}>–</div>
           </div>
 
           {/* % tiro */}
           <div style={s.pctRow}>
             {[{l:'% TL',k:'simples',c:'#22D07A'},{l:'% 2P',k:'dobles',c:'#F0B429'},{l:'% 3P',k:'triples',c:'#60A5FA'}].map(t=>(
               <div key={t.k} style={s.pctCard}>
-                <div style={{color:'#6B7A99',fontSize:11,marginBottom:4,textTransform:'uppercase',letterSpacing:.5}}>{t.l}</div>
+                <div style={{color:'#6B7A99',fontSize:10,marginBottom:4,textTransform:'uppercase',letterSpacing:.5}}>{t.l}</div>
                 <div style={{display:'flex',gap:8,justifyContent:'center',alignItems:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:20}}>
-                  <span style={{color:'#F0B429'}}>{parsed.pct.local[t.k]}%</span>
+                  <span style={{color:'#F04060'}}>{parsed.pct.local[t.k]}%</span>
                   <span style={{color:'#4A566E',fontSize:10}}>vs</span>
                   <span style={{color:'#60A5FA'}}>{parsed.pct.visit[t.k]}%</span>
                 </div>
@@ -492,62 +501,87 @@ export default function ExcelUpload() {
             ))}
           </div>
 
-          {/* Warnings */}
-          {parsed.warnings.length>0&&(
+          {/* Warnings del parser */}
+          {parsed.warnings.length>0 && (
             <div style={s.warnBox}>
-              <p style={{margin:'0 0 6px',fontWeight:600}}>⚠️ {parsed.warnings.length} advertencia(s)</p>
-              {parsed.warnings.map((w,i)=><p key={i} style={{margin:'2px 0',fontSize:13}}>{w}</p>)}
+              <p style={{margin:'0 0 6px',fontWeight:600}}>⚠️ {parsed.warnings.length} advertencia(s) del archivo</p>
+              {parsed.warnings.map((w,i)=><p key={i} style={{margin:'2px 0',fontSize:12}}>{w}</p>)}
             </div>
           )}
 
-          {/* Resumen */}
-          <div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
-            <span style={{color:'#22D07A',fontWeight:600}}>✅ {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras OK</span>
-            {parsed.jugadoras.filter(j=>!j.jugadora).length>0&&(
-              <span style={{color:'#F04060'}}>❌ {parsed.jugadoras.filter(j=>!j.jugadora).length} sin resolver</span>
+          {/* Resumen de resolución */}
+          <div style={s.resumenBar}>
+            <div style={s.resumenItem}>
+              <span style={s.resumenDot('#22D07A')}/>
+              <span style={{color:'#22D07A',fontWeight:700}}>{jugOkCount} resueltas</span>
+            </div>
+            {jugWarnCount>0 && (
+              <div style={s.resumenItem}>
+                <span style={s.resumenDot('#F0B429')}/>
+                <span style={{color:'#F0B429'}}>{jugWarnCount} confianza media</span>
+              </div>
             )}
-            {parsed.jugadoras.filter(j=>!j.ptsOk).length>0&&(
-              <span style={{color:'#F0B429'}}>⚡ {parsed.jugadoras.filter(j=>!j.ptsOk).length} PTS inconsistente</span>
+            {jugNoCount>0 && (
+              <div style={s.resumenItem}>
+                <span style={s.resumenDot('#F04060')}/>
+                <span style={{color:'#F04060'}}>{jugNoCount} no resueltas (se ignoran)</span>
+              </div>
             )}
           </div>
 
-          {/* Tablas */}
+          {/* Tablas por equipo */}
           {[{label:parsed.equipoLocal,jugs:localJugs},{label:parsed.equipoVisit,jugs:visitJugs}].map(({label,jugs})=>(
             <div key={label} style={{marginBottom:28}}>
-              <div style={s.teamLabel}>{label} <span style={{color:'#4A566E',fontSize:13,fontFamily:'Barlow Condensed'}}>{jugs.length} jugadoras</span></div>
+              <div style={s.teamLabel}>
+                {label}
+                <span style={{color:'#4A566E',fontSize:13,fontFamily:'Barlow Condensed',marginLeft:10}}>
+                  {jugs.filter(j=>j.jugadora).length}/{jugs.length} jugadoras
+                </span>
+              </div>
               <div style={{overflowX:'auto'}}>
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      {['#','Nombre (plantel)','PTS','VAL','TL C/F','2P C/F','3P C/F','AS','RD','RO','ROB','TAP','PÉR','FP'].map(h=>(
+                      {['#','Nombre plantel (Excel)','PTS','VAL','TL C/F','2P C/F','3P C/F','AS','RD','RO','ROB','TAP','PÉR','FP'].map(h=>(
                         <th key={h} style={s.th}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {jugs.map((j,i)=>(
-                      <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:j.jugadora?1:0.45}}>
-                        <td style={s.td}>{j.numero??'–'}</td>
-                        <td style={{...s.td,textAlign:'left',minWidth:160}}>
-                          <div style={{color:j.jugadora?(j.ptsOk?'#EEF2F8':'#FCD34D'):'#F04060',fontWeight:600,fontSize:13}}>
-                            {j.jugadora?j.jugadora.nombre:`❌ ${j.nombreRaw}`}
-                          </div>
-                          <div style={{color:'#4A566E',fontSize:11}}>{j.nombreRaw}</div>
-                        </td>
-                        <td style={{...s.td,color:'#F0B429',fontWeight:700}}>{j.pts}</td>
-                        <td style={{...s.td,color:j.val>=0?'#22D07A':'#F04060'}}>{j.val}</td>
-                        <td style={s.td}>{j.sc}/{j.sf}</td>
-                        <td style={s.td}>{j.dc}/{j.df}</td>
-                        <td style={s.td}>{j.tc}/{j.tf}</td>
-                        <td style={s.td}>{j.as_}</td>
-                        <td style={s.td}>{j.rd}</td>
-                        <td style={s.td}>{j.ro}</td>
-                        <td style={s.td}>{j.rb}</td>
-                        <td style={s.td}>{j.tp}</td>
-                        <td style={s.td}>{j.pe}</td>
-                        <td style={s.td}>{j.fp}</td>
-                      </tr>
-                    ))}
+                    {jugs.map((j,i)=>{
+                      const color = !j.jugadora ? '#F04060' : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
+                      const methodBadge = !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
+                      return (
+                        <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:j.jugadora?1:0.4}}>
+                          <td style={s.td}>{j.numero??'–'}</td>
+                          <td style={{...s.td,textAlign:'left',minWidth:180}}>
+                            <div style={{color,fontWeight:600,fontSize:13}}>
+                              {methodBadge} {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
+                            </div>
+                            <div style={{color:'#4A566E',fontSize:10}}>
+                              {j.nombreRaw}
+                              {j.matchMethod && j.jugadora && (
+                                <span style={{marginLeft:6,color: j.matchMethod==='alias'?'#22D07A':'#6B7A99'}}>
+                                  [{j.matchMethod}]
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{...s.td,color:'#F0B429',fontWeight:700}}>{j.pts}</td>
+                          <td style={{...s.td,color:j.val>=0?'#22D07A':'#F04060'}}>{j.val}</td>
+                          <td style={s.td}>{j.sc}/{j.sf}</td>
+                          <td style={s.td}>{j.dc}/{j.df}</td>
+                          <td style={s.td}>{j.tc}/{j.tf}</td>
+                          <td style={s.td}>{j.as_}</td>
+                          <td style={s.td}>{j.rd}</td>
+                          <td style={s.td}>{j.ro}</td>
+                          <td style={s.td}>{j.rb}</td>
+                          <td style={s.td}>{j.tp}</td>
+                          <td style={s.td}>{j.pe}</td>
+                          <td style={s.td}>{j.fp}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -564,27 +598,30 @@ export default function ExcelUpload() {
         </>
       )}
 
-      {/* PASO DUPLICADO — aviso antes de sobreescribir */}
+      {/* ── DUPLICADO ── */}
       {step==='duplicado' && duplicate && (
         <div style={s.dupeBox}>
           <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
-          <h3 style={{color:'#F0B429',margin:'0 0 12px',fontFamily:"'Bebas Neue',sans-serif",fontSize:24}}>
+          <h3 style={{color:'#F0B429',margin:'0 0 12px',fontFamily:"'Bebas Neue',sans-serif",fontSize:26}}>
             PARTIDO YA CARGADO
           </h3>
           <p style={{color:'#EEF2F8',marginBottom:8}}>
             Ya existe un partido entre estos equipos en la Fecha {jornada}:
           </p>
-          <div style={{background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,padding:'12px 16px',marginBottom:24,textAlign:'center'}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:'#F0B429'}}>
+          <div style={{background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,padding:'14px',marginBottom:20,textAlign:'center'}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:'#F0B429'}}>
               {duplicate.puntos_local} — {duplicate.puntos_visit}
             </div>
-            <div style={{color:'#6B7A99',fontSize:12,marginTop:4}}>ID Partido: {duplicate.id} · Estado: {duplicate.estado}</div>
+            <div style={{color:'#6B7A99',fontSize:11,marginTop:4}}>
+              ID {duplicate.id} · {duplicate.estado}
+            </div>
           </div>
           <p style={{color:'#F04060',fontSize:13,marginBottom:20}}>
-            Si continuás, el partido anterior y todas sus estadísticas serán eliminados y reemplazados.
+            Si sobreescribís, se borran el partido anterior y todas sus estadísticas.
           </p>
           <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
-            <button onClick={()=>handlePublish(true)} style={{...s.btnPublish,background:'linear-gradient(135deg,#F04060,#B91C1C)',maxWidth:240}}>
+            <button onClick={()=>handlePublish(true)}
+              style={{...s.btnPublish,background:'linear-gradient(135deg,#F04060,#B91C1C)',maxWidth:220}}>
               🗑️ SOBREESCRIBIR
             </button>
             <button onClick={()=>setStep('preview')} style={s.btnCancel}>
@@ -594,48 +631,54 @@ export default function ExcelUpload() {
         </div>
       )}
 
-      {/* PASO 3: Publicando */}
+      {/* ── PUBLICANDO ── */}
       {step==='publicando' && (
         <div style={s.logBox}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:'#F0B429',marginBottom:16,letterSpacing:1}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:'#F0B429',marginBottom:16,letterSpacing:1}}>
             Publicando partido...
           </div>
           {log.map((l,i)=>(
-            <div key={i} style={{padding:'3px 0',fontSize:13,fontFamily:'Barlow Condensed',
+            <div key={i} style={{padding:'3px 0',fontSize:13,fontFamily:'Barlow Condensed',letterSpacing:.3,
               color:l.startsWith('❌')?'#F04060':l.startsWith('✅')||l.startsWith('🎉')||l.startsWith('⭐')?'#22D07A':l.startsWith('⚠️')?'#F0B429':'#EEF2F8'}}>
               {l}
             </div>
           ))}
-          <div style={{marginTop:16,color:'#4A566E',fontSize:12}}>Por favor no cerrés esta ventana...</div>
+          <div style={{marginTop:16,color:'#4A566E',fontSize:12}}>
+            No cerrés esta ventana...
+          </div>
         </div>
       )}
 
-      {/* PASO 4: Listo */}
+      {/* ── LISTO ── */}
       {step==='listo' && parsed && (
         <div style={s.successBox}>
-          <div style={{fontSize:56,marginBottom:12}}>🎉</div>
-          <h3 style={{color:'#22D07A',margin:'0 0 8px',fontFamily:"'Bebas Neue',sans-serif",fontSize:28,letterSpacing:1}}>
-            ¡PARTIDO PUBLICADO!
+          <div style={{fontSize:60,marginBottom:12}}>🎉</div>
+          <h3 style={{color:'#22D07A',margin:'0 0 8px',fontFamily:"'Bebas Neue',sans-serif",fontSize:30,letterSpacing:1}}>
+            ¡PUBLICADO!
           </h3>
-          <p style={{color:'#EEF2F8',margin:'0 0 4px',fontSize:18}}>
+          <p style={{color:'#EEF2F8',fontSize:18,margin:'0 0 4px'}}>
             {parsed.equipoLocal} <strong style={{color:'#F0B429'}}>{parsed.marcador.local.total}</strong>
             {' — '}
             <strong style={{color:'#F0B429'}}>{parsed.marcador.visit.total}</strong> {parsed.equipoVisit}
           </p>
-          <div style={{display:'flex',gap:8,justifyContent:'center',margin:'8px 0 4px',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:6,justifyContent:'center',margin:'10px 0 4px',flexWrap:'wrap'}}>
             {['q1','q2','q3','q4'].map(q=>(
-              <span key={q} style={{background:'#141C2A',padding:'2px 10px',borderRadius:4,fontSize:13,color:'#6B7A99',fontFamily:"'Barlow Condensed'"}}>
+              <span key={q} style={{background:'#141C2A',padding:'2px 10px',borderRadius:4,fontSize:12,color:'#6B7A99',fontFamily:"'Barlow Condensed'"}}>
                 {q.toUpperCase()} {parsed.marcador.local[q]}-{parsed.marcador.visit[q]}
               </span>
             ))}
           </div>
-          <p style={{color:'#6B7A99',margin:'8px 0 24px',fontSize:13}}>
-            {parsed.jugadoras.filter(j=>j.jugadora).length} jugadoras · promedios actualizados · sitio actualizado en tiempo real
+          <p style={{color:'#6B7A99',margin:'10px 0 4px',fontSize:13}}>
+            {jugOkCount} jugadoras · promedios actualizados · sitio en tiempo real
           </p>
           {log.filter(l=>l.startsWith('⭐')).map((l,i)=>(
-            <div key={i} style={{color:'#F0B429',fontSize:14,marginBottom:16}}>{l}</div>
+            <p key={i} style={{color:'#F0B429',fontSize:14,margin:'4px 0'}}>{l}</p>
           ))}
-          <button onClick={reset} style={{...s.btnPublish,maxWidth:260}}>+ Cargar otro partido</button>
+          <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:20}}>
+            <button onClick={reset} style={{...s.btnPublish,maxWidth:260}}>
+              + Cargar otro partido
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -643,34 +686,36 @@ export default function ExcelUpload() {
 }
 
 const s = {
-  title:     {color:'#F0B429',fontFamily:"'Bebas Neue',sans-serif",fontSize:26,letterSpacing:1,marginBottom:20},
-  stepper:   {display:'flex',alignItems:'center',marginBottom:28,gap:0},
-  stepWrap:  {display:'flex',alignItems:'center',gap:6,flex:1},
-  stepDot:   {width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0},
-  stepLine:  {flex:1,height:2,borderRadius:1},
-  metaRow:   {display:'flex',gap:16,marginBottom:20,flexWrap:'wrap'},
-  metaGroup: {display:'flex',flexDirection:'column',gap:6,flex:1,minWidth:140},
-  label:     {color:'#6B7A99',fontSize:11,letterSpacing:.5,textTransform:'uppercase'},
-  input:     {padding:'10px 12px',background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,color:'#EEF2F8',fontSize:14,outline:'none'},
-  dropZone:  {border:'2px dashed #1C2535',borderRadius:12,padding:'2.5rem 1rem',textAlign:'center',cursor:'pointer',marginBottom:20},
-  errBox:    {background:'rgba(240,64,96,.1)',border:'1px solid rgba(240,64,96,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F04060',fontSize:14},
-  warnBox:   {background:'rgba(240,180,41,.08)',border:'1px solid rgba(240,180,41,.25)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F0B429',fontSize:14},
-  marcadorCard:{background:'#0E1420',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
-  marcSide:  {flex:1,textAlign:'center',minWidth:120},
-  marcNombre:{fontFamily:"'Bebas Neue',sans-serif",fontSize:17,letterSpacing:1,color:'#EEF2F8',marginBottom:4},
-  marcTotal: {fontFamily:"'Bebas Neue',sans-serif",fontSize:60,color:'#F0B429',lineHeight:1},
-  parciales: {display:'flex',gap:6,justifyContent:'center',marginTop:6,flexWrap:'wrap'},
-  parcial:   {background:'#141C2A',padding:'3px 8px',borderRadius:4,fontSize:13,color:'#EEF2F8'},
-  vs:        {fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:'#4A566E',letterSpacing:2},
-  pctRow:    {display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'},
-  pctCard:   {flex:1,minWidth:90,background:'#0E1420',border:'1px solid #1C2535',borderRadius:8,padding:'10px 12px',textAlign:'center'},
-  teamLabel: {fontFamily:"'Bebas Neue',sans-serif",fontSize:19,letterSpacing:1,color:'#EEF2F8',marginBottom:10,paddingBottom:8,borderBottom:'1px solid #1C2535'},
-  table:     {width:'100%',borderCollapse:'collapse',fontSize:13},
-  th:        {background:'#141C2A',color:'#6B7A99',padding:'8px 10px',textAlign:'center',fontSize:11,whiteSpace:'nowrap'},
-  td:        {padding:'7px 10px',textAlign:'center',color:'#EEF2F8',borderBottom:'1px solid #1C2535'},
-  btnPublish:{flex:1,maxWidth:280,padding:'13px',background:'linear-gradient(135deg,#F0B429,#FF6B2B)',border:'none',borderRadius:10,color:'#080C12',fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:1,cursor:'pointer'},
-  btnCancel: {padding:'10px 20px',background:'transparent',border:'1px solid #4A566E',borderRadius:8,color:'#6B7A99',cursor:'pointer',fontSize:14},
-  logBox:    {background:'#0E1420',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',minHeight:200},
-  successBox:{textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:12},
-  dupeBox:   {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:12},
+  stepper:    {display:'flex',alignItems:'center',marginBottom:28,gap:0},
+  stepWrap:   {display:'flex',alignItems:'center',gap:6,flex:1},
+  stepDot:    {width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0},
+  stepLine:   {flex:1,height:2,borderRadius:1},
+  metaRow:    {display:'flex',gap:16,marginBottom:20,flexWrap:'wrap'},
+  metaGroup:  {display:'flex',flexDirection:'column',gap:6,flex:1,minWidth:140},
+  label:      {fontSize:10,fontWeight:700,letterSpacing:2,color:'#4A566E'},
+  input:      {padding:'11px 12px',background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,color:'#EEF2F8',fontSize:14,outline:'none'},
+  dropZone:   {border:'2px dashed #1C2535',borderRadius:14,padding:'2.5rem 1rem',textAlign:'center',cursor:'pointer',marginBottom:20,transition:'border-color .2s'},
+  errBox:     {background:'rgba(240,64,96,.1)',border:'1px solid rgba(240,64,96,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F04060',fontSize:14},
+  warnBox:    {background:'rgba(240,180,41,.08)',border:'1px solid rgba(240,180,41,.25)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F0B429',fontSize:13},
+  marcadorCard:{background:'#0E1420',border:'1px solid #1C2535',borderRadius:14,padding:'1.5rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
+  marcSide:   {flex:1,textAlign:'center',minWidth:120},
+  marcNombre: {fontFamily:"'Bebas Neue',sans-serif",fontSize:17,letterSpacing:1,color:'#EEF2F8',marginBottom:4},
+  marcTotal:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:62,color:'#F0B429',lineHeight:1},
+  parciales:  {display:'flex',gap:6,justifyContent:'center',marginTop:6,flexWrap:'wrap'},
+  parcial:    {background:'#141C2A',padding:'3px 8px',borderRadius:4,fontSize:13,color:'#EEF2F8'},
+  vs:         {fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:'#4A566E'},
+  pctRow:     {display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'},
+  pctCard:    {flex:1,minWidth:90,background:'#0E1420',border:'1px solid #1C2535',borderRadius:8,padding:'10px 12px',textAlign:'center'},
+  resumenBar: {display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center',padding:'10px 14px',background:'rgba(255,255,255,.03)',borderRadius:8,border:'1px solid #1C2535'},
+  resumenItem:{display:'flex',alignItems:'center',gap:6},
+  resumenDot: c=>({width:8,height:8,borderRadius:'50%',background:c,flexShrink:0}),
+  teamLabel:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:19,letterSpacing:1,color:'#EEF2F8',marginBottom:10,paddingBottom:8,borderBottom:'1px solid #1C2535'},
+  table:      {width:'100%',borderCollapse:'collapse',fontSize:12},
+  th:         {background:'#141C2A',color:'#6B7A99',padding:'8px 10px',textAlign:'center',fontSize:10,whiteSpace:'nowrap'},
+  td:         {padding:'7px 8px',textAlign:'center',color:'#EEF2F8',borderBottom:'1px solid #1C2535'},
+  btnPublish: {flex:1,maxWidth:280,padding:'13px',background:'linear-gradient(135deg,#F0B429,#FF6B2B)',border:'none',borderRadius:10,color:'#080C12',fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:1,cursor:'pointer'},
+  btnCancel:  {padding:'10px 20px',background:'transparent',border:'1px solid #4A566E',borderRadius:8,color:'#6B7A99',cursor:'pointer',fontSize:14},
+  logBox:     {background:'#0E1420',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',minHeight:200},
+  successBox: {textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
+  dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };

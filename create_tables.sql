@@ -372,3 +372,68 @@ DROP TRIGGER IF EXISTS trg_recalcular_promedios ON stats_partido_femenino;
 CREATE TRIGGER trg_recalcular_promedios
   AFTER INSERT OR UPDATE OR DELETE ON stats_partido_femenino
   FOR EACH ROW EXECUTE FUNCTION fn_recalcular_promedios();
+
+-- ═══════════════════════════════════════════════════════════════
+-- TABLA: nombre_aliases
+-- Mapeo persistente de "apellido en Excel" → jugadora_id
+-- Se auto-popula al confirmar un partido en el admin.
+-- Garantiza que las cargas futuras resuelvan sin fuzzy matching.
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nombre_aliases (
+  id           SERIAL PRIMARY KEY,
+  alias        TEXT NOT NULL,          -- ej: 'Teloni', 'Chiavazza', 'Donofrio'
+  alias_norm   TEXT NOT NULL,          -- alias normalizado (sin tildes, lowercase)
+  jugadora_id  TEXT NOT NULL REFERENCES jugadoras_femenino(id),
+  equipo_id    TEXT NOT NULL REFERENCES equipos_femenino(id),
+  confirmado   BOOLEAN DEFAULT true,   -- false = fuzzy automático (no confirmado)
+  creado_en    TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(alias_norm, equipo_id)
+);
+
+ALTER TABLE nombre_aliases ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='nombre_aliases' AND policyname='pub_read')
+    THEN CREATE POLICY "pub_read" ON nombre_aliases FOR SELECT USING (true); END IF;
+END $$;
+
+-- Seed inicial: aliases conocidos de las primeras 4 fechas
+-- Pilar Sport Club
+INSERT INTO nombre_aliases (alias, alias_norm, jugadora_id, equipo_id) VALUES
+  ('Giraudo',   'giraudo',   'f_psc_01', 'f_pilar'),  -- María Jose Giraudo (nro 10)
+  ('Ivana',     'ivana',     'f_psc_03', 'f_pilar'),  -- Ivana Giraudo (desambigua con nombre)
+  ('Chiavazza', 'chiavazza', 'f_psc_08', 'f_pilar'),  -- Chivazza Melania
+  ('Serra',     'serra',     'f_psc_02', 'f_pilar'),
+  ('Bulacio',   'bulacio',   'f_psc_17', 'f_pilar'),
+  ('Bergia',    'bergia',    'f_psc_06', 'f_pilar'),
+  ('Viada',     'viada',     'f_psc_18', 'f_pilar'),
+  ('Azar',      'azar',      'f_psc_09', 'f_pilar'),
+  ('Arce',      'arce',      'f_psc_07', 'f_pilar'),
+  ('Gomez',     'gomez',     'f_psc_16', 'f_pilar'),
+  ('Romero',    'romero',    'f_psc_15', 'f_pilar'),
+  ('Sintora',   'sintora',   'f_psc_12', 'f_pilar'),
+  ('Allende',   'allende',   'f_psc_13', 'f_pilar'),
+  ('Montironi', 'montironi', 'f_psc_10', 'f_pilar'),
+  ('Gregori',   'gregori',   'f_psc_11', 'f_pilar'),
+  ('Wolfel',    'wolfel',    'f_psc_04', 'f_pilar'),
+  ('Diaz',      'diaz',      'f_psc_05', 'f_pilar')
+ON CONFLICT (alias_norm, equipo_id) DO NOTHING;
+
+-- Triple Locura
+INSERT INTO nombre_aliases (alias, alias_norm, jugadora_id, equipo_id) VALUES
+  ('Carnielli', 'carnielli', 'f_tl_01', 'f_triple_locura'),
+  ('Ortega',    'ortega',    'f_tl_02', 'f_triple_locura'),
+  ('Sanchez',   'sanchez',   'f_tl_03', 'f_triple_locura'),
+  ('Weinbender','weinbender','f_tl_04', 'f_triple_locura'),
+  ('Pikaluk',   'pikaluk',   'f_tl_05', 'f_triple_locura'),
+  ('Donofrio',  'donofrio',  'f_tl_06', 'f_triple_locura'),  -- D'Onofrio
+  ('D''Onofrio','donofrio',  'f_tl_06', 'f_triple_locura'),
+  ('Magariño',  'magarino',  'f_tl_07', 'f_triple_locura'),
+  ('Magarino',  'magarino',  'f_tl_07', 'f_triple_locura'),
+  ('Pinedo',    'pinedo',    'f_tl_08', 'f_triple_locura'),
+  ('Vega',      'vega',      'f_tl_09', 'f_triple_locura'),
+  ('Re',        're',        'f_tl_10', 'f_triple_locura'),
+  ('Abad',      'abad',      'f_tl_11', 'f_triple_locura'),
+  ('Farias',    'farias',    'f_tl_12', 'f_triple_locura'),
+  ('Teloni',    'teloni',    'f_tl_13', 'f_triple_locura'),
+  ('Farias',    'farias',    'f_tl_12', 'f_triple_locura')
+ON CONFLICT (alias_norm, equipo_id) DO NOTHING;

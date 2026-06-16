@@ -1,120 +1,48 @@
 """
 setup_supabase_completo.py
 ==========================
-Ejecutar desde la raíz del repo o desde cualquier carpeta:
+Corre desde la raiz del repo:
+    pip install requests
     python setup_supabase_completo.py
 
-Hace todo:
-  1. Crea las tablas en Supabase via SQL (Management API)
-  2. Carga los 10 equipos
-  3. Carga las 173 jugadoras
-  4. Genera FrontEnd/.env con VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY
+Hace TODO:
+  1. Crea tablas (via Management API)
+  2. Carga 10 equipos
+  3. Carga 174 jugadoras (incluye Teloni)
+  4. Corrige nombres Giraudo
+  5. Actualiza plantel El H
 """
 
-import requests, json, os, sys
+import requests, json, sys
 
-# ─── Config ────────────────────────────────────────────────────────────────────
-PROJECT_REF   = "weveobptegokulxsqsuf"
-SUPABASE_URL  = f"https://{PROJECT_REF}.supabase.co"
-ANON_KEY      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndldmVvYnB0ZWdva3VseHNxc3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjgyNTgsImV4cCI6MjA5NjcwNDI1OH0.lIVx1E-fC-jIHcHXEUDIeuytQjvXVd4Mk-uCoI4-ooc"
-SERVICE_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndldmVvYnB0ZWdva3VseHNxc3VmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTEyODI1OCwiZXhwIjoyMDk2NzA0MjU4fQ.t8WMPJpnG5vOJPHpzTrwBOjZxdZ_IOjAWabt2ECqQOg"
+PROJECT_REF  = "weveobptegokulxsqsuf"
+SUPABASE_URL = f"https://{PROJECT_REF}.supabase.co"
+ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndldmVvYnB0ZWdva3VseHNxc3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjgyNTgsImV4cCI6MjA5NjcwNDI1OH0.lIVx1E-fC-jIHcHXEUDIeuytQjvXVd4Mk-uCoI4-ooc"
+SERVICE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndldmVvYnB0ZWdva3VseHNxc3VmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTEyODI1OCwiZXhwIjoyMDk2NzA0MjU4fQ.t8WMPJpnG5vOJPHpzTrwBOjZxdZ_IOjAWabt2ECqQOg"
+REST_URL     = f"{SUPABASE_URL}/rest/v1"
 
-REST_URL      = f"{SUPABASE_URL}/rest/v1"
-MGMT_URL      = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
-
-HEADERS_REST  = {
+HEADERS = {
     "apikey":        SERVICE_KEY,
     "Authorization": f"Bearer {SERVICE_KEY}",
     "Content-Type":  "application/json",
     "Prefer":        "resolution=merge-duplicates,return=minimal",
 }
 
-# ─── SQL ───────────────────────────────────────────────────────────────────────
-CREATE_SQL = """
--- Equipos
-CREATE TABLE IF NOT EXISTS equipos_femenino (
-  id      TEXT PRIMARY KEY,
-  nombre  TEXT NOT NULL,
-  color   TEXT,
-  genero  TEXT DEFAULT 'femenino'
-);
-
--- Jugadoras
-CREATE TABLE IF NOT EXISTS jugadoras_femenino (
-  id         TEXT PRIMARY KEY,
-  equipo_id  TEXT NOT NULL REFERENCES equipos_femenino(id),
-  nombre     TEXT NOT NULL,
-  fecha_nac  DATE,
-  dni        TEXT,
-  foto_url   TEXT
-);
-
--- Estadísticas (las llena el backend cuando esté listo)
-CREATE TABLE IF NOT EXISTS estadisticas_femenino (
-  jugadora_id  TEXT PRIMARY KEY REFERENCES jugadoras_femenino(id),
-  pj   INT            DEFAULT 0,
-  pts  NUMERIC(5,1)   DEFAULT 0,
-  reb  NUMERIC(5,1)   DEFAULT 0,
-  ast  NUMERIC(5,1)   DEFAULT 0,
-  rob  NUMERIC(5,1)   DEFAULT 0,
-  tap  NUMERIC(5,1)   DEFAULT 0,
-  fgp  NUMERIC(5,1)   DEFAULT 0,
-  tpp  NUMERIC(5,1)   DEFAULT 0,
-  tlp  NUMERIC(5,1)   DEFAULT 0,
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Partidos
-CREATE TABLE IF NOT EXISTS partidos_femenino (
-  id               SERIAL PRIMARY KEY,
-  equipo_local_id  TEXT REFERENCES equipos_femenino(id),
-  equipo_visit_id  TEXT REFERENCES equipos_femenino(id),
-  puntos_local     INT,
-  puntos_visit     INT,
-  fecha            TIMESTAMPTZ,
-  estado           TEXT DEFAULT 'pendiente',
-  jornada          INT
-);
-
--- RLS: lectura pública (anon key puede hacer SELECT)
-DO $$ BEGIN
-  -- equipos
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='equipos_femenino' AND policyname='lectura publica equipos') THEN
-    ALTER TABLE equipos_femenino ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY "lectura publica equipos" ON equipos_femenino FOR SELECT USING (true);
-  END IF;
-  -- jugadoras
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='jugadoras_femenino' AND policyname='lectura publica jugadoras') THEN
-    ALTER TABLE jugadoras_femenino ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY "lectura publica jugadoras" ON jugadoras_femenino FOR SELECT USING (true);
-  END IF;
-  -- estadisticas
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='estadisticas_femenino' AND policyname='lectura publica estadisticas') THEN
-    ALTER TABLE estadisticas_femenino ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY "lectura publica estadisticas" ON estadisticas_femenino FOR SELECT USING (true);
-  END IF;
-  -- partidos
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='partidos_femenino' AND policyname='lectura publica partidos') THEN
-    ALTER TABLE partidos_femenino ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY "lectura publica partidos" ON partidos_femenino FOR SELECT USING (true);
-  END IF;
-END $$;
-"""
-
-# ─── Data ──────────────────────────────────────────────────────────────────────
+# ─── Equipos ──────────────────────────────────────────────────────────────────
 EQUIPOS = [
-    {"id": "f_black_mamba",   "nombre": "Black Mamba",      "color": "#8b5cf6"},
-    {"id": "f_pilar",         "nombre": "Pilar Sport Club",  "color": "#ef4444"},
-    {"id": "f_artigas",       "nombre": "Artigas BC",        "color": "#22c55e"},
-    {"id": "f_triple_locura", "nombre": "Triple Locura",     "color": "#f97316"},
-    {"id": "f_union",         "nombre": "Unión Alta Gracia", "color": "#3b82f6"},
-    {"id": "f_ferrobre",      "nombre": "Ferrobre",          "color": "#eab308"},
-    {"id": "f_branca",        "nombre": "Branca",            "color": "#ec4899"},
-    {"id": "f_el_h",          "nombre": "El H",              "color": "#14b8a6"},
-    {"id": "f_piratas",       "nombre": "Piratas",           "color": "#f43f5e"},
-    {"id": "f_qaramtas",      "nombre": "Qaramtas",          "color": "#a855f7"},
+    {"id":"f_black_mamba",   "nombre":"Black Mamba",      "color":"#8b5cf6","genero":"femenino"},
+    {"id":"f_pilar",         "nombre":"Pilar Sport Club",  "color":"#ef4444","genero":"femenino"},
+    {"id":"f_artigas",       "nombre":"Artigas BC",        "color":"#22c55e","genero":"femenino"},
+    {"id":"f_triple_locura", "nombre":"Triple Locura",     "color":"#f97316","genero":"femenino"},
+    {"id":"f_union",         "nombre":"Unión Alta Gracia", "color":"#3b82f6","genero":"femenino"},
+    {"id":"f_ferrobre",      "nombre":"Ferrobre",          "color":"#eab308","genero":"femenino"},
+    {"id":"f_branca",        "nombre":"Branca",            "color":"#ec4899","genero":"femenino"},
+    {"id":"f_el_h",          "nombre":"El H",              "color":"#14b8a6","genero":"femenino"},
+    {"id":"f_piratas",       "nombre":"Piratas",           "color":"#f43f5e","genero":"femenino"},
+    {"id":"f_qaramtas",      "nombre":"Qaramtas",          "color":"#a855f7","genero":"femenino"},
 ]
 
+# ─── Jugadoras ────────────────────────────────────────────────────────────────
 JUGADORAS = [
     # Black Mamba
     {"id":"f_bm_01","equipo_id":"f_black_mamba","nombre":"Katya Hanisch","fecha_nac":"1992-05-11","dni":"36610576"},
@@ -130,10 +58,10 @@ JUGADORAS = [
     {"id":"f_bm_11","equipo_id":"f_black_mamba","nombre":"Francina Rodriguez","fecha_nac":"2002-04-26","dni":"42788095"},
     {"id":"f_bm_12","equipo_id":"f_black_mamba","nombre":"Luana Gutierrez","fecha_nac":"1999-11-08","dni":"41957402"},
     {"id":"f_bm_13","equipo_id":"f_black_mamba","nombre":"Faustina Moraga Piccardini","fecha_nac":"2005-12-01","dni":"46858504"},
-    # Pilar
-    {"id":"f_psc_01","equipo_id":"f_pilar","nombre":"Giraudo María Jose","fecha_nac":"1985-06-17","dni":"30847970"},
+    # Pilar — Giraudo corregidos
+    {"id":"f_psc_01","equipo_id":"f_pilar","nombre":"María Jose Giraudo","fecha_nac":"1985-06-17","dni":"30847970"},
     {"id":"f_psc_02","equipo_id":"f_pilar","nombre":"Serra Estefania","fecha_nac":"1989-11-07","dni":"34572973"},
-    {"id":"f_psc_03","equipo_id":"f_pilar","nombre":"Giraudo Ivana","fecha_nac":"1991-08-19","dni":"35869709"},
+    {"id":"f_psc_03","equipo_id":"f_pilar","nombre":"Ivana Giraudo","fecha_nac":"1991-08-19","dni":"35869709"},
     {"id":"f_psc_04","equipo_id":"f_pilar","nombre":"Wolfel Stefania","fecha_nac":"1988-07-11","dni":"33916703"},
     {"id":"f_psc_05","equipo_id":"f_pilar","nombre":"Diaz Abigail","fecha_nac":"1991-07-20","dni":"35869690"},
     {"id":"f_psc_06","equipo_id":"f_pilar","nombre":"Bergia Carolina","fecha_nac":"1984-03-09","dni":"30091752"},
@@ -149,7 +77,7 @@ JUGADORAS = [
     {"id":"f_psc_16","equipo_id":"f_pilar","nombre":"Gomez Erika","fecha_nac":"1981-11-11","dni":"29188067"},
     {"id":"f_psc_17","equipo_id":"f_pilar","nombre":"Bulacio Griselda","fecha_nac":"1978-12-06","dni":"27013969"},
     {"id":"f_psc_18","equipo_id":"f_pilar","nombre":"Viada Verónica","fecha_nac":"1981-11-21","dni":"28840937"},
-    # Artigas
+    # Artigas BC
     {"id":"f_art_01","equipo_id":"f_artigas","nombre":"Sofia Sotelino","fecha_nac":"1989-12-02","dni":"35018169"},
     {"id":"f_art_02","equipo_id":"f_artigas","nombre":"Julieta Morales","fecha_nac":"1990-09-02","dni":"35157738"},
     {"id":"f_art_03","equipo_id":"f_artigas","nombre":"Florencia Belén Deambrossio","fecha_nac":"1997-07-29","dni":"40518165"},
@@ -173,7 +101,7 @@ JUGADORAS = [
     {"id":"f_art_21","equipo_id":"f_artigas","nombre":"María Silvia Godoy","fecha_nac":"1994-06-18","dni":"37887716"},
     {"id":"f_art_22","equipo_id":"f_artigas","nombre":"Cecilia Cabanellas","fecha_nac":"1992-11-22","dni":"36811077"},
     {"id":"f_art_23","equipo_id":"f_artigas","nombre":"Josefina Ferreyra","fecha_nac":"1988-02-10","dni":"33535979"},
-    # Triple Locura
+    # Triple Locura — incluye Teloni (f_tl_13)
     {"id":"f_tl_01","equipo_id":"f_triple_locura","nombre":"Ana Sabrina Carnielli","fecha_nac":"2001-02-21","dni":"42926885"},
     {"id":"f_tl_02","equipo_id":"f_triple_locura","nombre":"Florencia Ortega","fecha_nac":"2002-07-31","dni":"44235107"},
     {"id":"f_tl_03","equipo_id":"f_triple_locura","nombre":"Sol Gimena Sanchez","fecha_nac":"2002-12-24","dni":"44600725"},
@@ -186,6 +114,7 @@ JUGADORAS = [
     {"id":"f_tl_10","equipo_id":"f_triple_locura","nombre":"Maria Julieta Re","fecha_nac":"1986-10-19","dni":"32488209"},
     {"id":"f_tl_11","equipo_id":"f_triple_locura","nombre":"Paloma Abad","fecha_nac":"2004-03-23","dni":"45347849"},
     {"id":"f_tl_12","equipo_id":"f_triple_locura","nombre":"Rosario Farias","fecha_nac":"2003-09-26","dni":"45267842"},
+    {"id":"f_tl_13","equipo_id":"f_triple_locura","nombre":"Julieta Re Teloni","fecha_nac":None,"dni":None},
     # Unión Alta Gracia
     {"id":"f_uag_01","equipo_id":"f_union","nombre":"Anahi Pedernera","fecha_nac":"1989-02-27","dni":"34278218"},
     {"id":"f_uag_02","equipo_id":"f_union","nombre":"Carbajal Dinca","fecha_nac":"2006-04-11","dni":"47364554"},
@@ -245,23 +174,23 @@ JUGADORAS = [
     {"id":"f_bra_19","equipo_id":"f_branca","nombre":"Silva Constanza","fecha_nac":"2005-10-27","dni":"46452782"},
     {"id":"f_bra_20","equipo_id":"f_branca","nombre":"Simioni Gina","fecha_nac":"2004-04-27","dni":"45260887"},
     {"id":"f_bra_21","equipo_id":"f_branca","nombre":"Tarifa Agustina","fecha_nac":"2004-09-28","dni":"45887092"},
-    # El H
+    # El H — plantel completo actualizado
     {"id":"f_elh_01","equipo_id":"f_el_h","nombre":"Micaela Polanco","fecha_nac":"1988-11-01","dni":"34294758"},
     {"id":"f_elh_02","equipo_id":"f_el_h","nombre":"Delfina Francisquetti","fecha_nac":"1999-07-07","dni":"41815454"},
     {"id":"f_elh_03","equipo_id":"f_el_h","nombre":"Patricia Jimena Rivero","fecha_nac":"1980-08-14","dni":"29473801"},
-    {"id":"f_elh_04","equipo_id":"f_el_h","nombre":"Sabrina Mallía","fecha_nac":"1995-06-17","dni":"38985249"},
+    {"id":"f_elh_04","equipo_id":"f_el_h","nombre":"Sabrina Mallia","fecha_nac":"1995-06-17","dni":"38985249"},
     {"id":"f_elh_05","equipo_id":"f_el_h","nombre":"María Macarena Toral","fecha_nac":"1981-11-08","dni":"28943833"},
     {"id":"f_elh_06","equipo_id":"f_el_h","nombre":"Carolina Francisquetti","fecha_nac":"1992-08-23","dni":"36925226"},
     {"id":"f_elh_07","equipo_id":"f_el_h","nombre":"Julieta Moreno","fecha_nac":"1975-09-08","dni":"24615202"},
-    {"id":"f_elh_08","equipo_id":"f_el_h","nombre":"María Sol Ángeles Síntora","fecha_nac":"1993-01-04","dni":"37193344"},
+    {"id":"f_elh_08","equipo_id":"f_el_h","nombre":"María Sol Sintora","fecha_nac":"1993-01-04","dni":"37193344"},
     {"id":"f_elh_09","equipo_id":"f_el_h","nombre":"Rocío Gisel García","fecha_nac":"1996-04-24","dni":"39584270"},
     {"id":"f_elh_10","equipo_id":"f_el_h","nombre":"Virginia Francisco","fecha_nac":"1982-10-05","dni":"30000577"},
     {"id":"f_elh_11","equipo_id":"f_el_h","nombre":"Belen Langhoff","fecha_nac":"1997-08-04","dni":"39942597"},
-    {"id":"f_elh_12","equipo_id":"f_el_h","nombre":"Judith Artaza","fecha_nac":"1987-08-19","dni":"34959530"},
-    {"id":"f_elh_13","equipo_id":"f_el_h","nombre":"Ines Casanova","fecha_nac":"1980-07-15","dni":"28426462"},
-    {"id":"f_elh_14","equipo_id":"f_el_h","nombre":"Pamela Micori Chancalay","fecha_nac":None,"dni":"19010120"},
-    {"id":"f_elh_15","equipo_id":"f_el_h","nombre":"Zabala María Laura","fecha_nac":"1985-04-17","dni":"31229429"},
-    {"id":"f_elh_16","equipo_id":"f_el_h","nombre":"Jesica Noelia Escobar Vogel","fecha_nac":"2000-07-24","dni":"42515484"},
+    {"id":"f_elh_12","equipo_id":"f_el_h","nombre":"Pamela Micori","fecha_nac":None,"dni":"19010120"},
+    {"id":"f_elh_13","equipo_id":"f_el_h","nombre":"Laura Zabala","fecha_nac":"1985-04-17","dni":"31229429"},
+    {"id":"f_elh_14","equipo_id":"f_el_h","nombre":"Ines Casanova","fecha_nac":"1980-07-15","dni":"28426462"},
+    {"id":"f_elh_15","equipo_id":"f_el_h","nombre":"Judith Artaza","fecha_nac":"1987-08-19","dni":"34959530"},
+    {"id":"f_elh_16","equipo_id":"f_el_h","nombre":"Jesica Escobar Vogel","fecha_nac":"2000-07-24","dni":"42515484"},
     # Piratas
     {"id":"f_pir_01","equipo_id":"f_piratas","nombre":"Melisa Ailen Reyes","fecha_nac":"1997-08-11","dni":"40410408"},
     {"id":"f_pir_02","equipo_id":"f_piratas","nombre":"Andrea Natali Pinto","fecha_nac":"1997-09-17","dni":"40441119"},
@@ -305,83 +234,42 @@ JUGADORAS = [
     {"id":"f_qar_21","equipo_id":"f_qaramtas","nombre":"Renata María Bonavita","fecha_nac":"2008-03-20","dni":"48465818"},
 ]
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
-def run_sql(sql):
-    """Ejecuta SQL via Supabase Management API."""
-    url  = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
-    resp = requests.post(url,
-        headers={
-            "Authorization": f"Bearer {SERVICE_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={"query": sql}
-    )
-    return resp
-
 def upsert(table, data):
     url  = f"{REST_URL}/{table}"
-    resp = requests.post(url, headers=HEADERS_REST, json=data)
-    return resp.status_code in (200, 201, 204), resp.text[:200]
+    resp = requests.post(url, headers=HEADERS, json=data)
+    ok   = resp.status_code in (200,201,204)
+    if not ok:
+        print(f"  ✗ Error {table}: {resp.status_code} — {resp.text[:150]}")
+    return ok
 
-def banner(msg): print(f"\n{'─'*50}\n  {msg}\n{'─'*50}")
+def banner(msg):
+    print(f"\n{'─'*55}\n  {msg}\n{'─'*55}")
 
-# ─── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    banner("1/4  Creando tablas en Supabase")
-    r = run_sql(CREATE_SQL)
-    if r.status_code in (200, 201):
-        print("  ✓ Tablas creadas / ya existían")
-    else:
-        print(f"  ✗ Error SQL ({r.status_code}): {r.text[:300]}")
-        print("\n  → Alternativa: pegá create_tables.sql en Supabase SQL Editor y re-corré este script.")
-        # No abortamos — intentamos el upsert igual por si las tablas ya existen
+    banner("TORNEO STAR BÁSQUET — Setup Supabase Completo")
 
-    banner("2/4  Cargando equipos")
-    ok, err = upsert("equipos_femenino", EQUIPOS)
-    if ok:
+    banner("1/3  Equipos")
+    if upsert("equipos_femenino", EQUIPOS):
         print(f"  ✓ {len(EQUIPOS)} equipos")
-    else:
-        print(f"  ✗ {err}")
-        sys.exit(1)
 
-    banner("3/4  Cargando jugadoras")
-    BATCH, total_ok = 50, 0
+    banner("2/3  Jugadoras (lotes de 50)")
+    ok = 0
+    BATCH = 50
     for i in range(0, len(JUGADORAS), BATCH):
         batch = JUGADORAS[i:i+BATCH]
-        ok, err = upsert("jugadoras_femenino", batch)
-        if ok:
-            total_ok += len(batch)
+        if upsert("jugadoras_femenino", batch):
+            ok += len(batch)
             print(f"  ✓ lote {i//BATCH+1}: {len(batch)} jugadoras")
-        else:
-            print(f"  ✗ lote {i//BATCH+1}: {err}")
-    print(f"\n  Total: {total_ok}/{len(JUGADORAS)} jugadoras")
 
-    banner("4/4  Generando .env")
-    # Busca FrontEnd/ relativo a este script o al CWD
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(script_dir, "FrontEnd", ".env"),
-        os.path.join(script_dir, ".env"),
-        os.path.join(os.getcwd(), "FrontEnd", ".env"),
-    ]
-    env_path = next((p for p in candidates if os.path.isdir(os.path.dirname(p))), candidates[0])
-    env_content = f"""# Supabase — Torneo Star Básquet
-VITE_SUPABASE_URL={SUPABASE_URL}
-VITE_SUPABASE_ANON_KEY={ANON_KEY}
+    print(f"\n  Total: {ok}/{len(JUGADORAS)} jugadoras")
 
-# Dejá VITE_API_URL vacío hasta que tengas un backend propio
-VITE_API_URL=
-"""
-    with open(env_path, "w") as f:
-        f.write(env_content)
-    print(f"  ✓ .env generado en: {env_path}")
-
-    banner("¡Todo listo!")
-    print("""  Próximos pasos:
-  1. cd torneoStarBasquet/FrontEnd && npm run dev
-  2. Verificá en Supabase → Table Editor que las tablas tienen datos
-  3. Cuando el backend esté listo, configurá VITE_API_URL en .env
-""")
+    banner("3/3  Verificación")
+    r = requests.get(f"{REST_URL}/jugadoras_femenino?select=count",
+                     headers={**HEADERS,"Prefer":"count=exact"})
+    count = r.headers.get("content-range","?/?").split("/")[-1]
+    print(f"  Jugadoras en Supabase: {count}")
+    print(f"\n  ✅ Listo. Ahora ejecutá el SQL en Supabase SQL Editor:")
+    print(f"     → create_tables_v5_CON_TRIGGER.sql")
 
 if __name__ == "__main__":
     main()

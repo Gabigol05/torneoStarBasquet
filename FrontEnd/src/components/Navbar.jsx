@@ -2,6 +2,7 @@ import logo from '../assets/logo_torneo.jpg';
 import { useState, useCallback } from 'react';
 import { TournamentSelector } from './TournamentSelector';
 import { GlobalSearch } from './GlobalSearch';
+import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
@@ -12,6 +13,7 @@ function dispatchTabChange(tabKey) {
 }
 
 export function Navbar() {
+  const { equipos } = useStats();
   const { mode } = useTournament();
   const activeSection = useActiveSection();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -95,6 +97,7 @@ export function Navbar() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <GlobalSearch
+            equipos={equipos}
             onSelectPlayer={setSelectedPlayer}
             onSelectTeam={() => {
               document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });

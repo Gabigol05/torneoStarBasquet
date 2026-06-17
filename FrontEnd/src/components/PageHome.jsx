@@ -12,6 +12,7 @@ import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx'
 import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
 import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats } from '../hooks/useFemeninoStats';
+import { StatsContext } from '../context/StatsContext';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
 
 function duplicateTicker() {

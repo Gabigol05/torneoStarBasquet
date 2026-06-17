@@ -4663,3 +4663,13 @@ table tbody tr:nth-child(5) td {
 }
 .gc-stat-bar-a { height: 100%; border-radius: 3px 0 0 3px; transition: width 0.6s ease; }
 .gc-stat-bar-b { height: 100%; border-radius: 0 3px 3px 0; transition: width 0.6s ease; }
+
+/* ══ GLOBAL SEARCH — keyboard nav active state ════════════════ */
+.gs-item-active,
+.gs-item:hover {
+  background: rgba(240, 180, 41, 0.07) !important;
+  border-radius: 8px;
+}
+.gs-item-active .gs-item-name {
+  color: #F0B429 !important;
+}

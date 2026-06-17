@@ -13,7 +13,7 @@ function dispatchTabChange(tabKey) {
 }
 
 export function Navbar() {
-  const { equipos } = useStats();
+  const { equipos = [] } = useStats();
   const { mode } = useTournament();
   const activeSection = useActiveSection();
   const [isMobileOpen, setIsMobileOpen] = useState(false);

@@ -3,7 +3,7 @@ import { useStats } from '../context/StatsContext';
 
 export function FavoritoCard({ onSelectTeam }) {
   const { favoritoId } = useFavorito();
-  const { equipos } = useStats();
+  const { equipos = [] } = useStats();
 
   if (!favoritoId) return null;
 

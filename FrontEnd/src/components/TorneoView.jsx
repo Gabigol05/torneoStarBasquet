@@ -217,8 +217,8 @@ function FixtureCard({ partido, equiposFem, fechas }) {
 export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extSelectTeam }) {
   const { mode } = useTournament();
   const {
-    equipos: equiposFemenino, isLoading: isLoadingStats, error: statsError,
-    partidos, fechas, statsPorPartido,
+    equipos: equiposFemenino = [], isLoading: isLoadingStats = false, error: statsError = null,
+    partidos = [], fechas = [], statsPorPartido = {},
   } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
 

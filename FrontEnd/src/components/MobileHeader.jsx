@@ -8,7 +8,7 @@ import { useStats } from '../context/StatsContext';
 
 export function MobileHeader() {
   const { mode } = useTournament();
-  const { equipos } = useStats();
+  const { equipos = [] } = useStats();
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   return (

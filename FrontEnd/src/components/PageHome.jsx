@@ -12,7 +12,7 @@ import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx'
 import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
 import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats } from '../hooks/useFemeninoStats';
-import { StatsContext } from '../context/StatsContext';
+import { StatsContext }     from '../context/StatsContext';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
 
 function duplicateTicker() {
@@ -27,17 +27,18 @@ export function PageHome() {
   useScrollReveal();
   const [activeTab, setActiveTab] = useState('inicio');
 
-  const { equipos, partidos, isLoading, refetch } = useFemeninoStats();
+  const {
+    equipos, partidos, fechas, statsPorPartido,
+    isLoading, error, refetch,
+  } = useFemeninoStats();
+
   const { toasts, addToast, removeToast } = useToast();
   const { isPulling, isRefreshing } = usePullToRefresh(refetch);
 
   useResultadosToast(equipos, addToast);
 
-  // Sincronizar activeTab con eventos del navbar y TorneoView
   useEffect(() => {
-    const handler = (e) => {
-      if (e.detail?.tab) setActiveTab(e.detail.tab);
-    };
+    const handler = e => { if (e.detail?.tab) setActiveTab(e.detail.tab); };
     window.addEventListener('star:tab', handler);
     return () => window.removeEventListener('star:tab', handler);
   }, []);
@@ -45,16 +46,16 @@ export function PageHome() {
   useEffect(() => { duplicateTicker(); }, []);
 
   return (
-    <>
+    <StatsContext.Provider value={{ equipos, partidos, fechas, statsPorPartido, isLoading }}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
 
-      {/* Desktop: navbar top */}
+      {/* Desktop */}
       <div className="desktop-only">
         <Navbar />
       </div>
 
-      {/* Mobile: header compacto */}
+      {/* Mobile */}
       <div className="mobile-only">
         <MobileHeader />
       </div>
@@ -69,11 +70,7 @@ export function PageHome() {
       <PlayoffsBracket />
       <Footer />
 
-      {/* Bottom nav — solo mobile, con tab activo sincronizado */}
-      <BottomNav
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
-    </>
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+    </StatsContext.Provider>
   );
 }

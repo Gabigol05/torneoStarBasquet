@@ -1,9 +1,9 @@
 import { useFavorito } from '../hooks/useFavorito';
-import { useFemeninoStats } from '../hooks/useFemeninoStats';
+import { useStats } from '../context/StatsContext';
 
 export function FavoritoCard({ onSelectTeam }) {
   const { favoritoId } = useFavorito();
-  const { equipos } = useFemeninoStats();
+  const { equipos } = useStats();
 
   if (!favoritoId) return null;
 

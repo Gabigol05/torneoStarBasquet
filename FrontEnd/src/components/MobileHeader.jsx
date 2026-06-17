@@ -4,9 +4,11 @@ import { TournamentSelector } from './TournamentSelector';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
+import { useStats } from '../context/StatsContext';
 
 export function MobileHeader() {
   const { mode } = useTournament();
+  const { equipos } = useStats();
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   return (
@@ -34,7 +36,7 @@ export function MobileHeader() {
 
         {/* Acciones: búsqueda + redes */}
         <div className="mh-actions">
-          <GlobalSearch onSelectPlayer={setSelectedPlayer} />
+          <GlobalSearch equipos={equipos} onSelectPlayer={setSelectedPlayer} />
 
           <a
             href="https://www.youtube.com/@TorneoStarBasquet"

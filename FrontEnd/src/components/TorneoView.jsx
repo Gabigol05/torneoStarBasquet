@@ -38,7 +38,7 @@ import { GameCenterModal } from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { TeamPageFem } from './TeamPageFem';
 import { FavoritoCard } from './FavoritoCard';
-import { useFemeninoStats } from '../hooks/useFemeninoStats';
+import { useStats } from '../context/StatsContext';
 import { useSwipe } from '../hooks/useSwipe';
 import { useFavorito } from '../hooks/useFavorito';
 
@@ -219,7 +219,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const {
     equipos: equiposFemenino, isLoading: isLoadingStats, error: statsError,
     partidos, fechas, statsPorPartido,
-  } = useFemeninoStats();
+  } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
 
   const [activeTab,      setActiveTab]      = useState('tabla');

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 
-const normQ = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const normQ = s => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 export function useGlobalSearch(equiposFemenino = []) {
   const [query,  setQuery]  = useState('');
@@ -11,8 +11,8 @@ export function useGlobalSearch(equiposFemenino = []) {
     const q = normQ(query.trim());
     if (q.length < 2) return { equipos:[], jugadoras:[] };
 
-    const equipos = equiposFemenino
-      .filter(e => normQ(e.name).includes(q) || normQ(e.nombre ?? '').includes(q))
+    const equipos = (equiposFemenino ?? [])
+      .filter(e => normQ(e.name ?? '').includes(q) || normQ(e.nombre ?? '').includes(q))
       .slice(0, 3);
 
     const jugadoras = [];

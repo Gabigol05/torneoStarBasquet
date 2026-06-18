@@ -5,11 +5,11 @@ import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
-const normStr = s => s.normalize('NFD').replace(/[\u0300-\u036f'`]/g,'').toLowerCase().trim();
+const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f'`]/g,'').toLowerCase().trim();
 
 // ─── Índice fuzzy completo ────────────────────────────────────────────────────
 const TODAS_JUGADORAS = equiposFemenino.flatMap(eq =>
-  eq.jugadoras.map(j => {
+  eq.jugadoras.filter(j => j && j.nombre).map(j => {
     const partes = j.nombre.trim().split(/\s+/);
     return {
       id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),

@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS partidos_femenino (
   -- % tiro por equipo
   pct_simples_local NUMERIC(5,1), pct_dobles_local NUMERIC(5,1), pct_triples_local NUMERIC(5,1),
   pct_simples_visit NUMERIC(5,1), pct_dobles_visit NUMERIC(5,1), pct_triples_visit NUMERIC(5,1),
+  hora_inicio      TIME,                    -- hora del partido ej: 20:00
   lugar            TEXT,
   estado           TEXT DEFAULT 'pendiente',
   mvp_jugadora_id  TEXT,
@@ -77,6 +78,7 @@ ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS pct_triples_local NUMERIC
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS pct_simples_visit NUMERIC(5,1);
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS pct_dobles_visit  NUMERIC(5,1);
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS pct_triples_visit NUMERIC(5,1);
+ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS hora_inicio       TIME;
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS lugar             TEXT;
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS mvp_jugadora_id   TEXT;
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS creado_en         TIMESTAMPTZ DEFAULT now();

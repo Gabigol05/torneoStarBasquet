@@ -333,9 +333,16 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       <div key={idx} className="tp-match-card upcoming"
                         style={{ '--team-color': team.color }}>
                         <div className="tp-match-header">
-                          <span className="tp-match-date">
-                            {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
-                          </span>
+                          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                            <span className="tp-match-date">
+                              {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
+                            </span>
+                            {p.hora && (
+                              <span style={{ fontSize:12, color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", letterSpacing:.5 }}>
+                                🕐 {p.hora}
+                              </span>
+                            )}
+                          </div>
                           <span className="tp-match-result upcoming">PRÓXIMO</span>
                         </div>
                         <div className="tp-match-info">

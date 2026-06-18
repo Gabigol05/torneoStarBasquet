@@ -117,6 +117,7 @@ async function fetchTodo() {
           fechaNum:  fecha?.numero,
           fechaDesc: fecha?.descripcion,
           lugar:     p.lugar,
+          hora:      p.hora_inicio ? String(p.hora_inicio).slice(0,5) : null,
           estado:    p.estado,
         });
       }

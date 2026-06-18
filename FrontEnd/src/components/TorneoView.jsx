@@ -91,7 +91,14 @@ function MatchResultCard({ partido, equiposFem, fechas, onClick }) {
     <div className="result-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       {/* Header */}
       <div className="rc-header">
-        <span className="rc-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Partido'}</span>
+        <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+          <span className="rc-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Partido'}</span>
+          {partido.hora_inicio && (
+            <span style={{ fontSize:11, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>
+              🕐 {String(partido.hora_inicio).slice(0,5)}
+            </span>
+          )}
+        </div>
         <span className={`rc-estado ${enVivo ? 'en-vivo' : 'finalizado'}`}>
           {enVivo ? '🔴 EN VIVO' : 'FINAL'}
         </span>
@@ -195,7 +202,14 @@ function FixtureCard({ partido, equiposFem, fechas }) {
     <div className="fixture-card">
       <div className="fc2-header">
         <span className="fc2-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Próximo'}</span>
-        {partido.lugar && <span className="fc2-lugar">📍 {partido.lugar}</span>}
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          {partido.hora_inicio && (
+            <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, color:'#F0B429', letterSpacing:.5 }}>
+              🕐 {String(partido.hora_inicio).slice(0,5)}
+            </span>
+          )}
+          {partido.lugar && <span className="fc2-lugar">📍 {partido.lugar}</span>}
+        </div>
       </div>
       <div className="fc2-body">
         <div className="fc2-equipo">

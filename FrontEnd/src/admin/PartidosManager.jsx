@@ -9,7 +9,7 @@ const EMPTY_PARTIDO = {
   puntos_local:'',    puntos_visit:'',
   q1_local:'', q2_local:'', q3_local:'', q4_local:'', ot_local:'',
   q1_visit:'', q2_visit:'', q3_visit:'', q4_visit:'', ot_visit:'',
-  fecha_id:'', lugar:'', estado:'pendiente',
+  fecha_id:'', hora_inicio:'', lugar:'', estado:'pendiente',
 };
 
 function LogoEq({ id, size=28 }) {
@@ -143,6 +143,12 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
           </select>
         </div>
         <div style={F.group}>
+          <label style={F.label}>HORA DEL PARTIDO</label>
+          <input type="time" value={form.hora_inicio ?? ''}
+            onChange={e => setForm(f => ({...f, hora_inicio:e.target.value}))}
+            style={F.input}/>
+        </div>
+        <div style={F.group}>
           <label style={F.label}>LUGAR (opcional)</label>
           {inp('lugar', 'Club, cancha...')}
         </div>
@@ -165,12 +171,12 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [partidos,     setPartidos]     = useState([
-    { equipo_local_id:'', equipo_visit_id:'', lugar:'' },
+    { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' },
   ]);
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
 
-  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', lugar:'' }]);
+  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
   const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => j===i?{...r,[field]:val}:r));
 
@@ -288,6 +294,13 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
                   ))}
                 </select>
               </div>
+              <div style={{ flex:'0 0 110px', minWidth:100 }}>
+                <input type="time"
+                  value={p.hora_inicio ?? ''}
+                  onChange={e => updatePartido(i,'hora_inicio',e.target.value)}
+                  style={{ ...F.input, fontFamily:"'Barlow Condensed',sans-serif", fontSize:16 }}
+                  title="Hora del partido"/>
+              </div>
               <div style={{ flex:'0 0 180px', minWidth:140 }}>
                 <input type="text" placeholder="Lugar (opcional)"
                   value={p.lugar ?? ''}
@@ -352,6 +365,7 @@ export default function PartidosManager() {
         equipo_visit_id: form.equipo_visit_id,
         fecha_id:        form.fecha_id || null,
         lugar:           form.lugar    || null,
+        hora_inicio:     form.hora_inicio || null,
         estado:          form.estado,
         q1_local: Number(form.q1_local||0), q2_local: Number(form.q2_local||0),
         q3_local: Number(form.q3_local||0), q4_local: Number(form.q4_local||0), ot_local: Number(form.ot_local||0),
@@ -376,7 +390,7 @@ export default function PartidosManager() {
   const handleEdit = (p) => {
     setForm({
       equipo_local_id: p.equipo_local_id??'', equipo_visit_id: p.equipo_visit_id??'',
-      fecha_id: p.fecha_id??'', lugar: p.lugar??'', estado: p.estado??'pendiente',
+      fecha_id: p.fecha_id??'', hora_inicio: p.hora_inicio??'', lugar: p.lugar??'', estado: p.estado??'pendiente',
       q1_local:p.q1_local??'', q2_local:p.q2_local??'', q3_local:p.q3_local??'', q4_local:p.q4_local??'', ot_local:p.ot_local??'',
       q1_visit:p.q1_visit??'', q2_visit:p.q2_visit??'', q3_visit:p.q3_visit??'', q4_visit:p.q4_visit??'', ot_visit:p.ot_visit??'',
     });
@@ -534,7 +548,8 @@ export default function PartidosManager() {
                           </div>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                             <EstadoBadge estado={p.estado}/>
-                            {p.lugar && <span style={{ fontSize:11, color:'#4A566E' }}>📍 {p.lugar}</span>}
+                            {p.hora_inicio && <span style={{ fontSize:11, color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:14 }}>🕐 {p.hora_inicio.slice(0,5)}</span>}
+                    {p.lugar && <span style={{ fontSize:11, color:'#4A566E' }}>📍 {p.lugar}</span>}
                             {/* Parciales */}
                             {p.estado==='finalizado' && p.q1_local!=null && (
                               <div style={{ display:'flex', gap:4 }}>

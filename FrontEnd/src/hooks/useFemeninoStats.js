@@ -147,6 +147,16 @@ async function fetchTodo() {
           fgp: st.pct_dobles  ?? 0,
           tpp: st.pct_triples ?? 0,
           tlp: st.pct_simples ?? 0,
+          // tiros convertidos/fallados
+          sc_total: st.sc_total ?? 0,
+          sf_total: st.sf_total ?? 0,
+          dc_total: st.dc_total ?? 0,
+          df_total: st.df_total ?? 0,
+          tc_total: st.tc_total ?? 0,
+          tf_total: st.tf_total ?? 0,
+          sc_prom:  st.sc_prom  ?? 0,
+          dc_prom:  st.dc_prom  ?? 0,
+          tc_prom:  st.tc_prom  ?? 0,
         };
       }),
     };

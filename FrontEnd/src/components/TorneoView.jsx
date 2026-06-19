@@ -642,6 +642,16 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             ...j,
                             id: j.id, name: j.nombre, team: j.equipo,
                             fechaNac: j.fechaNac, equipoId: j.equipoId,
+                            color: j.equipoColor,
+                            sc_total: j.sc_total ?? 0,
+                            sf_total: j.sf_total ?? 0,
+                            dc_total: j.dc_total ?? 0,
+                            df_total: j.df_total ?? 0,
+                            tc_total: j.tc_total ?? 0,
+                            tf_total: j.tf_total ?? 0,
+                            sc_prom:  j.sc_prom  ?? 0,
+                            dc_prom:  j.dc_prom  ?? 0,
+                            tc_prom:  j.tc_prom  ?? 0,
                           })}>
                           <div className="player-item-avatar"
                             style={{ background:`${j.equipoColor}22`, border:`1.5px solid ${j.equipoColor}55` }}>

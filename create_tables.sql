@@ -168,6 +168,17 @@ CREATE TABLE IF NOT EXISTS estadisticas_femenino (
   ast_total        INT          DEFAULT 0,
   mejor_pts        INT          DEFAULT 0,
   mejor_pts_rival  TEXT,
+  -- Totales de tiros acumulados (para mostrar SC/SF, DC/DF, TC/TF en perfil)
+  sc_total  INT DEFAULT 0,  -- simples convertidos total
+  sf_total  INT DEFAULT 0,
+  dc_total  INT DEFAULT 0,  -- dobles convertidos total
+  df_total  INT DEFAULT 0,
+  tc_total  INT DEFAULT 0,  -- triples convertidos total
+  tf_total  INT DEFAULT 0,
+  -- Promedios de tiros por partido
+  sc_prom   NUMERIC(5,1) DEFAULT 0,
+  dc_prom   NUMERIC(5,1) DEFAULT 0,
+  tc_prom   NUMERIC(5,1) DEFAULT 0,
   updated_at       TIMESTAMPTZ  DEFAULT now()
 );
 
@@ -316,6 +327,7 @@ BEGIN
     v_rob_prom, v_tap_prom, v_per_prom, v_val_prom,
     v_pts_total, v_reb_total, v_ast_total, v_mejor_pts,
     v_tsc, v_tsf, v_tdc, v_tdf, v_ttc, v_ttf
+  -- Nota: sc/sf/dc/df/tc/tf se usan para pct y también se guardan como totales
   FROM stats_partido_femenino
   WHERE jugadora_id = v_jugadora_id;
 

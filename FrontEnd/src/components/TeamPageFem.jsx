@@ -192,6 +192,16 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                         ast: j.ast_prom ?? j.ast ?? 0,
                         rob: j.rob_prom ?? j.rob ?? 0,
                         tap: j.tap_prom ?? j.tap ?? 0,
+                        // tiros
+                        sc_total: j.sc_total ?? 0,
+                        sf_total: j.sf_total ?? 0,
+                        dc_total: j.dc_total ?? 0,
+                        df_total: j.df_total ?? 0,
+                        tc_total: j.tc_total ?? 0,
+                        tf_total: j.tf_total ?? 0,
+                        sc_prom:  j.sc_prom  ?? 0,
+                        dc_prom:  j.dc_prom  ?? 0,
+                        tc_prom:  j.tc_prom  ?? 0,
                       })}
                     >
                       {/* Avatar */}

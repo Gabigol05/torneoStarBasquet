@@ -57,22 +57,12 @@ import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
 
-import logoMambas   from '../assets/logo_mambas.png';
-import logoToros    from '../assets/logo_toros.png';
-import logoSpartans from '../assets/logo_spartans.png';
-
 const TABS = [
   { key: 'tabla',      label: '📊 Tabla'     },
   { key: 'resultados', label: '🏀 Resultados' },
   { key: 'fixture',    label: '📅 Fixture'    },
   { key: 'jugadores',  label: '👤 Jugadoras'  },
   { key: 'equipos',    label: '🏟️ Equipos'    },
-];
-
-const TEAMS_MASC = [
-  { id: 'm1', name: 'Black Mambas', logo: logoMambas,   record: '7-0', color: '#3b82f6', pg: 7, pp: 0 },
-  { id: 'm2', name: 'Los Toros',    logo: logoToros,    record: '6-1', color: '#ef4444', pg: 6, pp: 1 },
-  { id: 'm3', name: 'Spartans',     logo: logoSpartans, record: '5-2', color: '#b45309', pg: 5, pp: 2 },
 ];
 
 const IG_URL = 'https://www.instagram.com/torneostar.basquet/';
@@ -537,7 +527,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             );
                           })
                         ) : (
-                          TEAMS_MASC.map((t, idx) => (
+                          EQUIPOSMASCULINO.map((t, idx) => (
                             <tr key={t.id}>
                               <td className="team-cell">
                                 <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
@@ -784,7 +774,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     </div>
                   ))
                 ) : (
-                  TEAMS_MASC.map(team => (
+                  EQUIPOSMASCULINO.map(team => (
                     <div className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`} key={team.id}
                       onClick={() => {
                         const isTouch = window.matchMedia('(hover: none)').matches;

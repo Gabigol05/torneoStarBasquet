@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CounterUp } from './CounterUp';
+=======
+import { TournamentSelector } from './TournamentSelector';
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 import { useTournament } from '../context/TournamentContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
@@ -10,6 +14,7 @@ const MODE_COLORS = {
 
 const HERO_DATA = {
   masculino: {
+<<<<<<< HEAD
     badge: 'Torneo Masculino · En Curso',
     subtitle: 'Categoría Masculina · Córdoba · 2026',
     stats: [
@@ -30,6 +35,14 @@ const HERO_DATA = {
       { end: 180, label: 'Jugadoras', suffix: '+' },
       { end: 34,  label: 'Partidos' },
     ],
+=======
+    badge:    '♂ Torneo Masculino · En Curso',
+    subtitle: 'Categoría Masculina · Córdoba · 2026',
+  },
+  femenino: {
+    badge:    '♀ Torneo Femenino · En Curso',
+    subtitle: 'Categoría Femenina · Córdoba · 2026',
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
   },
 };
 
@@ -79,6 +92,7 @@ export function Hero() {
   }, [mode, transitioning, toggleMode]);
 
   return (
+<<<<<<< HEAD
     <section ref={rootRef} id="inicio" className={`hero hero-mode-${mode}`}>
       <div className="hero-bg-glow" />
       <div className="hero-bg-grid" />
@@ -144,7 +158,34 @@ export function Hero() {
             </svg>
           </div>
         </div>
+=======
+    <section className={`hero hero-mode-${mode}`} id="inicio">
+      <div className="hero-orb hero-orb-1"/>
+      <div className="hero-orb hero-orb-2"/>
+      <div className="hero-orb hero-orb-3"/>
+      <div className="hero-grid"/>
+
+      <div className={`hero-badge hero-badge-${mode}`}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+        </svg>
+        {data.badge}
+      </div>
+
+      <h1 className="hero-title">
+        TORNEO<br/><span>STAR </span>BÁSQUET
+      </h1>
+
+      <p className="hero-subtitle">{data.subtitle}</p>
+
+      <TournamentSelector/>
+
+      <div className="scroll-arrow">
+        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
       </div>
     </section>
   );
-}
+} 

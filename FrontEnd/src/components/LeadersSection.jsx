@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿import { useTournament } from '../context/TournamentContext';
+=======
+import { useTournament } from '../context/TournamentContext';
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 
 function calcLiders(equipos, statKey, n = 3) {
   const all = [];
@@ -17,7 +21,11 @@ function getInitials(nombre) {
 
 function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
   const lideres = calcLiders(equipos, statKey);
+<<<<<<< HEAD
   const top = lideres[0];
+=======
+  const top     = lideres[0];
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
   const hayDatos = top && top.val > 0;
   return (
     <div className="leader-card fem">
@@ -30,7 +38,12 @@ function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
       ) : (
         <>
           <div className="lc-top">
+<<<<<<< HEAD
             <div className="lc-avatar" style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}55` }}>
+=======
+            <div className="lc-avatar"
+              style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}55` }}>
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
               {getInitials(top.nombre)}
             </div>
             <div>
@@ -67,11 +80,16 @@ const CATEGORIAS_FEM = [
 
 export function LeadersSection({ equipos = [], isLoading = false }) {
   const { mode } = useTournament();
+<<<<<<< HEAD
+=======
+
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
   return (
     <>
       <section className="page-section" id="jugadores">
         <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Estadísticas Individuales</p>
         <h2 className="section-heading">Líderes <span className="gold">2026</span></h2>
+<<<<<<< HEAD
         {mode === 'femenino' && (
           <>
             <div style={{ marginBottom: 24, fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--gray)' }}>
@@ -98,10 +116,57 @@ export function LeadersSection({ equipos = [], isLoading = false }) {
             </div>
           </>
         )}
+=======
+
+        {/* ── FEMENINO ── */}
+        {mode === 'femenino' && (
+          <>
+            <div style={{ marginBottom: 24, fontFamily: "'Barlow Condensed'", fontSize: 12,
+              fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--gray)' }}>
+              TORNEO FEMENINO
+            </div>
+            {isLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7A99' }}>
+                Cargando estadísticas...
+              </div>
+            ) : (
+              <div className="leaders-grid">
+                {CATEGORIAS_FEM.map(cat => (
+                  <LeaderCard key={cat.statKey} {...cat} equipos={equipos}/>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── MASCULINO ── */}
+        {mode === 'masculino' && (
+          <>
+            <div style={{ marginBottom: 24, fontFamily: "'Barlow Condensed'", fontSize: 12,
+              fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--gray)' }}>
+              TORNEO MASCULINO
+            </div>
+            <div style={{ padding: '40px', textAlign: 'center', background: 'var(--dark2)',
+              borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>🏀</div>
+              <div style={{ fontFamily: "'Bebas Neue'", fontSize: 20, color: 'var(--white)', marginBottom: 8 }}>
+                Estadísticas en camino
+              </div>
+              <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 14, color: 'var(--gray)' }}>
+                Se publicarán cuando los datos del torneo masculino se carguen
+              </div>
+            </div>
+          </>
+        )}
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
       </section>
       <div className="full-rule"/>
     </>
   );
+<<<<<<< HEAD
 }
 
 
+=======
+} 
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17

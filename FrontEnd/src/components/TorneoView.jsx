@@ -48,7 +48,10 @@ function TableSkeleton() {
   );
 }
 
+<<<<<<< HEAD
 import { equiposMasculino } from '../data/masculinoData';
+=======
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 import { useTournament }    from '../context/TournamentContext';
 import { GameCenterModal }  from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
@@ -57,7 +60,10 @@ import { FavoritoCard }     from './FavoritoCard';
 import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
+<<<<<<< HEAD
 
+=======
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 
 const TABS = [
   { key: 'tabla',      label: '📊 Tabla'     },
@@ -66,7 +72,10 @@ const TABS = [
   { key: 'jugadores',  label: '👤 Jugadoras'  },
   { key: 'equipos',    label: '🏟️ Equipos'    },
 ];
+<<<<<<< HEAD
 
+=======
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 
 const IG_URL = 'https://www.instagram.com/torneostar.basquet/';
 
@@ -517,7 +526,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                 <td>{t.pf}</td><td>{t.pc}</td>
                                 <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
                                 <td className="pct-td">{pct}</td>
+<<<<<<< HEAD
                                 <td className="pts-td" style={{ color: modeColor }}>-</td>
+=======
+                                <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                                 <td className="td-racha">
                                   {t.historial?.slice(-5).map((h, i) => (
                                     <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
@@ -530,7 +543,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             );
                           })
                         ) : (
+<<<<<<< HEAD
                           equiposMasculino.map((t, idx) => (
+=======
+                          EQUIPOSMASCULINO.map((t, idx) => (
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                             <tr key={t.id}>
                               <td className="team-cell">
                                 <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
@@ -538,7 +555,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                   style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}/>
                                 <span className="team-name-txt">{t.name}</span>
                               </td>
+<<<<<<< HEAD
                               <td>-</td><td>-</td><td>-</td>
+=======
+                              <td>{t.pg + t.pp}</td><td>{t.pg}</td><td>{t.pp}</td>
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                               <td>–</td><td>–</td><td>–</td>
                               <td className="pct-td">–</td>
                               <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
@@ -711,11 +732,29 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       ))
                     )
                   ) : (
+<<<<<<< HEAD
                     <div style={{textAlign:"center",padding:"3rem",color:"#6B7A99"}}>
     <div style={{fontSize:32,marginBottom:12}}>🏀</div>
     <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#EEF2F8",marginBottom:8}}>Proximamente</div>
     <div style={{fontSize:13}}>Los jugadores del torneo masculino se cargaran pronto</div>
   </div>}
+=======
+                    [1, 2, 3, 4, 5, 6].map(i => (
+                      <div className="player-item" key={i}
+                        onClick={() => handleSelectPlayer({ id: i, name: `Jugador ${i}`, team: 'Black Mambas', pts: 0, reb: 0, ast: 0 })}>
+                        <div className="player-item-avatar">
+                          <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: '20px', color: 'var(--gray)' }}>
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                          </svg>
+                        </div>
+                        <div className="player-item-info">
+                          <div className="player-item-name">Jugador {i}</div>
+                          <div className="player-item-team">Black Mambas</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                 </div>
               </div>
             )}
@@ -767,7 +806,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     </div>
                   ))
                 ) : (
+<<<<<<< HEAD
                   equiposMasculino.map(team => (
+=======
+                  EQUIPOSMASCULINO.map(team => (
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                     <div className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`} key={team.id}
                       onClick={() => {
                         const isTouch = window.matchMedia('(hover: none)').matches;

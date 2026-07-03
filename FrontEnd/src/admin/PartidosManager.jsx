@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
@@ -613,3 +613,5 @@ const F = {
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
 };
+
+

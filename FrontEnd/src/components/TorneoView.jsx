@@ -1,6 +1,5 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+﻿import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
 function Skel({ w = '100%', h = 16, radius = 6, mb = 8, style = {} }) {
   return (
     <div style={{
@@ -48,10 +47,7 @@ function TableSkeleton() {
   );
 }
 
-<<<<<<< HEAD
 import { equiposMasculino } from '../data/masculinoData';
-=======
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 import { useTournament }    from '../context/TournamentContext';
 import { GameCenterModal }  from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
@@ -60,26 +56,17 @@ import { FavoritoCard }     from './FavoritoCard';
 import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
-<<<<<<< HEAD
-
-=======
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 
 const TABS = [
-  { key: 'tabla',      label: '📊 Tabla'     },
-  { key: 'resultados', label: '🏀 Resultados' },
-  { key: 'fixture',    label: '📅 Fixture'    },
-  { key: 'jugadores',  label: '👤 Jugadoras'  },
-  { key: 'equipos',    label: '🏟️ Equipos'    },
+  { key: 'tabla',      label: 'Tabla'     },
+  { key: 'resultados', label: 'Resultados' },
+  { key: 'fixture',    label: 'Fixture'    },
+  { key: 'jugadores',  label: 'Jugadoras'  },
+  { key: 'equipos',    label: 'Equipos'    },
 ];
-<<<<<<< HEAD
-
-=======
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
 
 const IG_URL = 'https://www.instagram.com/torneostar.basquet/';
 
-// ── Mapa de jugadoras para lookup O(1) — evita buscar en cada render ──────────
 function buildJugadorasMap(equipos) {
   const map = {};
   for (const eq of equipos) {
@@ -105,14 +92,12 @@ function EmptyState({ icon, title, sub, showIG = true }) {
   );
 }
 
-// ── Tarjeta de resultado ──────────────────────────────────────────────────────
 function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
   const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
   const fecha   = fechas.find(f => f.id === partido.fecha_id);
   const enVivo  = partido.estado === 'en_juego';
 
-  // ⚠️ FIX: calcular puntos desde cuartos si puntos_local/visit son null
   const ptsLocal = partido.puntos_local ??
     ((partido.q1_local ?? 0) + (partido.q2_local ?? 0) +
      (partido.q3_local ?? 0) + (partido.q4_local ?? 0) + (partido.ot_local ?? 0));
@@ -123,28 +108,24 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
 
   if (!localEq || !visitEq) return null;
 
-  // ⚠️ FIX: leer MVP desde mvp_jugadora_id (no recalcular)
   const mvpJug = partido.mvp_jugadora_id ? jugadorasMap[partido.mvp_jugadora_id] : null;
 
   return (
     <div className="result-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      {/* Header */}
       <div className="rc-header">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span className="rc-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Partido'}</span>
-          {/* ⚠️ FIX: mostrar hora_inicio, no lugar */}
           {partido.hora_inicio && (
             <span style={{ fontSize: 11, color: '#4A566E', fontFamily: "'Barlow Condensed',sans-serif" }}>
-              🕐 {String(partido.hora_inicio).slice(0, 5)}
+              {String(partido.hora_inicio).slice(0, 5)}
             </span>
           )}
         </div>
         <span className={`rc-estado ${enVivo ? 'en-vivo' : 'finalizado'}`}>
-          {enVivo ? '🔴 EN VIVO' : 'FINAL'}
+          {enVivo ? 'EN VIVO' : 'FINAL'}
         </span>
       </div>
 
-      {/* Equipos + marcador */}
       <div className="rc-body">
         <div className={`rc-equipo ${ganLocal ? 'ganador' : ''}`}>
           <img src={localEq.logo} alt={localEq.name} className="rc-logo" loading="lazy"
@@ -154,7 +135,7 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
             {ptsLocal}
           </span>
         </div>
-        <div className="rc-sep">–</div>
+        <div className="rc-sep">-</div>
         <div className={`rc-equipo rc-equipo-visit ${!ganLocal ? 'ganador' : ''}`}>
           <span className="rc-pts" style={{ color: !ganLocal ? visitEq.color : '#6B7A99' }}>
             {ptsVisit}
@@ -165,7 +146,6 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
         </div>
       </div>
 
-      {/* Parciales */}
       {partido.q1_local != null && (
         <div className="rc-parciales">
           {['q1', 'q2', 'q3', 'q4'].map(q => (
@@ -191,10 +171,9 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
         </div>
       )}
 
-      {/* MVP — leído desde BD, no recalculado */}
       {mvpJug && (
         <div className="rc-mvp">
-          <span style={{ fontSize: 16 }}>⭐</span>
+          <span style={{ fontSize: 16 }}>*</span>
           <div>
             <div className="rc-mvp-label">MVP del partido</div>
             <div className="rc-mvp-name">{mvpJug.nombre}</div>
@@ -203,25 +182,24 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
         </div>
       )}
 
-      {/* % tiro */}
       {partido.pct_dobles_local != null && (
         <div className="rc-pct-row">
           <span className="rc-pct-item">
             <span className="rc-pct-lbl">TL%</span>
             <span style={{ color: localEq.color }}>{partido.pct_simples_local}%</span>
-            <span className="rc-pct-sep">·</span>
+            <span className="rc-pct-sep">.</span>
             <span style={{ color: visitEq.color }}>{partido.pct_simples_visit}%</span>
           </span>
           <span className="rc-pct-item">
             <span className="rc-pct-lbl">2P%</span>
             <span style={{ color: localEq.color }}>{partido.pct_dobles_local}%</span>
-            <span className="rc-pct-sep">·</span>
+            <span className="rc-pct-sep">.</span>
             <span style={{ color: visitEq.color }}>{partido.pct_dobles_visit}%</span>
           </span>
           <span className="rc-pct-item">
             <span className="rc-pct-lbl">3P%</span>
             <span style={{ color: localEq.color }}>{partido.pct_triples_local}%</span>
-            <span className="rc-pct-sep">·</span>
+            <span className="rc-pct-sep">.</span>
             <span style={{ color: visitEq.color }}>{partido.pct_triples_visit}%</span>
           </span>
         </div>
@@ -230,7 +208,6 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
   );
 }
 
-// ── Tarjeta de próximo partido ────────────────────────────────────────────────
 function FixtureCard({ partido, equiposFem, fechas }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
   const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
@@ -239,14 +216,14 @@ function FixtureCard({ partido, equiposFem, fechas }) {
   return (
     <div className="fixture-card">
       <div className="fc2-header">
-        <span className="fc2-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Próximo'}</span>
+        <span className="fc2-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Proximo'}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {partido.hora_inicio && (
             <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, color: '#F0B429', letterSpacing: .5 }}>
-              🕐 {String(partido.hora_inicio).slice(0, 5)}
+              {String(partido.hora_inicio).slice(0, 5)}
             </span>
           )}
-          {partido.lugar && <span className="fc2-lugar">📍 {partido.lugar}</span>}
+          {partido.lugar && <span className="fc2-lugar">{partido.lugar}</span>}
         </div>
       </div>
       <div className="fc2-body">
@@ -266,7 +243,6 @@ function FixtureCard({ partido, equiposFem, fechas }) {
   );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
 export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extSelectTeam }) {
   const { mode } = useTournament();
   const {
@@ -280,7 +256,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const { toggleFavorito, esFavorito } = useFavorito();
 
   const [activeTab,       setActiveTab]       = useState('tabla');
-  const [prevTab,         setPrevTab]         = useState('tabla'); // ⚠️ FIX: recordar tab al volver
+  const [prevTab,         setPrevTab]         = useState('tabla');
   const [selectedMatch,   setSelectedMatch]   = useState(null);
   const [selectedPlayer,  setSelectedPlayer]  = useState(null);
   const [selectedTeamId,  setSelectedTeamId]  = useState(null);
@@ -289,7 +265,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const [tappedCard,      setTappedCard]      = useState(null);
   const [fechaSelId,      setFechaSelId]      = useState(null);
 
-  // ⚠️ FIX: mapa de jugadoras O(1) — evita find() en cada card de resultado
   const jugadorasMap = useMemo(() => buildJugadorasMap(equiposFemenino), [equiposFemenino]);
 
   const selectedTeamFem = selectedTeamId
@@ -331,17 +306,16 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const handleSelectPlayer = p => { setSelectedPlayer(p); extSelectPlayer?.(p); };
 
   const handleSelectTeam = t => {
-    setPrevTab(activeTab); // ⚠️ FIX: guardar tab actual antes de navegar
+    setPrevTab(activeTab);
     setSelectedTeamId(t.id);
     extSelectTeam?.(t);
   };
 
   const handleBackFromTeam = () => {
     setSelectedTeamId(null);
-    setActiveTab(prevTab); // ⚠️ FIX: restaurar tab al volver
+    setActiveTab(prevTab);
   };
 
-  // Jugadoras filtradas
   const jugadorasFiltradas = useMemo(() => {
     const q = searchJugadoras.toLowerCase();
     return equiposFemenino.flatMap(team =>
@@ -355,7 +329,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     );
   }, [equiposFemenino, searchJugadoras, filterEquipoId]);
 
-  // Partidos filtrados
   const partidosFinalizados = useMemo(() =>
     partidos
       .filter(p => p.estado === 'finalizado')
@@ -370,7 +343,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
       .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0)),
     [partidos, fechaSelId]);
 
-  // ⚠️ FIX: ordenamiento correcto de tabla — por PTS, luego DIF, luego PF
   const equiposOrdenados = useMemo(() =>
     [...equiposFemenino].sort((a, b) => {
       const ptsA = a.pg * 2, ptsB = b.pg * 2;
@@ -405,7 +377,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     );
   };
 
-  // ⚠️ FIX: usar handleBackFromTeam para restaurar tab
   if (selectedTeamFem && mode === 'femenino') {
     return (
       <TeamPageFem
@@ -441,7 +412,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
       <div className="torneo-section" id="torneo-view">
         <div className="torneo-inner">
 
-          {/* Header */}
           <div className="gender-header">
             <div>
               <div className="gender-pill">
@@ -465,11 +435,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
           {statsError && mode === 'femenino' && (
             <div className="stats-error-banner">
-              ⚠️ Error al cargar estadísticas. Reintentando...
+              Error al cargar estadisticas. Reintentando...
             </div>
           )}
 
-          {/* Tabs */}
           <div className="tab-nav">
             {TABS.map(tab => (
               <button key={tab.key} type="button"
@@ -492,7 +461,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
           <div {...swipeHandlers} style={{ touchAction: 'pan-y' }}>
 
-            {/* ══ TABLA ══ */}
             {activeTab === 'tabla' && (
               <div>
                 {isLoadingStats ? <TableSkeleton/> : (
@@ -520,34 +488,26 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                     style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
                                     onError={e => { e.target.style.display = 'none'; }}/>
                                   <span className="team-name-txt">{t.name}</span>
-                                  {esFavorito(t.id) && <span className="fav-star">⭐</span>}
+                                  {esFavorito(t.id) && <span className="fav-star">*</span>}
                                 </td>
                                 <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
                                 <td>{t.pf}</td><td>{t.pc}</td>
                                 <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
                                 <td className="pct-td">{pct}</td>
-<<<<<<< HEAD
-                                <td className="pts-td" style={{ color: modeColor }}>-</td>
-=======
                                 <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                                 <td className="td-racha">
                                   {t.historial?.slice(-5).map((h, i) => (
                                     <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
                                       {h.resultado}
                                     </span>
                                   ))}
-                                  {!t.historial?.length && <span className="racha-nd">–</span>}
+                                  {!t.historial?.length && <span className="racha-nd">-</span>}
                                 </td>
                               </tr>
                             );
                           })
                         ) : (
-<<<<<<< HEAD
                           equiposMasculino.map((t, idx) => (
-=======
-                          EQUIPOSMASCULINO.map((t, idx) => (
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                             <tr key={t.id}>
                               <td className="team-cell">
                                 <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
@@ -555,15 +515,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                   style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}/>
                                 <span className="team-name-txt">{t.name}</span>
                               </td>
-<<<<<<< HEAD
-                              <td>-</td><td>-</td><td>-</td>
-=======
                               <td>{t.pg + t.pp}</td><td>{t.pg}</td><td>{t.pp}</td>
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
-                              <td>–</td><td>–</td><td>–</td>
-                              <td className="pct-td">–</td>
+                              <td>-</td><td>-</td><td>-</td>
+                              <td className="pct-td">-</td>
                               <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
-                              <td className="td-racha"><span className="racha-nd">–</span></td>
+                              <td className="td-racha"><span className="racha-nd">-</span></td>
                             </tr>
                           ))
                         )}
@@ -576,7 +532,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           Clasifican a playoffs
                         </div>
                         <div style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--gray)' }}>
-                          Desempate: PTS → DIF → PF
+                          Desempate: PTS -&gt; DIF -&gt; PF
                         </div>
                       </div>
                     )}
@@ -585,7 +541,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
               </div>
             )}
 
-            {/* ══ RESULTADOS ══ */}
             {activeTab === 'resultados' && (
               <div>
                 {mode === 'femenino' ? (
@@ -593,8 +548,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     <FechaChips modo="resultados"/>
                     {isLoadingStats ? <ResultSkeleton/> : (
                       partidosFinalizados.length === 0 ? (
-                        <EmptyState icon="🏀" title="Sin resultados todavía"
-                          sub="Los resultados aparecerán acá en cuanto se cargue el primer partido."/>
+                        <EmptyState icon="B" title="Sin resultados todavia"
+                          sub="Los resultados apareceran aca en cuanto se cargue el primer partido."/>
                       ) : (
                         <div className="results-grid">
                           {partidosFinalizados.map(p => (
@@ -609,13 +564,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     )}
                   </>
                 ) : (
-                  <EmptyState icon="🏀" title="Resultados del torneo masculino"
-                    sub="Próximamente disponibles."/>
+                  <EmptyState icon="B" title="Resultados del torneo masculino"
+                    sub="Proximamente disponibles."/>
                 )}
               </div>
             )}
 
-            {/* ══ FIXTURE ══ */}
             {activeTab === 'fixture' && (
               <div>
                 {mode === 'femenino' ? (
@@ -623,8 +577,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     <FechaChips modo="fixture"/>
                     {isLoadingStats ? <ResultSkeleton/> : (
                       partidosPendientes.length === 0 ? (
-                        <EmptyState icon="📅" title="Fixture pendiente de publicación"
-                          sub="Los próximos partidos se cargarán cuando se confirme el fixture oficial."/>
+                        <EmptyState icon="C" title="Fixture pendiente de publicacion"
+                          sub="Los proximos partidos se cargaran cuando se confirme el fixture oficial."/>
                       ) : (
                         <div className="fixture-grid">
                           {partidosPendientes.map(p => (
@@ -636,13 +590,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     )}
                   </>
                 ) : (
-                  <EmptyState icon="📅" title="Fixture masculino"
-                    sub="Se publicará próximamente."/>
+                  <EmptyState icon="C" title="Fixture masculino"
+                    sub="Se publicara proximamente."/>
                 )}
               </div>
             )}
 
-            {/* ══ JUGADORAS ══ */}
             {activeTab === 'jugadores' && (
               <div>
                 <input type="text" className="search-bar"
@@ -691,9 +644,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       ))
                     ) : jugadorasFiltradas.length === 0 ? (
                       <div style={{ gridColumn: '1/-1' }}>
-                        <EmptyState icon="🔍"
+                        <EmptyState icon="?"
                           title={searchJugadoras ? `Sin resultados para "${searchJugadoras}"` : 'Sin jugadoras'}
-                          sub="Probá con otro nombre o equipo" showIG={false}/>
+                          sub="Proba con otro nombre o equipo" showIG={false}/>
                       </div>
                     ) : (
                       jugadorasFiltradas.map(j => (
@@ -721,9 +674,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             {(j.pts_prom ?? 0) > 0 && (
                               <div className="player-item-stats">
                                 <span style={{ color: '#F0B429' }}>{j.pts_prom} PTS</span>
-                                <span style={{ color: '#4A566E' }}> · </span>
+                                <span style={{ color: '#4A566E' }}> - </span>
                                 <span>{j.reb_prom} REB</span>
-                                <span style={{ color: '#4A566E' }}> · </span>
+                                <span style={{ color: '#4A566E' }}> - </span>
                                 <span>{j.ast_prom} AST</span>
                               </div>
                             )}
@@ -732,34 +685,16 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       ))
                     )
                   ) : (
-<<<<<<< HEAD
                     <div style={{textAlign:"center",padding:"3rem",color:"#6B7A99"}}>
-    <div style={{fontSize:32,marginBottom:12}}>🏀</div>
-    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#EEF2F8",marginBottom:8}}>Proximamente</div>
-    <div style={{fontSize:13}}>Los jugadores del torneo masculino se cargaran pronto</div>
-  </div>}
-=======
-                    [1, 2, 3, 4, 5, 6].map(i => (
-                      <div className="player-item" key={i}
-                        onClick={() => handleSelectPlayer({ id: i, name: `Jugador ${i}`, team: 'Black Mambas', pts: 0, reb: 0, ast: 0 })}>
-                        <div className="player-item-avatar">
-                          <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: '20px', color: 'var(--gray)' }}>
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                          </svg>
-                        </div>
-                        <div className="player-item-info">
-                          <div className="player-item-name">Jugador {i}</div>
-                          <div className="player-item-team">Black Mambas</div>
-                        </div>
-                      </div>
-                    ))
+                      <div style={{fontSize:32,marginBottom:12}}>B</div>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#EEF2F8",marginBottom:8}}>Proximamente</div>
+                      <div style={{fontSize:13}}>Los jugadores del torneo masculino se cargaran pronto</div>
+                    </div>
                   )}
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                 </div>
               </div>
             )}
 
-            {/* ══ EQUIPOS ══ */}
             {activeTab === 'equipos' && (
               <div className="teams-grid">
                 {mode === 'femenino' ? (
@@ -777,7 +712,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
                         onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
                         title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}>
-                        {esFavorito(team.id) ? '⭐' : '☆'}
+                        {esFavorito(team.id) ? '*' : 'o'}
                       </button>
                       <div className="flip-card-inner">
                         <div className="flip-card-front">
@@ -789,13 +724,13 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           <div className="fc-subtitle">{team.jugadoras.length} jugadoras</div>
                           {team.pj > 0 && (
                             <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
-                              {team.pg}G — {team.pp}P
+                              {team.pg}G - {team.pp}P
                             </div>
                           )}
                         </div>
                         <div className="flip-card-back">
                           <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
-                          <div className="fc-record-label">RÉCORD ACTUAL</div>
+                          <div className="fc-record-label">RECORD ACTUAL</div>
                           <div className="fc-record-val" style={{ color: team.color }}>{team.pg} - {team.pp}</div>
                           <div className="fc-team-name">{team.name}</div>
                           <div style={{ marginTop: '12px', fontSize: '13px', fontFamily: "'Barlow Condensed'", color: 'var(--gray)', letterSpacing: '1px' }}>
@@ -806,11 +741,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     </div>
                   ))
                 ) : (
-<<<<<<< HEAD
                   equiposMasculino.map(team => (
-=======
-                  EQUIPOSMASCULINO.map(team => (
->>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
                     <div className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`} key={team.id}
                       onClick={() => {
                         const isTouch = window.matchMedia('(hover: none)').matches;
@@ -827,7 +758,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         </div>
                         <div className="flip-card-back">
                           <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
-                          <div className="fc-record-label">RÉCORD ACTUAL</div>
+                          <div className="fc-record-label">RECORD ACTUAL</div>
                           <div className="fc-record-val" style={{ color: team.color }}>{team.record}</div>
                           <div className="fc-team-name">{team.name}</div>
                         </div>
@@ -843,4 +774,4 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
       </div>
     </>
   );
-} 
+}

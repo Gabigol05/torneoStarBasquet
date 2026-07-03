@@ -1,13 +1,11 @@
-import logo from '../assets/logo_torneo.jpg';
+﻿import logo from '../assets/logo_torneo.jpg';
 import { useState, useCallback } from 'react';
-import { TournamentSelector } from './TournamentSelector';
 import { GlobalSearch } from './GlobalSearch';
 import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
 
-// Evento custom para que TorneoView escuche y cambie el tab activo
 function dispatchTabChange(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
 }
@@ -24,9 +22,7 @@ export function Navbar() {
   const handleEquiposClick = useCallback((e) => {
     e.preventDefault();
     closeMobile();
-    // Scroll a torneo-view
     document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-    // Disparar cambio de tab a "equipos" con pequeño delay para que sea visible
     setTimeout(() => dispatchTabChange('equipos'), 400);
   }, []);
 
@@ -37,7 +33,6 @@ export function Navbar() {
     setTimeout(() => dispatchTabChange('jugadores'), 400);
   }, []);
 
-  // Mapeo de sección activa → link del navbar
   const isActive = (href) => {
     if (href === '#inicio')    return activeSection === 'inicio';
     if (href === '#jugadores') return activeSection === 'jugadores' || activeSection === 'torneo-view';
@@ -65,11 +60,9 @@ export function Navbar() {
               Inicio
             </a>
           </li>
-          <li className="nav-item-selector">
-            <TournamentSelector />
-          </li>
           <li>
-            <a
+            
+              <a
               href="#jugadores"
               className={isActive('#jugadores') ? 'active' : ''}
               onClick={handleJugadoresClick}
@@ -78,7 +71,8 @@ export function Navbar() {
             </a>
           </li>
           <li>
-            <a
+            
+              <a
               href="#equipos"
               className={`nav-equipos-link ${isActive('#equipos') ? 'active' : ''} nav-mode-${mode}`}
               onClick={handleEquiposClick}
@@ -106,7 +100,6 @@ export function Navbar() {
           />
 
           <a href="https://www.youtube.com/@TorneoStarBasquet" target="_blank" className="live-badge" title="Mirar en YouTube">
-            {/* Ícono YouTube */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}>
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
             </svg>
@@ -120,9 +113,10 @@ export function Navbar() {
             <span>Instagram</span>
           </a>
 
-          <button className="hamburger-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>☰</button>
+          <button className="hamburger-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>&#9776;</button>
         </div>
       </nav>
     </>
   );
 }
+

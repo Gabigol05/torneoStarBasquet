@@ -1,4 +1,10 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
+
+// Three.js r152+ enabled automatic color management by default, which changes
+// how colors/lighting render compared to the r128 CDN build this scene was
+// originally designed against. Disabling it restores the older, uncorrected
+// color behavior the textures and lighting values were tuned for.
+
 
 const BALL_RADIUS = 1.72;
 const CAMERA_RADIUS = 6.5;
@@ -35,23 +41,30 @@ function makeBallTexture() {
   const x = c.getContext('2d');
 
   const g = x.createLinearGradient(0, 0, 0, 512);
-  g.addColorStop(0, '#f0913a');
-  g.addColorStop(0.5, '#d5701f');
-  g.addColorStop(1, '#a24a12');
+  g.addColorStop(0, '#d97a3d');
+  g.addColorStop(0.5, '#c96426');
+  g.addColorStop(1, '#b3521c');
   x.fillStyle = g;
   x.fillRect(0, 0, 1024, 512);
 
   // pebbled leather grain
-  for (let i = 0; i < 4200; i++) {
+  for (let i = 0; i < 9000; i++) {
     const shade = Math.random() > 0.5
-      ? `rgba(255,205,150,${Math.random() * 0.1})`
-      : `rgba(50,20,5,${Math.random() * 0.09})`;
+      ? `rgba(70,30,8,${Math.random() * 0.16})`
+      : `rgba(255,200,140,${Math.random() * 0.10})`;
     x.fillStyle = shade;
     const r = Math.random() * 1.8 + 0.3;
     x.beginPath();
     x.arc(Math.random() * 1024, Math.random() * 512, r, 0, Math.PI * 2);
     x.fill();
   }
+
+  // subtle darker vignette near poles/edges for roundness cue
+  const vg = x.createRadialGradient(512, 256, 60, 512, 256, 380);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(40,15,3,.28)');
+  x.fillStyle = vg;
+  x.fillRect(0, 0, 1024, 512);
 
   // seam channel: soft highlight either side of a dark groove for depth
   drawSeams(x, 'rgba(255,200,140,.28)', 13);
@@ -136,29 +149,29 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
 
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(BALL_RADIUS, 64, 64),
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       map: makeBallTexture(),
       bumpMap: makeBallBumpMap(),
-      bumpScale: 0.014,
-      roughness: 0.52,
+      bumpScale: 0.028,
+      roughness: 0.58,
       metalness: 0.04,
-      clearcoat: 0.18,
-      clearcoatRoughness: 0.45,
+      
+      
     })
   );
   ball.position.set(0, -0.32, 0);
   scene.add(ball);
 
   scene.add(new THREE.AmbientLight(0x3a4560, 0.7));
-  const key = new THREE.DirectionalLight(0xffffff, 1.3);
+  const key = new THREE.DirectionalLight(0xffffff, 1.15);
   key.position.set(4, 6, 5);
   scene.add(key);
   const warm = new THREE.PointLight(0xffcf80, 0.5, 30);
   warm.position.set(-3, 1, 4);
   scene.add(warm);
-  const glint = new THREE.PointLight(0xffffff, 1.4, 12, 2.2);
-  glint.position.set(2.2, 3.2, 4.4);
-  scene.add(glint);
+  
+  
+  
   const rim = new THREE.PointLight(mood.getHex(), 2.6, 40);
   scene.add(rim);
 
@@ -367,3 +380,17 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
     },
   };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

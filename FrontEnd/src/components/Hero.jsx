@@ -94,7 +94,7 @@ export function Hero() {
           <div className="hero-logo">
             <img src={logoTorneo} alt="Torneo Star Basquet" />
           </div>
-          <span className="hero-liga-label">Liga Oficial - Cordoba 2026</span>
+          <span className="hero-liga-label">Torneo Oficial</span>
         </div>
 
         <div className="hero-center">
@@ -108,7 +108,6 @@ export function Hero() {
             <span className="hero-title-line hero-title-accent">STAR BASQUET</span>
           </h1>
 
-          <p className="hero-subtitle">{data.subtitle}</p>
 
           <button
             type="button"
@@ -147,3 +146,4 @@ export function Hero() {
     </section>
   );
 }
+

@@ -305,224 +305,410 @@ nav {
 
 /* ══════════════════════════════
    HERO
+   3D WebGL basketball hero — see src/three/basketballScene.js for the
+   scene and Hero.jsx for the masc/fem cinematic transition wiring.
 ══════════════════════════════ */
 .hero {
-  min-height: auto;
+  --hero-accent: var(--masc2);
+  --hero-deep: var(--masc);
+  --hero-glow: 79, 163, 255;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  background: radial-gradient(120% 95% at 50% 16%, #0c1424 0%, #070a12 46%, #04060a 100%);
+}
+
+.hero-mode-femenino {
+  --hero-accent: var(--fem2);
+  --hero-deep: var(--fem);
+  --hero-glow: 255, 79, 163;
+}
+
+.hero-bg-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(52% 44% at 50% 46%, rgba(var(--hero-glow), .17) 0%, rgba(var(--hero-glow), .05) 45%, transparent 72%);
+  transition: background .8s ease;
+}
+
+.hero-bg-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .55;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .04) 1px, transparent 1px);
+  background-size: 54px 54px;
+  -webkit-mask-image: radial-gradient(72% 62% at 50% 45%, #000, transparent 76%);
+  mask-image: radial-gradient(72% 62% at 50% 45%, #000, transparent 76%);
+}
+
+.hero-ring {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--hero-glow), .16);
+  transition: border-color .8s ease;
+}
+
+.hero-ring-outer {
+  width: min(72vw, 640px);
+  height: min(72vw, 640px);
+  box-shadow: 0 0 80px rgba(var(--hero-glow), .06) inset;
+}
+
+.hero-ring-inner {
+  width: min(44vw, 400px);
+  height: min(44vw, 400px);
+  border-color: rgba(var(--hero-glow), .1);
+}
+
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+  touch-action: none;
+  cursor: grab;
+}
+
+.hero-canvas:active {
+  cursor: grabbing;
+}
+
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(58% 48% at 50% 46%, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, .2) 62%, rgba(4, 6, 10, .62) 100%);
+}
+
+.hero-scrim-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, .85) 100%);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  text-align: center;
-  padding: var(--spacing-3xl) var(--container-padding) var(--spacing-4xl);
-  gap: var(--spacing-lg);
+  justify-content: space-between;
+  padding: clamp(20px, 4vw, 42px) clamp(16px, 4vw, 52px);
 }
 
-.hero-orb {
-  position: absolute;
+.hero-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-logo {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  filter: blur(clamp(60px, 10vw, 120px));
-  pointer-events: none;
-  opacity: 0.8;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--dark2);
+  border: 1.5px solid rgba(240, 180, 41, .5);
+  box-shadow: 0 0 22px rgba(240, 180, 41, .22);
 }
 
-.hero-orb-1 {
-  width: clamp(300px, 60vw, 700px);
-  height: clamp(300px, 60vw, 700px);
-  background: rgba(240, 180, 41, 0.08);
-  top: clamp(-100px, -15vw, -200px);
-  left: 50%;
-  transform: translateX(-50%);
+.hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.hero-orb-2 {
-  width: clamp(200px, 40vw, 400px);
-  height: clamp(200px, 40vw, 400px);
-  background: rgba(232, 24, 122, 0.06);
-  bottom: 0;
-  left: 0;
+.hero-liga-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  letter-spacing: 3px;
+  font-size: 12px;
+  color: var(--gray);
+  text-transform: uppercase;
 }
 
-.hero-orb-3 {
-  width: clamp(200px, 40vw, 400px);
-  height: clamp(200px, 40vw, 400px);
-  background: rgba(24, 120, 232, 0.06);
-  bottom: 0;
-  right: 0;
-}
-
-.hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(240, 180, 41, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(240, 180, 41, 0.04) 1px, transparent 1px);
-  background-size: clamp(30px, 5vw, 60px) clamp(30px, 5vw, 60px);
-  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+.hero-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(15px, 2.4vw, 22px);
+  width: 100%;
 }
 
 .hero-badge {
   display: inline-flex;
   align-items: center;
-  gap: clamp(6px, 1vw, 8px);
-  padding: clamp(5px, 1vw, 6px) clamp(12px, 2vw, 16px);
-  border: 1px solid rgba(240, 180, 41, 0.3);
-  border-radius: 20px;
+  gap: 9px;
+  padding: 8px 18px;
+  border-radius: 100px;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(12px, 1.5vw, 14px);
   font-weight: 700;
-  letter-spacing: clamp(1.5px, 0.3vw, 3px);
+  letter-spacing: 2.5px;
+  font-size: clamp(11px, 1.6vw, 13px);
   text-transform: uppercase;
-  color: var(--gold);
-  margin-bottom: var(--spacing-md);
+  color: var(--hero-accent);
+  background: rgba(var(--hero-glow), .1);
+  border: 1px solid rgba(var(--hero-glow), .34);
+  transition: color .8s ease, background .8s ease, border-color .8s ease;
   animation: fadeUp 0.8s ease both;
+}
+
+.hero-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hero-accent);
+  box-shadow: 0 0 10px var(--hero-accent);
+  animation: starDot 1.6s infinite;
+  transition: background .8s ease;
 }
 
 .hero-title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(48px, 12vw, 140px);
-  line-height: 0.88;
-  letter-spacing: clamp(1px, 0.3vw, 3px);
+  margin: 0;
+  line-height: .8;
+  font-size: clamp(60px, 13.5vw, 184px);
+  letter-spacing: 2px;
+  text-shadow: 0 10px 55px rgba(0, 0, 0, .72);
   animation: fadeUp 0.8s 0.1s ease both;
-  margin-bottom: var(--spacing-sm);
 }
 
-.hero-title span {
+.hero-title-line {
   display: block;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--orange) 60%, var(--gold2) 100%);
+  color: var(--white);
+}
+
+.hero-title-accent {
+  background: linear-gradient(100deg, var(--gold) 0%, var(--orange) 52%, var(--gold2) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 clamp(20px, 4vw, 40px) rgba(240, 180, 41, 0.3));
 }
 
 .hero-subtitle {
+  margin: 0;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(12px, 2vw, 20px);
-  font-weight: 300;
-  letter-spacing: clamp(3px, 1vw, 8px);
-  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 2.5px;
+  font-size: clamp(12px, 2vw, 17px);
   color: var(--gray);
-  margin-top: var(--spacing-sm);
+  text-transform: uppercase;
+  transition: color .8s ease;
   animation: fadeUp 0.8s 0.2s ease both;
 }
 
-.hero-cats {
-  display: flex;
-  gap: clamp(12px, 2vw, 20px);
-  margin-top: var(--spacing-xl);
-  flex-wrap: wrap;
-  justify-content: center;
-  animation: fadeUp 0.8s 0.35s ease both;
-  width: 100%;
-  max-width: 500px;
+.hero-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 236px;
+  height: 48px;
+  padding: 5px;
+  border-radius: 100px;
+  background: rgba(10, 15, 26, .72);
+  border: 1px solid rgba(255, 255, 255, .09);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  animation: fadeUp 0.8s 0.3s ease both;
 }
 
-.cat-btn {
+.hero-toggle:disabled {
+  cursor: default;
+  opacity: .85;
+}
+
+.hero-toggle-slider {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 113px;
+  height: 38px;
+  border-radius: 100px;
+  background: linear-gradient(180deg, var(--hero-accent), var(--hero-deep));
+  box-shadow: 0 6px 20px rgba(var(--hero-glow), .55);
+  transition: left .65s cubic-bezier(.7, 0, .15, 1), background .65s ease;
+}
+
+.hero-mode-femenino .hero-toggle-slider {
+  left: 118px;
+}
+
+.hero-toggle-opt {
+  position: relative;
+  z-index: 2;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(8px, 1.5vw, 12px);
-  padding: clamp(12px, 2vw, 16px) clamp(24px, 4vw, 32px);
-  border-radius: 6px;
+  gap: 6px;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(15px, 2vw, 18px);
   font-weight: 700;
-  letter-spacing: clamp(1px, 0.2vw, 2px);
-  text-transform: uppercase;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.25s;
-  border: none;
-  flex: 1;
-  min-width: 140px;
-  min-height: 44px;
+  letter-spacing: 2px;
+  font-size: 14px;
+  color: var(--gray);
+  transition: color .5s ease;
 }
 
-.cat-fem {
-  background: var(--fem);
+.hero-toggle-opt.is-active {
   color: #fff;
 }
 
-.cat-fem:hover {
-  background: var(--fem2);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(232, 24, 122, 0.35);
-}
-
-.cat-masc {
-  background: var(--masc);
-  color: #fff;
-}
-
-.cat-masc:hover {
-  background: var(--masc2);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(24, 120, 232, 0.35);
+.hero-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 3vw, 24px);
+  width: 100%;
 }
 
 .hero-stats {
   display: flex;
-  gap: clamp(24px, 5vw, 48px);
-  margin-top: var(--spacing-2xl);
-  flex-wrap: wrap;
   justify-content: center;
-  animation: fadeUp 0.8s 0.5s ease both;
-  width: 100%;
+  gap: clamp(14px, 4vw, 44px);
+  flex-wrap: wrap;
+  max-width: 920px;
+  animation: fadeUp 0.5s ease both;
 }
 
 .hero-stat {
-  text-align: center;
-  min-width: clamp(60px, 15vw, 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
 }
 
 .hero-stat-num {
+  display: flex;
+  align-items: baseline;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(36px, 6vw, 56px);
-  letter-spacing: clamp(1px, 0.2vw, 2px);
+  font-size: clamp(32px, 5.2vw, 54px);
+  letter-spacing: 1px;
   color: var(--gold);
   line-height: 1;
 }
 
-.hero-stat-lbl {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(11px, 1.5vw, 14px);
-  font-weight: 600;
-  letter-spacing: clamp(1.5px, 0.3vw, 3px);
-  text-transform: uppercase;
-  color: var(--gray);
-  margin-top: 4px;
+.hero-stat-suffix {
+  font-size: .58em;
 }
 
-.scroll-arrow {
-  position: absolute;
-  bottom: clamp(16px, 3vw, 32px);
-  left: 50%;
-  transform: translateX(-50%);
+.hero-stat-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(10px, 1.4vw, 13px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.hero-scroll-hint {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  opacity: 0.3;
-  animation: bounce 2.5s infinite;
+  gap: 5px;
+  animation: starHintBob 2s ease-in-out infinite;
 }
 
-.scroll-arrow svg {
-  width: clamp(14px, 2vw, 18px);
-  height: clamp(14px, 2vw, 18px);
-  stroke: var(--white);
+.hero-scroll-hint span {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--gray);
+  text-transform: uppercase;
 }
 
-@keyframes bounce {
+.hero-scroll-hint svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--gray);
+}
+
+@keyframes starHintBob {
 
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
+    opacity: .5;
   }
 
-  55% {
-    transform: translateX(-50%) translateY(8px);
+  50% {
+    transform: translateY(7px);
+    opacity: 1;
+  }
+}
+
+@keyframes starDot {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .3;
+    transform: scale(.65);
+  }
+}
+
+@media (max-width: 767px) {
+  .hero-title {
+    font-size: clamp(44px, 15vw, 72px);
+  }
+
+  .hero-liga-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .hero-toggle {
+    width: 208px;
+    height: 44px;
+  }
+
+  .hero-toggle-slider {
+    width: 99px;
+    height: 34px;
+  }
+
+  .hero-mode-femenino .hero-toggle-slider {
+    left: 104px;
+  }
+
+  .hero-stats {
+    gap: clamp(14px, 5vw, 28px);
   }
 }
 
@@ -1677,10 +1863,6 @@ footer {
 
 /* Desktop */
 @media (min-width: 1024px) {
-  .hero {
-    min-height: 85vh;
-  }
-
   .kpi-row {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -3015,26 +3197,6 @@ body.theme-masculino .navbar-sticky {
 .nav-links a.active::after,
 .nav-links a:hover::after { width: 100%; }
 
-/* ── 2. HERO REACTIVO AL MODO ── */
-.hero-badge-femenino {
-  border-color: rgba(232, 24, 122, 0.4) !important;
-  color: var(--fem2) !important;
-}
-.hero-badge-masculino {
-  border-color: rgba(24, 120, 232, 0.4) !important;
-  color: var(--masc2) !important;
-}
-
-/* Orbs del hero cambian con el modo */
-body.theme-femenino  .hero-orb-2 { background: rgba(232, 24, 122, 0.12); }
-body.theme-femenino  .hero-orb-3 { background: rgba(232, 24, 122, 0.07); }
-body.theme-masculino .hero-orb-2 { background: rgba(24, 120, 232, 0.10); }
-body.theme-masculino .hero-orb-3 { background: rgba(24, 120, 232, 0.07); }
-.hero-orb-2, .hero-orb-3 { transition: background 0.6s ease; }
-
-/* Stats del hero con animación al cambiar modo */
-.hero-stats { animation: fadeUp 0.5s ease both; }
-
 /* ── 3. ANIMACIONES DE ENTRADA (scroll) ── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(28px); }
@@ -3139,41 +3301,6 @@ table tbody tr:hover {
     padding: 10px 0 4px;
     text-transform: uppercase;
   }
-}
-
-/* ── 2. HERO COMPACTO en mobile ── */
-@media (max-width: 600px) {
-  .hero {
-    padding: 60px var(--container-padding) 32px;
-    min-height: auto;
-    gap: 16px;
-  }
-  .hero-title {
-    font-size: clamp(42px, 14vw, 64px);
-    line-height: 0.9;
-  }
-  .hero-subtitle { font-size: 12px; }
-  .hero-badge    { font-size: 10px; padding: 5px 10px; }
-
-  /* Stats en grid 3 columnas compacto */
-  .hero-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    width: 100%;
-    margin-top: 8px;
-  }
-  .hero-stat {
-    background: rgba(255,255,255,0.05);
-    border-radius: 10px;
-    padding: 10px 6px;
-    min-width: unset;
-  }
-  .hero-stat-num { font-size: clamp(22px, 7vw, 32px); }
-  .hero-stat-lbl { font-size: 10px; }
-
-  /* Scroll arrow más pequeño */
-  .scroll-arrow { width: 36px; height: 36px; }
 }
 
 /* ── 3. FLIP CARDS — tap state en mobile ── */
@@ -3580,10 +3707,7 @@ table tbody tr:hover {
 }
 
 /* ── FIX: Nav principal no tapa el hero ── */
-/* El hero section ya tiene padding-top en desktop, en mobile ajustamos */
 @media (max-width: 767px) {
-  /* Aseguramos que el nav no tape la sección */
-  .hero { padding-top: 48px; }
   section#jugadores { scroll-margin-top: 70px; }
 }
 
@@ -3796,15 +3920,8 @@ table tbody tr:hover {
   .team-page-overlay { padding-bottom: 80px; }
 }
 
-/* ── HERO mobile con safe area ── */
+/* Asegurar que el gs-overlay no tape el bottom nav */
 @media (max-width: 767px) {
-  .hero {
-    padding-top: 32px;
-    padding-bottom: 24px;
-    min-height: auto;
-  }
-
-  /* Asegurar que el gs-overlay no tape el bottom nav */
   .gs-overlay { z-index: 300; }
   .gc-overlay { z-index: 300; }
 }
@@ -4287,18 +4404,6 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 @media (max-width: 767px) {
   .filter-chips { padding: 4px 0 12px; margin: 0 -4px; padding-left: 4px; }
   .chip { font-size: 12px; padding: 7px 12px; }
-}
-
-/* ── HERO mobile más compacto ── */
-@media (max-width: 767px) {
-  .hero { padding: 24px 16px 20px; min-height: auto; gap: 12px; }
-  .hero-title { font-size: clamp(36px, 11vw, 56px); }
-  .hero-badge { font-size: 10px; padding: 4px 10px; }
-  .hero-stats { grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 4px; }
-  .hero-stat { padding: 8px 4px; border-radius: 8px; }
-  .hero-stat-num { font-size: clamp(20px, 6vw, 28px); }
-  .hero-stat-lbl { font-size: 9px; }
-  .scroll-arrow { display: none; }
 }
 
 /* ── SEASON KPIS mobile ── */

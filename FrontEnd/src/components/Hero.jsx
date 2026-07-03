@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { CounterUp } from './CounterUp';
+import { TournamentSelector } from './TournamentSelector';
 import { useTournament } from '../context/TournamentContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
@@ -10,14 +10,14 @@ const MODE_COLORS = {
 
 const HERO_DATA = {
   masculino: {
-    badge: 'Torneo Masculino · Próximamente',
+    badge: '♂ Torneo Masculino · En Curso',
     subtitle: 'Categoría Masculina · Córdoba · 2026',
     stats: [
       { end: 1,    label: 'Torneo' },
-      { end: 22,   label: 'Equipos' },
-      { label: 'Fechas', placeholder: true },
-      { end: 320,  label: 'Jugadores', suffix: '+' },
-      { end: 2026, label: 'Edición' },
+      { end: 8,    label: 'Equipos' },
+      { end: 7,    label: 'Fechas' },
+      { end: 120,  label: 'Jugadores', suffix: '+' },
+      { end: 28,   label: 'Partidos' },
     ],
   },
   femenino: {
@@ -30,6 +30,14 @@ const HERO_DATA = {
       { end: 180, label: 'Jugadoras', suffix: '+' },
       { end: 34,  label: 'Partidos' },
     ],
+=======
+    badge:    '♂ Torneo Masculino · En Curso',
+    subtitle: 'Categoría Masculina · Córdoba · 2026',
+  },
+  femenino: {
+    badge:    '♀ Torneo Femenino · En Curso',
+    subtitle: 'Categoría Femenina · Córdoba · 2026',
+>>>>>>> cf9a68dca73d046ab4b689891720dfc6ec90da17
   },
 };
 
@@ -79,47 +87,43 @@ export function Hero() {
   }, [mode, transitioning, toggleMode]);
 
   return (
-    <section ref={rootRef} id="inicio" className={`hero hero-mode-${mode}`}>
-      <div className="hero-bg-glow" />
-      <div className="hero-bg-grid" />
-      <div className="hero-ring hero-ring-outer" />
-      <div className="hero-ring hero-ring-inner" />
+    <section className={`hero hero-mode-${mode}`} id="inicio">
+      <div className="hero-orb hero-orb-1"></div>
+      <div className="hero-orb hero-orb-2"></div>
+      <div className="hero-orb hero-orb-3"></div>
+      <div className="hero-grid"></div>
 
-      <canvas ref={canvasRef} className="hero-canvas" />
+      <div className={`hero-badge hero-badge-${mode}`}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+        </svg>
+        {data.badge}
+      </div>
 
-      <div className="hero-scrim" />
-      <div className="hero-scrim-bottom" />
-
-      <div className="hero-content">
-        <div className="hero-top">
-          <div className="hero-logo">
-            <img src={logoTorneo} alt="Torneo Star Básquet" />
-          </div>
-          <span className="hero-liga-label">Liga Oficial · Córdoba 2026</span>
-        </div>
-
-        <div className="hero-center">
-          <div className="hero-badge">
-            <span className="hero-badge-dot" />
-            {data.badge}
-          </div>
-
-          <h1 className="hero-title">
-            <span className="hero-title-line">TORNEO</span>
-            <span className="hero-title-line hero-title-accent">STAR BÁSQUET</span>
-          </h1>
+      <h1 className="hero-title">
+        TORNEO<br /><span>STAR </span>BÁSQUET
+      </h1>
 
           <p className="hero-subtitle">{data.subtitle}</p>
 
-          <button
-            type="button"
-            className="hero-toggle"
-            onClick={handleToggle}
-            disabled={transitioning}
-            aria-label={`Modo actual: ${mode}. Tocar para cambiar a ${mode === 'masculino' ? 'femenino' : 'masculino'}.`}
-          >
-            <span className="hero-toggle-slider" />
-            <span className={`hero-toggle-opt${mode === 'masculino' ? ' is-active' : ''}`}>♂ MASC</span>
-            <span className={`hero-toggle-opt${mode === 'femenino' ? ' is-active' : ''}`}>♀ FEM</span>
-          </button>
-        </div>
+      <TournamentSelector />
+
+      <div className="hero-stats" key={mode}>
+        {data.stats.map((s, i) => (
+          <div className="hero-stat" key={i}>
+            <div className="hero-stat-num">
+              <CounterUp end={s.end} suffix={s.suffix} />
+            </div>
+            <div className="hero-stat-lbl">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="scroll-arrow">
+        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2">
+          <path d="M12 5v14M5 12l7 7 7-7" />
+        </svg>
+      </div>
+    </section>
+  );
+}

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
 import { Hero }             from './Hero.jsx';
-import { SeasonKpis }       from './SeasonKpis.jsx';
+
 import { TorneoView }       from './TorneoView.jsx';
 import { LeadersSection }   from './LeadersSection.jsx';
 import { PlayoffsBracket }  from './PlayoffsBracket.jsx';
@@ -61,7 +61,7 @@ export function PageHome() {
       </div>
 
       <Hero />
-      <SeasonKpis equipos={equipos} partidos={partidos} />
+
       <div className="full-rule"></div>
       <TorneoView />
       <div className="full-rule"></div>
@@ -74,3 +74,5 @@ export function PageHome() {
     </StatsContext.Provider>
   );
 }
+
+

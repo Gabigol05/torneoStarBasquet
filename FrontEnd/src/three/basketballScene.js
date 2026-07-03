@@ -269,11 +269,13 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
 
   // ── render loop ──────────────────────────────────────────
   let disposed = false;
+  let paused = false;
   let raf = null;
   let last = performance.now();
 
   const loop = () => {
     if (disposed) return;
+    if (paused) { raf = null; return; }
     raf = requestAnimationFrame(loop);
     const now = performance.now();
     const dt = Math.min((now - last) / 1000, 0.05);
@@ -356,6 +358,15 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
       mode = nextMode;
       ballVel.y += 13;
     },
+    pause() {
+      paused = true;
+    },
+    resume() {
+      if (!paused) return;
+      paused = false;
+      last = performance.now();
+      if (!raf) raf = requestAnimationFrame(loop);
+    },
     destroy() {
       disposed = true;
       if (raf) cancelAnimationFrame(raf);
@@ -380,6 +391,9 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
     },
   };
 }
+
+
+
 
 
 

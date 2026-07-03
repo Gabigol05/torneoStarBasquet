@@ -434,7 +434,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 Temporada Regular
               </div>
               <div style={{ fontFamily: "'Bebas Neue'", fontSize: '28px', letterSpacing: '2px', color: modeColor, marginTop: '4px' }}>
-                {fechas.length > 0 ? `Fecha ${Math.max(...fechas.map(f => f.numero))}` : 'Jornada 1'}
+                {mode === 'femenino' && fechas.length > 0 ? `Fecha ${Math.max(...fechas.map(f => f.numero))}` : 'Jornada 1'}
               </div>
             </div>
           </div>
@@ -453,7 +453,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
                 style={activeTab === tab.key ? { color: modeColor, borderBottomColor: modeColor } : {}}
                 onClick={() => setActiveTab(tab.key)}>
-                {tab.label}
+                {tab.key === 'jugadores' ? (mode === 'femenino' ? 'Jugadoras' : 'Jugadores') : tab.label}
               </button>
             ))}
           </div>
@@ -505,7 +505,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                 style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
                                 <td className="team-cell">
                                   <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
-                                  <img src={t.logo} alt={t.name} loading="lazy" decoding="async"
+                                  <img src={t.logo} alt={t.name} decoding="async"
                                     style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
                                     onError={e => { e.target.style.display = 'none'; }}/>
                                   <span className="team-name-txt">{t.name}</span>
@@ -533,7 +533,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             <tr key={t.id}>
                               <td className="team-cell">
                                 <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
-                                <img src={t.logo} alt={t.name} loading="lazy" decoding="async"
+                                <img src={t.logo} alt={t.name} decoding="async"
                                   style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}/>
                                 <span className="team-name-txt">{t.name}</span>
                               </td>
@@ -807,5 +807,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
+
+
+
 
 

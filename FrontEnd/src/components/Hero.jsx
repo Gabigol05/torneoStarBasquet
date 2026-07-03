@@ -13,22 +13,22 @@ const HERO_DATA = {
     badge: 'Torneo Masculino - En Curso',
     subtitle: 'Categoria Masculina - Cordoba - 2026',
     stats: [
-      { end: 1,   label: 'Torneo' },
-      { end: 8,   label: 'Equipos' },
-      { end: 7,   label: 'Fechas' },
-      { end: 120, label: 'Jugadores', suffix: '+' },
-      { end: 28,  label: 'Partidos' },
+      { end: 6,   label: 'Edicion' },
+      { end: 22,  label: 'Equipos' },
+      { end: 0,   label: 'Fechas' },
+      { end: 0,   label: 'Jugadores' },
+      { end: 0,   label: 'Partidos' },
     ],
   },
   femenino: {
     badge: 'Torneo Femenino - En Curso',
     subtitle: 'Categoria Femenina - Cordoba - 2026',
     stats: [
-      { end: 1,   label: 'Torneo' },
+      { end: 1,   label: 'Edicion' },
       { end: 10,  label: 'Equipos' },
-      { end: 7,   label: 'Fechas' },
-      { end: 180, label: 'Jugadoras', suffix: '+' },
-      { end: 34,  label: 'Partidos' },
+      { end: 5,   label: 'Fechas' },
+      { end: 178, label: 'Jugadoras', suffix: '+' },
+      { end: 25,  label: 'Partidos' },
     ],
   },
 };
@@ -65,6 +65,31 @@ export function Hero() {
       sceneRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pausar el render 3D cuando el Hero sale de pantalla o la pestana pierde
+  // foco, para no competir por CPU/GPU con el resto del scroll de la pagina.
+  useEffect(() => {
+    if (!rootRef.current) return undefined;
+
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && document.visibilityState === 'visible') {
+        sceneRef.current?.resume();
+      } else {
+        sceneRef.current?.pause();
+      }
+    }, { threshold: 0 });
+    io.observe(rootRef.current);
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') sceneRef.current?.pause();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      io.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const handleToggle = useCallback(() => {
@@ -146,4 +171,9 @@ export function Hero() {
     </section>
   );
 }
+
+
+
+
+
 

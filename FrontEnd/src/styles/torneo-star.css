@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --gold: #F0B429;
   --gold2: #FFD166;
   --orange: #FF6B2B;
@@ -4465,20 +4465,11 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 /* ── ZONAS DE CLASIFICACIÓN ── */
 
 /* Top 4 — zona playoffs */
-table tbody tr:nth-child(-n+4) .pos-num {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
+
 
 /* Línea divisora después del 4° puesto */
-table tbody tr:nth-child(4) td {
-  border-bottom: 2px solid rgba(34, 197, 94, 0.25) !important;
-  padding-bottom: 12px;
-}
-table tbody tr:nth-child(5) td {
-  padding-top: 12px;
-}
+
+
 
 /* Badge "Zona Playoffs" — tooltip en hover */
 .pos-num { position: relative; }
@@ -4778,3 +4769,4 @@ table tbody tr:nth-child(5) td {
 .gs-item-active .gs-item-name {
   color: #F0B429 !important;
 }
+

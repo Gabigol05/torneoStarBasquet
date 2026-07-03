@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function Skeleton({ w = '100%', h = 16, radius = 4, style = {} }) {
   return (
     <div style={{
@@ -15,14 +14,13 @@ function Skeleton({ w = '100%', h = 16, radius = 4, style = {} }) {
   );
 }
 
-// ─── Barra de comparación ─────────────────────────────────────────────────────
 function StatBar({ label, a, b, colorA, colorB }) {
   const total = (a ?? 0) + (b ?? 0);
   const pctA  = total > 0 ? ((a / total) * 100).toFixed(0) : 50;
   const pctB  = 100 - pctA;
   return (
     <div className="gc-stat-row">
-      <span className="gc-stat-val-a" style={{ color: colorA }}>{a ?? '–'}</span>
+      <span className="gc-stat-val-a" style={{ color: colorA }}>{a ?? '-'}</span>
       <div className="gc-stat-center">
         <div className="gc-stat-label">{label}</div>
         <div className="gc-stat-bar-track">
@@ -30,16 +28,15 @@ function StatBar({ label, a, b, colorA, colorB }) {
           <div className="gc-stat-bar-b" style={{ width: `${pctB}%`, background: colorB }}/>
         </div>
       </div>
-      <span className="gc-stat-val-b" style={{ color: colorB }}>{b ?? '–'}</span>
+      <span className="gc-stat-val-b" style={{ color: colorB }}>{b ?? '-'}</span>
     </div>
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
 export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
-  const [tab,     setTab]     = useState('resumen'); // 'resumen' | 'local' | 'visit'
+  const [tab,     setTab]     = useState('resumen');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -47,17 +44,18 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
     setData(null);
     if (!isConfigured || !partidoId || mode !== 'femenino') return;
 
+    let ignore = false;
     setLoading(true);
     Promise.all([
       supabase.from('partidos_femenino').select('*').eq('id', partidoId).single(),
       supabase.from('stats_partido_femenino').select('*').eq('partido_id', partidoId),
     ]).then(([{ data: partido }, { data: stats }]) => {
+      if (ignore) return;
       if (!partido) { setLoading(false); return; }
 
       const eqLocal = equiposFemenino.find(e => e.id === partido.equipo_local_id);
       const eqVisit = equiposFemenino.find(e => e.id === partido.equipo_visit_id);
 
-      // Enriquecer stats con nombre de jugadora
       const enrich = (rows, eqId) =>
         (rows ?? [])
           .filter(r => r.equipo_id === eqId)
@@ -71,25 +69,34 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
       const statsLocal = enrich(stats, partido.equipo_local_id);
       const statsVisit = enrich(stats, partido.equipo_visit_id);
 
-      // MVP
-      const todasStats = [...(stats ?? [])];
-      const mvpRow     = todasStats.length > 0 ? todasStats.reduce((best, r) => r.val > (best?.val ?? -999) ? r : best, null) : null;
-      const mvpEq      = mvpRow ? equiposFemenino.find(e => e.id === mvpRow.equipo_id) : null;
-      const mvpJug     = mvpEq?.jugadoras.find(j => j.id === mvpRow?.jugadora_id);
+      // MVP: leido directamente desde mvp_jugadora_id (definido por el organizador),
+      // NO recalculado por valoracion.
+      let mvpRow = null, mvpNombre = null;
+      const mvpJugId = partido.mvp_jugadora_id;
+      if (mvpJugId) {
+        mvpRow = (stats ?? []).find(r => r.jugadora_id === mvpJugId) ?? null;
+        const mvpEq = eqLocal?.jugadoras.find(j => j.id === mvpJugId)
+          ? eqLocal
+          : (eqVisit?.jugadoras.find(j => j.id === mvpJugId) ? eqVisit : null);
+        mvpNombre = mvpEq?.jugadoras.find(j => j.id === mvpJugId)?.nombre ?? null;
+      }
 
-      setData({ partido, eqLocal, eqVisit, statsLocal, statsVisit, mvpRow, mvpNombre: mvpJug?.nombre });
+      setData({ partido, eqLocal, eqVisit, statsLocal, statsVisit, mvpRow, mvpNombre });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { if (!ignore) setLoading(false); });
+
+    return () => { ignore = true; };
   }, [isOpen, partidoId, mode]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="gc-overlay" onClick={onClose}>
-      <div className="gc-modal" onClick={e => e.stopPropagation()}>
+    <div className="gc-overlay" onClick={onClose}
+      style={{ backdropFilter: 'blur(6px)', background: 'rgba(3,5,10,.72)', animation: 'gcFadeIn .25s ease' }}>
+      <div className="gc-modal" onClick={e => e.stopPropagation()}
+        style={{ animation: 'gcPopIn .25s ease', boxShadow: '0 30px 90px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.1)' }}>
         <button className="gc-close-btn" onClick={onClose}>&times;</button>
 
-        {/* ── CARGANDO ── */}
         {loading && (
           <div style={{ padding: '2rem' }}>
             <Skeleton h={24} style={{ marginBottom: 20 }}/>
@@ -100,16 +107,22 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
           </div>
         )}
 
-        {/* ── DATOS REALES ── */}
         {!loading && data && (
           <>
-            {/* Header */}
             <div className="gc-header">
-              <div style={{ textAlign:'center', color:'var(--gray)', fontFamily:"'Barlow Condensed'", fontWeight:600, letterSpacing:'2px', fontSize:'12px', marginBottom:'8px' }}>
-                FINALIZADO · TORNEO FEMENINO
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{
+                  fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 11, letterSpacing: 1.5,
+                  color: '#7fe0a3', background: 'rgba(127,224,163,.12)', padding: '4px 12px', borderRadius: 100,
+                  textTransform: 'uppercase',
+                }}>
+                  Final
+                </span>
+                <span style={{ color: 'var(--gray)', fontFamily: "'Barlow Condensed'", fontWeight: 600, letterSpacing: '2px', fontSize: '12px' }}>
+                  TORNEO FEMENINO
+                </span>
               </div>
 
-              {/* Marcador */}
               <div className="gc-score-board">
                 <div className="gc-team">
                   <img src={data.eqLocal?.logo} alt={data.eqLocal?.name}
@@ -134,10 +147,9 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 </div>
               </div>
 
-              {/* Parciales */}
-              <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:16, flexWrap:'wrap' }}>
                 {['q1','q2','q3','q4'].map(q => (
-                  <div key={q} style={{ background:'#141C2A', borderRadius:6, padding:'4px 12px', textAlign:'center', minWidth:50 }}>
+                  <div key={q} style={{ background:'#141C2A', borderRadius:8, padding:'6px 14px', textAlign:'center', minWidth:52 }}>
                     <div style={{ fontSize:9, color:'#4A566E', letterSpacing:1, fontFamily:"'Barlow Condensed'", textTransform:'uppercase' }}>{q.toUpperCase()}</div>
                     <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16 }}>
                       <span style={{ color: data.eqLocal?.color }}>{data.partido[`${q}_local`] ?? 0}</span>
@@ -147,7 +159,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   </div>
                 ))}
                 {(data.partido.ot_local ?? 0) > 0 && (
-                  <div style={{ background:'#141C2A', borderRadius:6, padding:'4px 12px', textAlign:'center', minWidth:50 }}>
+                  <div style={{ background:'#141C2A', borderRadius:8, padding:'6px 14px', textAlign:'center', minWidth:52 }}>
                     <div style={{ fontSize:9, color:'#F0B429', letterSpacing:1, fontFamily:"'Barlow Condensed'" }}>OT</div>
                     <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16 }}>
                       <span style={{ color: data.eqLocal?.color }}>{data.partido.ot_local}</span>
@@ -159,10 +171,9 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
               </div>
             </div>
 
-            {/* MVP */}
             {data.mvpNombre && (
-              <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.2)', borderRadius:8, padding:'10px 14px', margin:'0 0 16px' }}>
-                <span style={{ fontSize:20 }}>⭐</span>
+              <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.28)', borderRadius:12, padding:'12px 16px', margin:'20px 0' }}>
+                <span style={{ fontSize:20 }}>*</span>
                 <div>
                   <div style={{ fontSize:10, color:'#F0B429', fontFamily:"'Barlow Condensed'", fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>MVP del Partido</div>
                   <div style={{ fontSize:15, color:'#EEF2F8', fontFamily:"'Barlow Condensed'", fontWeight:700 }}>{data.mvpNombre}</div>
@@ -173,27 +184,24 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
               </div>
             )}
 
-            {/* Tabs */}
-            <div style={{ display:'flex', gap:4, marginBottom:16 }}>
-              {[['resumen','📊 Resumen'],['local', data.eqLocal?.name ?? 'Local'],['visit', data.eqVisit?.name ?? 'Visit']].map(([k,l]) => (
+            <div style={{ display:'flex', gap:6, marginBottom:20, borderBottom: '1px solid rgba(255,255,255,.08)', paddingBottom: 2 }}>
+              {[['resumen','Resumen'],['local', data.eqLocal?.name ?? 'Local'],['visit', data.eqVisit?.name ?? 'Visit']].map(([k,l]) => (
                 <button key={k} onClick={() => setTab(k)}
-                  style={{ flex:1, padding:'8px 4px', background:tab===k?'#1C2535':'transparent',
-                    border:`1px solid ${tab===k?'#F0B429':'#1C2535'}`, borderRadius:8,
-                    color:tab===k?'#F0B429':'#6B7A99', cursor:'pointer', fontSize:12,
-                    fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5 }}>
+                  style={{ flex:1, padding:'9px 4px', background:'transparent',
+                    border:'none', borderBottom: tab===k ? '2px solid #F0B429' : '2px solid transparent',
+                    color:tab===k?'#EEF2F8':'#6b7a99', cursor:'pointer', fontSize:12.5, fontWeight: 700,
+                    fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform: 'uppercase' }}>
                   {l}
                 </button>
               ))}
             </div>
 
-            {/* ── Tab Resumen ── */}
             {tab === 'resumen' && (
               <div>
                 <StatBar label="% TL"     a={data.partido.pct_simples_local} b={data.partido.pct_simples_visit} colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                 <StatBar label="% 2P"     a={data.partido.pct_dobles_local}  b={data.partido.pct_dobles_visit}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                 <StatBar label="% 3P"     a={data.partido.pct_triples_local} b={data.partido.pct_triples_visit} colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
 
-                {/* Totales de equipo calculados desde stats */}
                 {(() => {
                   const sumL = (key) => data.statsLocal.reduce((a,r) => a+(r[key]??0), 0);
                   const sumV = (key) => data.statsVisit.reduce((a,r) => a+(r[key]??0), 0);
@@ -203,7 +211,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                       <StatBar label="Asistencias" a={sumL('as_')} b={sumV('as_')} colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                       <StatBar label="Robos"       a={sumL('rb')}  b={sumV('rb')}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                       <StatBar label="Tapones"     a={sumL('tp')}  b={sumV('tp')}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
-                      <StatBar label="Pérdidas"    a={sumL('pe')}  b={sumV('pe')}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
+                      <StatBar label="Perdidas"    a={sumL('pe')}  b={sumV('pe')}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                       <StatBar label="Faltas"      a={sumL('fp')}  b={sumV('fp')}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                     </>
                   );
@@ -211,13 +219,12 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
               </div>
             )}
 
-            {/* ── Tab stats equipo ── */}
             {(tab === 'local' || tab === 'visit') && (
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                   <thead>
                     <tr>
-                      {['#','Jugadora','PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PÉR','FP'].map(h => (
+                      {['#','Jugadora','PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
                         <th key={h} style={{ background:'#141C2A', color:'#6B7A99', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -227,7 +234,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                       const eq = tab === 'local' ? data.eqLocal : data.eqVisit;
                       return (
                         <tr key={r.jugadora_id} style={{ background: i%2===0 ? '#0E1420':'#141C2A' }}>
-                          <td style={{ padding:'6px 8px', textAlign:'center', color:'#6B7A99' }}>{r.numero ?? '–'}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center', color:'#6B7A99' }}>{r.numero ?? '-'}</td>
                           <td style={{ padding:'6px 8px', textAlign:'left', color: eq?.color, fontWeight:600, minWidth:120, whiteSpace:'nowrap' }}>
                             {r.nombre.split(' ').slice(0,2).join(' ')}
                           </td>
@@ -253,14 +260,15 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
           </>
         )}
 
-        {/* ── Sin datos ── */}
         {!loading && !data && (
           <div style={{ padding:'3rem', textAlign:'center', color:'#6B7A99' }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>📊</div>
-            <div>Estadísticas no disponibles para este partido</div>
+            <div style={{ fontSize:40, marginBottom:12 }}>-</div>
+            <div>Estadisticas no disponibles para este partido</div>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+

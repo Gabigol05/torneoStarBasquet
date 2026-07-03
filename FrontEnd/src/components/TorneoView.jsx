@@ -402,6 +402,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   return (
     <>
       <GameCenterModal
+        key={selectedMatch ?? 'none'}
         isOpen={!!selectedMatch}
         onClose={() => setSelectedMatch(null)}
         partidoId={selectedMatch}
@@ -806,4 +807,5 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
 

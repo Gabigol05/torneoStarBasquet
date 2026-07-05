@@ -3737,6 +3737,7 @@ table tbody tr:hover {
   gap: 10px;
   padding: 0 14px;
   height: 56px;
+  overflow: hidden;
   background: rgba(8, 12, 18, 0.97);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -4365,6 +4366,10 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .mh-title { font-size: 15px; letter-spacing: 1.5px; }
   .mh-sub   { font-size: 8px;  letter-spacing: 1.5px; }
   .mh-logo  { width: 32px !important; height: 32px !important; }
+
+@media (max-width: 380px) {
+  .mh-brand-text { display: none; }
+}
   
   /* Ocultar en mobile el nav top viejo si quedara */
   nav:not(.bottom-nav) { display: none; }
@@ -4780,6 +4785,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   from { opacity: 0; transform: scale(.94) translateY(10px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+
 
 
 

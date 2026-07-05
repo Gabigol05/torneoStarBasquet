@@ -1,6 +1,5 @@
-import logo from '../assets/logo_torneo.jpg';
+﻿import logo from '../assets/logo_torneo.jpg';
 import { GlobalSearch } from './GlobalSearch';
-import { TournamentSelector } from './TournamentSelector';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
@@ -18,27 +17,19 @@ export function MobileHeader() {
         onClose={() => setSelectedPlayer(null)}
         player={selectedPlayer}
       />
-
       <header className="mobile-header">
-        {/* Logo + nombre */}
         <div className="mh-brand">
-          <img src={logo} alt="Star Básquet" className="mh-logo" />
+          <img src={logo} alt="Star Basquet" className="mh-logo" />
           <div className="mh-brand-text">
             <span className="mh-title">STAR</span>
-            <span className="mh-sub">BÁSQUET</span>
+            <span className="mh-sub">BASQUET</span>
           </div>
         </div>
 
-        {/* Selector de modo (Masc/Fem) */}
-        <div className="mh-selector">
-          <TournamentSelector compact={true} />
-        </div>
-
-        {/* Acciones: búsqueda + redes */}
         <div className="mh-actions">
           <GlobalSearch equipos={equipos} onSelectPlayer={setSelectedPlayer} />
-
-          <a
+          
+            <a
             href="https://www.youtube.com/@TorneoStarBasquet"
             target="_blank"
             rel="noopener noreferrer"
@@ -49,8 +40,8 @@ export function MobileHeader() {
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
             </svg>
           </a>
-
-          <a
+          
+            <a
             href="https://www.instagram.com/torneostar.basquet/"
             target="_blank"
             rel="noopener noreferrer"
@@ -66,3 +57,5 @@ export function MobileHeader() {
     </>
   );
 }
+
+

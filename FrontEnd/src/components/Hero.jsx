@@ -10,7 +10,7 @@ const MODE_COLORS = {
 
 const HERO_DATA = {
   masculino: {
-    badge: 'Torneo Masculino - En Curso',
+    badge: 'Torneo Masculino - Proximamente',
     subtitle: 'Categoria Masculina - Cordoba - 2026',
     stats: [
       { end: 6,   label: 'Edicion' },

@@ -60,11 +60,23 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
   }
 
   // 2️⃣ Fuzzy matching con filtro de equipo
-  const resultados = fuseJugadoras.search(clean);
-  let candidatos   = resultados;
-  if (equipoId) {
+  const buscarConFiltro = (texto) => {
+    const resultados = fuseJugadoras.search(texto);
+    if (!equipoId) return resultados;
     const enEq = resultados.filter(r => r.item.equipoId === equipoId);
-    if (enEq.length > 0) candidatos = enEq;
+    return enEq;
+  };
+
+  const candidatosNormal = buscarConFiltro(clean);
+  const palabras = clean.split(' ').filter(Boolean);
+  const cleanInvertido = palabras.length > 1 ? [...palabras].reverse().join(' ') : null;
+  const candidatosInvertido = cleanInvertido ? buscarConFiltro(cleanInvertido) : [];
+
+  const mejorNormal    = candidatosNormal[0];
+  const mejorInvertido = candidatosInvertido[0];
+  let candidatos = candidatosNormal;
+  if (mejorInvertido && (!mejorNormal || (mejorInvertido.score ?? 1) < (mejorNormal.score ?? 1))) {
+    candidatos = candidatosInvertido;
   }
   if (candidatos.length === 0) return { jugadora: null, method: 'not_found', score: 1 };
 
@@ -754,6 +766,10 @@ const s = {
   successBox: {textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
   dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };
+
+
+
+
 
 
 

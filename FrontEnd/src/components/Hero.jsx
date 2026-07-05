@@ -16,8 +16,7 @@ const HERO_DATA = {
       { end: 6,   label: 'Edicion' },
       { end: 22,  label: 'Equipos' },
       { end: 0,   label: 'Fechas' },
-      { end: 0,   label: 'Jugadores' },
-      { end: 0,   label: 'Partidos' },
+      { end: 250,   label: 'Jugadores', suffix: '+' },
     ],
   },
   femenino: {
@@ -26,9 +25,8 @@ const HERO_DATA = {
     stats: [
       { end: 1,   label: 'Edicion' },
       { end: 10,  label: 'Equipos' },
-      { end: 5,   label: 'Fechas' },
-      { end: 178, label: 'Jugadoras', suffix: '+' },
-      { end: 25,  label: 'Partidos' },
+      { end: 6,   label: 'Fechas' },
+      { end: 200, label: 'Jugadoras', suffix: '+' },
     ],
   },
 };

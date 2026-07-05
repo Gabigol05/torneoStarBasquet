@@ -2079,9 +2079,11 @@ body.theme-femenino {
   animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   display: flex;
   flex-direction: column;
+  padding: 0 24px 24px;
 }
 
 .gc-header {
+  margin: 0 -24px;
   padding: 24px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   position: relative;
@@ -3273,14 +3275,14 @@ table tbody tr:hover {
 /* ── 1. TABLA COMPACTA en mobile ── */
 @media (max-width: 600px) {
   /* Ocultar columnas no esenciales */
-  table th:nth-child(5),  /* PF */
-  table th:nth-child(6),  /* PC */
-  table th:nth-child(7),  /* DIF */
-  table th:nth-child(8),  /* % */
-  table td:nth-child(5),
-  table td:nth-child(6),
-  table td:nth-child(7),
-  table td:nth-child(8)  { display: none; }
+  .table-wrap table th:nth-child(5),  /* PF */
+  .table-wrap table th:nth-child(6),  /* PC */
+  .table-wrap table th:nth-child(7),  /* DIF */
+  .table-wrap table th:nth-child(8),  /* % */
+  .table-wrap table td:nth-child(5),
+  .table-wrap table td:nth-child(6),
+  .table-wrap table td:nth-child(7),
+  .table-wrap table td:nth-child(8)  { display: none; }
 
   /* Tabla más ajustada */
   table th, table td { padding: 10px 8px; font-size: 13px; }
@@ -4778,6 +4780,10 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   from { opacity: 0; transform: scale(.94) translateY(10px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+
+
+
 
 
 

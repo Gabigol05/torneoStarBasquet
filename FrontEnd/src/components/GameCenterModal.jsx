@@ -94,8 +94,19 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
     <div className="gc-overlay" onClick={onClose}
       style={{ backdropFilter: 'blur(6px)', background: 'rgba(3,5,10,.72)', animation: 'gcFadeIn .25s ease' }}>
       <div className="gc-modal" onClick={e => e.stopPropagation()}
-        style={{ animation: 'gcPopIn .25s ease', boxShadow: '0 30px 90px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.1)' }}>
-        <button className="gc-close-btn" onClick={onClose}>&times;</button>
+        style={{ animation: 'gcPopIn .25s ease', boxShadow: '0 30px 90px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.1)', position: 'relative' }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 16, left: 16, zIndex: 10,
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#EEF2F8', cursor: 'pointer', padding: 0,
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
 
         {loading && (
           <div style={{ padding: '2rem' }}>
@@ -270,5 +281,6 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
     </div>
   );
 }
+
 
 

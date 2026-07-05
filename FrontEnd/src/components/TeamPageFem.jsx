@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { PlayerProfileModal } from './PlayerProfileModal';
+import { GameCenterModal } from './GameCenterModal';
 
 // Últimos N resultados de un equipo
 function getRacha(historial, n = 5) {
@@ -22,6 +23,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
   const [activeTab,      setActiveTab]      = useState('jugadoras');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
+  const [selectedMatch,  setSelectedMatch]  = useState(null);
 
   if (!team) return null;
 
@@ -80,6 +82,13 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+      />
+
+      <GameCenterModal
+        isOpen={!!selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+        partidoId={selectedMatch}
+        mode="femenino"
       />
 
       <div className="team-page-overlay">
@@ -278,7 +287,8 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       return (
                         <div key={idx}
                           className={`tp-match-card ${h.resultado === 'G' ? 'win' : 'loss'}`}
-                          style={{ '--team-color': team.color }}>
+                          style={{ '--team-color': team.color, cursor: h.partidoId ? 'pointer' : 'default' }}
+                          onClick={() => h.partidoId && setSelectedMatch(h.partidoId)}>
                           <div className="tp-match-header">
                             <span className="tp-match-date">
                               {fechaObj ? `Fecha ${fechaObj.numero}` : ''}
@@ -448,3 +458,4 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
     </>
   );
 } 
+

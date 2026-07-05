@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 function ShareButton({ player, pts, reb, ast }) {
   const handleShare = async () => {
     const url = window.location.origin + window.location.pathname + '?jugadora=' + player.id;
-    const text = `🏀 ${player.name} — ${player.team}\nPTS: ${pts} | REB: ${reb} | AST: ${ast}\nTorneo Star Básquet 2026\n${url}`;
+    const text = `🏀 ${player.name} — ${player.team}\nPTS: ${pts} | REB: ${reb} | AST: ${ast}\nTorneo Star Básquet 2026`;
     if (navigator.share) {
       try { await navigator.share({ title: `${player.name} — Star Básquet`, text, url }); }
       catch (_) {}
@@ -316,3 +316,4 @@ const ST = {
     color: '#EEF2F8', marginBottom: 12, textTransform: 'uppercase',
   },
 }; 
+

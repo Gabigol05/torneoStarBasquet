@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
@@ -30,7 +30,7 @@ const fuseJugadoras = new Fuse(TODAS_JUGADORAS, {
 });
 
 const fuseEq = new Fuse(equiposFemenino, {
-  keys: [{ name:'nombre', weight:1 }], threshold: 0.4,
+  keys: [{ name:'name', weight:1 }], threshold: 0.4,
 });
 
 // ─── Resolver jugadora: aliases → fuzzy ──────────────────────────────────────
@@ -134,6 +134,19 @@ function parsearExcel(wb) {
 
   if (marcRow===-1) { res.errores.push('No se encontró la sección de marcador.'); return res; }
   if (statsRow===-1){ res.errores.push('No se encontró la sección de estadísticas.'); return res; }
+
+  // Validar que las columnas esperadas tengan encabezado en esa fila.
+  const headerRow = rows[statsRow];
+  const camposEsperados = ['numero','nombre','sc','sf','dc','df','tc','tf','as_','rd','ro','fp','ft','fa','rb','tp','pe','ca','pts','val'];
+  const columnasVacias = camposEsperados.filter(campo => {
+    const idx = C[campo];
+    const val = headerRow[idx];
+    return val === null || val === undefined || String(val).trim() === '';
+  });
+  if (columnasVacias.length > 0) {
+    res.errores.push(`El formato del Excel no coincide con el esperado (columnas sin encabezado: ${columnasVacias.join(', ')}). Revisa que no se haya modificado la estructura de la planilla antes de subirla.`);
+    return res;
+  }
 
   // Marcador (acumulados → parciales)
   const rL=rows[marcRow+1], rV=rows[marcRow+2];
@@ -280,17 +293,19 @@ export default function ExcelUpload() {
 
   // ── Verificar duplicado ──
   const checkDuplicate = async (eqLId, eqVId, fechaNum) => {
-    const { data: fechaData } = await supabase
+    const { data: fechaData, error: fechaErr } = await supabase
       .from('fechas_femenino')
       .select('id')
       .eq('numero', Number(fechaNum))
       .maybeSingle();
+    if (fechaErr) throw new Error(`ver fecha: ${fechaErr.message}`);
     if (!fechaData) return null;
-    const { data: dupes } = await supabase
+    const { data: dupes, error: dupesErr } = await supabase
       .from('partidos_femenino')
       .select('id, puntos_local, puntos_visit, estado')
       .eq('fecha_id', fechaData.id)
       .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
+    if (dupesErr) throw new Error(`ver duplicados: ${dupesErr.message}`);
     return dupes?.length > 0 ? dupes[0] : null;
   };
 
@@ -356,6 +371,20 @@ export default function ExcelUpload() {
       const jugSkip = jugadoras.filter(j => !j.jugadora);
       addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length>0?` (${jugSkip.length} no resueltas)`:''}...`);
 
+      // Detectar colisiones: dos filas del Excel resueltas a la MISMA jugadora real.
+      // Esto rompería el upsert (ON CONFLICT no puede afectar la misma fila 2 veces).
+      const porJugadora = {};
+      for (const j of jugOk) {
+        if (!porJugadora[j.jugadora.id]) porJugadora[j.jugadora.id] = [];
+        porJugadora[j.jugadora.id].push(j);
+      }
+      const colisiones = Object.values(porJugadora).filter(arr => arr.length > 1);
+      if (colisiones.length > 0) {
+        const detalle = colisiones.map(arr =>
+          `"${arr[0].jugadora.nombre}" <- [${arr.map(x=>`"${x.nombreRaw}"`).join(', ')}]`
+        ).join(' | ');
+        throw new Error(`Nombres duplicados resueltos a la misma jugadora: ${detalle}. Corregi el Excel o revisa los aliases guardados antes de publicar.`);
+      }
       if (jugOk.length > 0) {
         const statsRows = jugOk.map(j => ({
           partido_id:pd.id, jugadora_id:j.jugadora.id, equipo_id:j.jugadora.equipoId,
@@ -468,6 +497,12 @@ export default function ExcelUpload() {
       {/* ── PASO 2: Preview ── */}
       {step==='preview' && parsed && (
         <>
+          {log.some(l => l.startsWith('❌')) && (
+            <div style={s.errBox}>
+              <p style={{margin:'0 0 4px',fontWeight:700}}>El intento de publicar anterior fallo:</p>
+              {log.filter(l => l.startsWith('❌')).map((l,i)=><p key={i} style={{margin:'4px 0'}}>{l}</p>)}
+            </div>
+          )}
           {/* Marcador */}
           <div style={s.marcadorCard}>
             {[{lbl:parsed.equipoLocal,m:parsed.marcador.local},{lbl:parsed.equipoVisit,m:parsed.marcador.visit}].map(({lbl,m},i)=>(
@@ -719,3 +754,11 @@ const s = {
   successBox: {textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
   dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };
+
+
+
+
+
+
+
+

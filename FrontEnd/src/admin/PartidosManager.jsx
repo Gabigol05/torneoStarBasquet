@@ -201,6 +201,24 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
         .select('id').single();
       if (fErr) throw fErr;
 
+      // Verificar duplicados antes de insertar
+      const { data: existentes, error: exErr } = await supabase
+        .from('partidos_femenino')
+        .select('equipo_local_id, equipo_visit_id')
+        .eq('fecha_id', fd.id);
+      if (exErr) throw exErr;
+
+      const yaExiste = (a, b) => (existentes ?? []).some(e =>
+        (e.equipo_local_id === a && e.equipo_visit_id === b) ||
+        (e.equipo_local_id === b && e.equipo_visit_id === a)
+      );
+      const nombreEqLocal = id => EQUIPOS.find(eq => eq.id === id)?.nombre ?? id;
+      const duplicados = validos.filter(p => yaExiste(p.equipo_local_id, p.equipo_visit_id));
+      if (duplicados.length > 0) {
+        const nombres = duplicados.map(p => `${nombreEqLocal(p.equipo_local_id)} vs ${nombreEqLocal(p.equipo_visit_id)}`).join(', ');
+        const confirmar = confirm(`Ya existen partidos cargados para: ${nombres}. Continuar y agregarlos de nuevo?`);
+        if (!confirmar) { setLoading(false); return; }
+      }
       // 2. Insertar partidos
       const rows = validos.map(p => ({
         fecha_id:        fd.id,
@@ -358,6 +376,19 @@ export default function PartidosManager() {
   const handleSave = async () => {
     if (!form.equipo_local_id || !form.equipo_visit_id) { flash('Seleccioná ambos equipos',false); return; }
     if (form.equipo_local_id === form.equipo_visit_id)   { flash('Los equipos no pueden ser iguales',false); return; }
+
+    if (!editId && form.fecha_id) {
+      const { data: dupes, error: dupErr } = await supabase
+        .from('partidos_femenino')
+        .select('id')
+        .eq('fecha_id', form.fecha_id)
+        .or(`and(equipo_local_id.eq.${form.equipo_local_id},equipo_visit_id.eq.${form.equipo_visit_id}),and(equipo_local_id.eq.${form.equipo_visit_id},equipo_visit_id.eq.${form.equipo_local_id})`);
+      if (dupErr) { flash(`Error verificando duplicados: ${dupErr.message}`, false); return; }
+      if (dupes?.length > 0) {
+        const confirmar = confirm('Ya existe un partido entre estos equipos en esta fecha. Agregar de todas formas?');
+        if (!confirmar) return;
+      }
+    }
     setLoading(true);
     try {
       const payload = {
@@ -613,5 +644,7 @@ const F = {
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
 };
+
+
 
 

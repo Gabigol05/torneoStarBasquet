@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // DATOS ESTÁTICOS — TORNEO FEMENINO
 // Solo plantel: nombre y fecha de nacimiento.
 // Las estadísticas (pts, reb, ast, pj, etc.) vienen del backend
@@ -68,6 +68,8 @@ export const equiposFemenino = [
       { id: 'f_psc_16', nombre: 'Gomez Erika',         fechaNac: '11/11/1981' },
       { id: 'f_psc_17', nombre: 'Bulacio Griselda',    fechaNac: '06/12/1978' },
       { id: 'f_psc_18', nombre: 'Viada Verónica',      fechaNac: '21/11/1981' },
+      { id: 'f_psc_19', nombre: 'Morales Malena',       fechaNac: '' },
+      { id: 'f_psc_20', nombre: 'Diani Elisa',          fechaNac: '' },
     ],
   },
   {
@@ -146,6 +148,7 @@ export const equiposFemenino = [
       { id: 'f_uag_16', nombre: 'Fassano Melina Abril',      fechaNac: '08/07/2003' },
       { id: 'f_uag_17', nombre: 'Sanchez Carla Gisele',      fechaNac: '21/05/1986' },
       { id: 'f_uag_18', nombre: 'Bustamante Lourdes Mirian', fechaNac: '10/02/2008' },
+      { id: 'f_uag_19', nombre: 'Gonzalez Ayelen',           fechaNac: '' },
     ],
   },
   {
@@ -282,3 +285,4 @@ export const equiposFemenino = [
     ],
   },
 ];
+

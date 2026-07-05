@@ -71,9 +71,11 @@ export function Hero() {
   // foco, para no competir por CPU/GPU con el resto del scroll de la pagina.
   useEffect(() => {
     if (!rootRef.current) return undefined;
+    let isIntersecting = false;
 
     const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && document.visibilityState === 'visible') {
+      isIntersecting = entry.isIntersecting;
+      if (isIntersecting && document.visibilityState === 'visible') {
         sceneRef.current?.resume();
       } else {
         sceneRef.current?.pause();
@@ -81,8 +83,14 @@ export function Hero() {
     }, { threshold: 0 });
     io.observe(rootRef.current);
 
+    // Cambiar de pestana no dispara el IntersectionObserver (la posicion en
+    // pantalla no cambio), asi que hay que resumir manualmente al volver.
     const onVisibility = () => {
-      if (document.visibilityState !== 'visible') sceneRef.current?.pause();
+      if (document.visibilityState === 'visible' && isIntersecting) {
+        sceneRef.current?.resume();
+      } else if (document.visibilityState !== 'visible') {
+        sceneRef.current?.pause();
+      }
     };
     document.addEventListener('visibilitychange', onVisibility);
 
@@ -171,6 +179,7 @@ export function Hero() {
     </section>
   );
 }
+
 
 
 

@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 // ─── Share button ─────────────────────────────────────────────────────────────
 function ShareButton({ player, pts, reb, ast }) {
   const handleShare = async () => {
-    const text = `🏀 ${player.name} — ${player.team}\nPTS: ${pts} | REB: ${reb} | AST: ${ast}\nTorneo Star Básquet 2026`;
+    const url = window.location.origin + window.location.pathname + '?jugadora=' + player.id;
+    const text = `🏀 ${player.name} — ${player.team}\nPTS: ${pts} | REB: ${reb} | AST: ${ast}\nTorneo Star Básquet 2026\n${url}`;
     if (navigator.share) {
-      try { await navigator.share({ title: `${player.name} — Star Básquet`, text }); }
+      try { await navigator.share({ title: `${player.name} — Star Básquet`, text, url }); }
       catch (_) {}
     } else {
       try {

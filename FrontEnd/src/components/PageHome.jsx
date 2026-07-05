@@ -2,10 +2,10 @@
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
 import { Hero }             from './Hero.jsx';
-
 import { TorneoView }       from './TorneoView.jsx';
 import { LeadersSection }   from './LeadersSection.jsx';
 import { PlayoffsBracket }  from './PlayoffsBracket.jsx';
+import { PlayerProfileModal } from './PlayerProfileModal.jsx';
 import { Footer }           from './Footer.jsx';
 import { BottomNav }        from './BottomNav.jsx';
 import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx';
@@ -23,18 +23,43 @@ function duplicateTicker() {
   }
 }
 
+// Arma el objeto de jugadora con el mismo formato que usan TorneoView/TeamPageFem
+// al abrir el perfil, para que el link compartido abra el mismo modal completo.
+function buildPlayerFromRoster(j, eq) {
+  return {
+    id: j.id, name: j.nombre, team: eq.name, equipoId: eq.id,
+    color: eq.color, fechaNac: j.fechaNac,
+    pj: j.pj ?? 0,
+    pts_prom: j.pts_prom ?? j.pts ?? 0,
+    reb_prom: j.reb_prom ?? j.reb ?? 0,
+    ast_prom: j.ast_prom ?? j.ast ?? 0,
+    rob_prom: j.rob_prom ?? j.rob ?? 0,
+    tap_prom: j.tap_prom ?? j.tap ?? 0,
+    per_prom: j.per_prom ?? 0,
+    val_prom: j.val_prom ?? 0,
+    pct_simples: j.pct_simples ?? j.tlp ?? 0,
+    pct_dobles:  j.pct_dobles  ?? j.fgp ?? 0,
+    pct_triples: j.pct_triples ?? j.tpp ?? 0,
+    mejor_pts: j.mejor_pts ?? 0,
+    pts_total: j.pts_total ?? 0,
+    sc_total: j.sc_total ?? 0, sf_total: j.sf_total ?? 0,
+    dc_total: j.dc_total ?? 0, df_total: j.df_total ?? 0,
+    tc_total: j.tc_total ?? 0, tf_total: j.tf_total ?? 0,
+    sc_prom:  j.sc_prom  ?? 0, dc_prom: j.dc_prom ?? 0,
+    tc_prom:  j.tc_prom  ?? 0,
+  };
+}
+
 export function PageHome() {
   useScrollReveal();
   const [activeTab, setActiveTab] = useState('inicio');
-
+  const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
   } = useFemeninoStats();
-
   const { toasts, addToast, removeToast } = useToast();
   const { isPulling, isRefreshing } = usePullToRefresh(refetch);
-
   useResultadosToast(equipos, addToast);
 
   useEffect(() => {
@@ -45,23 +70,51 @@ export function PageHome() {
 
   useEffect(() => { duplicateTicker(); }, []);
 
+  // Detecta ?jugadora=<id> en la URL (viene de un link compartido) y abre
+  // el perfil correspondiente automaticamente al cargar la pagina.
+  useEffect(() => {
+    if (!equipos || equipos.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const jugId = params.get('jugadora');
+    if (!jugId) return;
+
+    for (const eq of equipos) {
+      const j = eq.jugadoras?.find(x => x.id === jugId);
+      if (j) {
+        setDeepLinkPlayer(buildPlayerFromRoster(j, eq));
+        break;
+      }
+    }
+  }, [equipos]);
+
+  const closeDeepLinkPlayer = () => {
+    setDeepLinkPlayer(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('jugadora');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
   return (
     <StatsContext.Provider value={{ equipos, partidos, fechas, statsPorPartido, isLoading }}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
-
+      <PlayerProfileModal
+        isOpen={!!deepLinkPlayer}
+        onClose={closeDeepLinkPlayer}
+        player={deepLinkPlayer}
+        statsPorPartido={statsPorPartido}
+        partidos={partidos}
+        fechas={fechas}
+      />
       {/* Desktop */}
       <div className="desktop-only">
         <Navbar />
       </div>
-
       {/* Mobile */}
       <div className="mobile-only">
         <MobileHeader />
       </div>
-
       <Hero />
-
       <div className="full-rule"></div>
       <TorneoView />
       <div className="full-rule"></div>
@@ -69,10 +122,7 @@ export function PageHome() {
       <div className="full-rule"></div>
       <PlayoffsBracket />
       <Footer />
-
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </StatsContext.Provider>
   );
 }
-
-

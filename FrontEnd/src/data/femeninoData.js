@@ -175,6 +175,7 @@ export const equiposFemenino = [
       { id: 'f_fer_15', nombre: 'Plante Candela',               fechaNac: '08/09/2003' },
       { id: 'f_fer_16', nombre: 'Mallol Guadalupe',             fechaNac: '18/12/2002' },
       { id: 'f_fer_17', nombre: 'Toranzo Alicia Mabel',         fechaNac: '12/03/1974' },
+      { id: 'f_fer_18', nombre: 'Perrella Kiara',               fechaNac: '23/06/2003' },
     ],
   },
   {
@@ -286,6 +287,7 @@ export const equiposFemenino = [
     ],
   },
 ];
+
 
 
 

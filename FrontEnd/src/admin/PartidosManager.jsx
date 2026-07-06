@@ -430,7 +430,12 @@ export default function PartidosManager() {
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este partido y todas sus estadísticas?')) return;
-    await supabase.from('partidos_femenino').delete().eq('id',id);
+    const { error: logErr } = await supabase.from('upload_log').delete().eq('partido_id', id);
+    if (logErr) { flash(`Error borrando log de carga: ${logErr.message}`, false); return; }
+    const { error: statsErr } = await supabase.from('stats_partido_femenino').delete().eq('partido_id', id);
+    if (statsErr) { flash(`Error borrando stats: ${statsErr.message}`, false); return; }
+    const { error } = await supabase.from('partidos_femenino').delete().eq('id',id);
+    if (error) { flash(`Error: ${error.message}`, false); return; }
     await loadAll(); flash('✅ Eliminado');
   };
 
@@ -644,6 +649,8 @@ const F = {
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
 };
+
+
 
 
 

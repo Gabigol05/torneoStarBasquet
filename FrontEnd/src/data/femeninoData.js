@@ -42,6 +42,7 @@ export const equiposFemenino = [
       { id: 'f_bm_11', nombre: 'Francina Rodriguez',         fechaNac: '26/04/2002' },
       { id: 'f_bm_12', nombre: 'Luana Gutierrez',            fechaNac: '08/11/1999' },
       { id: 'f_bm_13', nombre: 'Faustina Moraga Piccardini', fechaNac: '01/12/2005' },
+      { id: 'f_bm_14', nombre: 'Luana Moraga',                fechaNac: '' },
     ],
   },
   {
@@ -285,6 +286,7 @@ export const equiposFemenino = [
     ],
   },
 ];
+
 
 
 

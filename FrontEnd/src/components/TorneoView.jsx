@@ -345,7 +345,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   const partidosPendientes = useMemo(() =>
     partidos
-      .filter(p => p.estado === 'pendiente' || p.estado === 'en_juego')
+      
       .filter(p => !fechaSelId || p.fecha_id === fechaSelId)
       .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0)),
     [partidos, fechaSelId]);
@@ -609,13 +609,21 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     <FechaChips modo="fixture"/>
                     {isLoadingStats ? <ResultSkeleton/> : (
                       partidosPendientes.length === 0 ? (
-                        <EmptyState icon="C" title="Fixture pendiente de publicacion"
-                          sub="Los proximos partidos se cargaran cuando se confirme el fixture oficial."/>
+                        <EmptyState icon="C" title="Sin partidos en esta fecha"
+                          sub="Todavia no hay partidos cargados para esta fecha."/>
                       ) : (
                         <div className="fixture-grid">
                           {partidosPendientes.map(p => (
-                            <FixtureCard key={p.id} partido={p}
-                              equiposFem={equiposFemenino} fechas={fechas}/>
+                            p.estado === 'finalizado' ? (
+                              <MatchResultCard key={p.id} partido={p}
+                                equiposFem={equiposFemenino}
+                                jugadorasMap={jugadorasMap}
+                                fechas={fechas}
+                                onClick={() => setSelectedMatch(p.id)}/>
+                            ) : (
+                              <FixtureCard key={p.id} partido={p}
+                                equiposFem={equiposFemenino} fechas={fechas}/>
+                            )
                           ))}
                         </div>
                       )
@@ -807,6 +815,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
+
+
 
 
 

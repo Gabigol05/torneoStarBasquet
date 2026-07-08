@@ -170,6 +170,7 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
 function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
+  const [fechaDia,     setFechaDia]     = useState('');
   const [partidos,     setPartidos]     = useState([
     { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' },
   ]);
@@ -196,6 +197,7 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
         .from('fechas_femenino')
         .upsert({
           numero:      Number(jornada),
+          fecha_dia:   fechaDia || null,
           descripcion: descripcion || `Fecha ${jornada}`,
         }, { onConflict:'numero' })
         .select('id').single();
@@ -268,6 +270,11 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
           <label style={F.label}>N° DE FECHA *</label>
           <input type="number" min="1" placeholder="1" value={jornada}
             onChange={e=>setJornada(e.target.value)} style={F.input}/>
+        </div>
+        <div style={{ flex:1, minWidth:200 }}>
+          <label style={F.label}>FECHA CALENDARIO</label>
+          <input type="date" value={fechaDia}
+            onChange={e=>setFechaDia(e.target.value)} style={F.input}/>
         </div>
         <div style={{ flex:1, minWidth:200 }}>
           <label style={F.label}>DESCRIPCIÓN (opcional)</label>
@@ -650,6 +657,8 @@ const F = {
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
 };
+
+
 
 
 

@@ -121,7 +121,10 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
     <div className="result-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div className="rc-header">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span className="rc-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Partido'}</span>
+          <span className="rc-fecha">
+            {fecha ? `Fecha ${fecha.numero}` : 'Partido'}
+            {fecha?.fecha_dia && ` - ${fecha.fecha_dia.split('-').reverse().slice(0,2).join('/')}`}
+          </span>
           {partido.hora_inicio && (
             <span style={{ fontSize: 11, color: '#4A566E', fontFamily: "'Barlow Condensed',sans-serif" }}>
               {String(partido.hora_inicio).slice(0, 5)}
@@ -223,7 +226,10 @@ function FixtureCard({ partido, equiposFem, fechas }) {
   return (
     <div className="fixture-card">
       <div className="fc2-header">
-        <span className="fc2-fecha">{fecha ? `Fecha ${fecha.numero}` : 'Proximo'}</span>
+        <span className="fc2-fecha">
+          {fecha ? `Fecha ${fecha.numero}` : 'Proximo'}
+          {fecha?.fecha_dia && ` - ${fecha.fecha_dia.split('-').reverse().slice(0,2).join('/')}`}
+        </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {partido.hora_inicio && (
             <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, color: '#F0B429', letterSpacing: .5 }}>
@@ -819,6 +825,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
+
 
 
 

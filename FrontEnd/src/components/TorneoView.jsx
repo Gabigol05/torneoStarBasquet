@@ -347,7 +347,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     partidos
       
       .filter(p => !fechaSelId || p.fecha_id === fechaSelId)
-      .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0)),
+      .sort((a, b) => {
+        const df = (a.fecha_id ?? 0) - (b.fecha_id ?? 0);
+        if (df !== 0) return df;
+        return (a.hora_inicio ?? '99:99').localeCompare(b.hora_inicio ?? '99:99');
+      }),
     [partidos, fechaSelId]);
 
   const equiposOrdenados = useMemo(() =>
@@ -815,6 +819,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
 
 
 

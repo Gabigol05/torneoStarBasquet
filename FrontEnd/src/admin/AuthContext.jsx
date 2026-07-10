@@ -1,34 +1,44 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-
-const ADMIN_PASSWORD = 'torneo2026'; // cambialo cuando quieras
-const SESSION_KEY    = 'ts_admin_auth';
+﻿import { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [authed, setAuthed] = useState(() => {
-    return sessionStorage.getItem(SESSION_KEY) === 'true';
-  });
-  const [error, setError] = useState('');
+  const [authed,  setAuthed]  = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
 
-  const login = (password) => {
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, 'true');
-      setAuthed(true);
-      setError('');
-      return true;
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthed(!!data.session);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const login = async (email, password) => {
+    setError('');
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      setError('Email o contrasena incorrectos');
+      return false;
     }
-    setError('Contraseña incorrecta');
-    return false;
+    setAuthed(true);
+    return true;
   };
 
-  const logout = () => {
-    sessionStorage.removeItem(SESSION_KEY);
+  const logout = async () => {
+    await supabase.auth.signOut();
     setAuthed(false);
   };
 
   return (
-    <AuthContext.Provider value={{ authed, login, logout, error }}>
+    <AuthContext.Provider value={{ authed, loading, login, logout, error }}>
       {children}
     </AuthContext.Provider>
   );

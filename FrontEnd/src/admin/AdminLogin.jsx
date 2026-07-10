@@ -1,9 +1,10 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useAuth } from './AuthContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
 export default function AdminLogin() {
   const { login, error } = useAuth();
+  const [email,   setEmail]   = useState('');
   const [pw,      setPw]      = useState('');
   const [loading, setLoading] = useState(false);
   const [shake,   setShake]   = useState(false);
@@ -11,7 +12,7 @@ export default function AdminLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const ok = login(pw);
+    const ok = await login(email, pw);
     if (!ok) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -21,25 +22,39 @@ export default function AdminLogin() {
 
   return (
     <div style={S.page}>
-      {/* Fondo animado */}
       <div style={S.bgOrb1}/>
       <div style={S.bgOrb2}/>
       <div style={S.grid}/>
 
       <div style={{ ...S.card, animation: shake ? 'shake 0.4s ease' : 'none' }}>
-        {/* Logo real */}
         <div style={S.logoWrap}>
           <div style={S.logoRing}>
-            <img src={logoTorneo} alt="Torneo Star Básquet" style={S.logoImg}/>
+            <img src={logoTorneo} alt="Torneo Star Basquet" style={S.logoImg}/>
           </div>
         </div>
 
         <h1 style={S.title}>TORNEO STAR</h1>
-        <p style={S.sub}>Panel de Administración</p>
+        <p style={S.sub}>Panel de Administracion</p>
         <div style={S.divider}/>
 
         <form onSubmit={handleSubmit} style={{ width:'100%' }}>
-          <label style={S.label}>CONTRASEÑA</label>
+          <label style={S.label}>EMAIL</label>
+          <div style={S.inputWrap}>
+            <svg style={S.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <input
+              type="email"
+              placeholder="admin@ejemplo.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoFocus
+              style={{ ...S.input, borderColor: error ? '#F04060' : email ? 'rgba(240,180,41,.4)' : '#1C2535' }}
+            />
+          </div>
+
+          <label style={S.label}>CONTRASENA</label>
           <div style={S.inputWrap}>
             <svg style={S.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -47,34 +62,33 @@ export default function AdminLogin() {
             </svg>
             <input
               type="password"
-              placeholder="••••••••"
+              placeholder="********"
               value={pw}
               onChange={e => setPw(e.target.value)}
-              autoFocus
               style={{ ...S.input, borderColor: error ? '#F04060' : pw ? 'rgba(240,180,41,.4)' : '#1C2535' }}
             />
           </div>
 
           {error && (
             <div style={S.errorMsg}>
-              <span>⚠️</span> {error}
+              <span>!</span> {error}
             </div>
           )}
 
-          <button type="submit" disabled={loading || !pw} style={{
+          <button type="submit" disabled={loading || !pw || !email} style={{
             ...S.btn,
-            opacity: pw && !loading ? 1 : 0.5,
+            opacity: pw && email && !loading ? 1 : 0.5,
             transform: loading ? 'scale(0.98)' : 'scale(1)',
           }}>
             {loading ? (
               <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                 <span style={S.spinner}/>INGRESANDO...
               </span>
-            ) : 'INGRESAR →'}
+            ) : 'INGRESAR ->'}
           </button>
         </form>
 
-        <p style={S.footer}>Torneo Star Básquet · Córdoba 2026</p>
+        <p style={S.footer}>Torneo Star Basquet - Cordoba 2026</p>
       </div>
 
       <style>{`
@@ -153,7 +167,7 @@ const S = {
   },
   sub:     { color:'#6B7A99', fontSize:13, margin:'0 0 20px', letterSpacing:1 },
   divider: { width:'100%', height:1, background:'linear-gradient(90deg,transparent,rgba(240,180,41,.3),transparent)', marginBottom:24 },
-  label:   { alignSelf:'flex-start', fontSize:10, fontWeight:700, letterSpacing:2, color:'#4A566E', marginBottom:6 },
+  label:   { alignSelf:'flex-start', fontSize:10, fontWeight:700, letterSpacing:2, color:'#4A566E', marginBottom:6, marginTop:8 },
   inputWrap:{ width:'100%', position:'relative', marginBottom:12 },
   inputIcon:{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:16, height:16, color:'#4A566E' },
   input: {

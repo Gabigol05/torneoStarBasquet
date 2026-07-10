@@ -362,7 +362,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   const equiposOrdenados = useMemo(() =>
     [...equiposFemenino].sort((a, b) => {
-      const ptsA = a.pg * 2, ptsB = b.pg * 2;
+      const ptsA = a.pg * 2 + a.pp, ptsB = b.pg * 2 + b.pp;
       if (ptsB !== ptsA) return ptsB - ptsA;
       const difA = a.pf - a.pc, difB = b.pf - b.pc;
       if (difB !== difA) return difB - difA;
@@ -525,7 +525,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                 <td>{t.pf}</td><td>{t.pc}</td>
                                 <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
                                 <td className="pct-td">{pct}</td>
-                                <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
+                                <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
                                 <td className="td-racha">
                                   {t.historial?.slice(-5).map((h, i) => (
                                     <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
@@ -550,7 +550,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                               <td>{t.pg + t.pp}</td><td>{t.pg}</td><td>{t.pp}</td>
                               <td>-</td><td>-</td><td>-</td>
                               <td className="pct-td">-</td>
-                              <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2}</td>
+                              <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
                               <td className="td-racha"><span className="racha-nd">-</span></td>
                             </tr>
                           ))
@@ -825,6 +825,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
 
 
 

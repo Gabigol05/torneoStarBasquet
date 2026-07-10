@@ -55,7 +55,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
   // ⚠️ FIX: useMemo para no re-sortear en cada render
   const sortedTeams = useMemo(() =>
     [...allTeams].sort((a, b) => {
-      const ptsA = a.pg * 2, ptsB = b.pg * 2;
+      const ptsA = a.pg * 2 + a.pp, ptsB = b.pg * 2 + b.pp;
       if (ptsB !== ptsA) return ptsB - ptsA;
       const difA = a.pf - a.pc, difB = b.pf - b.pc;
       if (difB !== difA) return difB - difA;
@@ -458,4 +458,5 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
     </>
   );
 } 
+
 

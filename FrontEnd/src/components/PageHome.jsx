@@ -114,7 +114,7 @@ export function PageHome() {
       <div className="mobile-only">
         <MobileHeader />
       </div>
-      <Hero />
+      <Hero equipos={equipos} partidos={partidos} fechas={fechas} />
       <div className="full-rule"></div>
       <TorneoView />
       <div className="full-rule"></div>
@@ -126,3 +126,4 @@ export function PageHome() {
     </StatsContext.Provider>
   );
 }
+

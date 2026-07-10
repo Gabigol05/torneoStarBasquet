@@ -444,7 +444,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 Temporada Regular
               </div>
               <div style={{ fontFamily: "'Bebas Neue'", fontSize: '28px', letterSpacing: '2px', color: modeColor, marginTop: '4px' }}>
-                {mode === 'femenino' && fechas.length > 0 ? `Fecha ${Math.max(...fechas.map(f => f.numero))}` : 'Jornada 1'}
+                {mode === 'femenino' && fechas.length > 0 ? (() => {
+                  const jugadas = fechas.filter(f => partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado'));
+                  return jugadas.length > 0 ? `Fecha ${Math.max(...jugadas.map(f => f.numero))}` : 'Jornada 1';
+                })() : 'Jornada 1'}
               </div>
             </div>
           </div>
@@ -825,6 +828,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     </>
   );
 }
+
 
 
 

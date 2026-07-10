@@ -67,7 +67,7 @@ export function Navbar() {
               className={isActive('#jugadores') ? 'active' : ''}
               onClick={handleJugadoresClick}
             >
-              Jugadores
+              {mode === 'femenino' ? 'Jugadoras' : 'Jugadores'}
             </a>
           </li>
           <li>
@@ -119,4 +119,5 @@ export function Navbar() {
     </>
   );
 }
+
 

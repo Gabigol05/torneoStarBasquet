@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CounterUp } from './CounterUp';
 import { useTournament } from '../context/TournamentContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
@@ -8,32 +8,39 @@ const MODE_COLORS = {
   femenino: { hex: 0xe8187a },
 };
 
-const HERO_DATA = {
-  masculino: {
-    badge: 'Torneo Masculino - Proximamente',
-    subtitle: 'Categoria Masculina - Cordoba - 2026',
-    stats: [
-      { end: 6,   label: 'Edicion' },
-      { end: 22,  label: 'Equipos' },
-      { end: 0,   label: 'Fechas' },
-      { end: 250,   label: 'Jugadores', suffix: '+' },
-    ],
-  },
-  femenino: {
-    badge: 'Torneo Femenino - En Curso',
-    subtitle: 'Categoria Femenina - Cordoba - 2026',
-    stats: [
-      { end: 1,   label: 'Edicion' },
-      { end: 10,  label: 'Equipos' },
-      { end: 6,   label: 'Fechas' },
-      { end: 200, label: 'Jugadoras', suffix: '+' },
-    ],
-  },
+const HERO_MASCULINO = {
+  badge: 'Torneo Masculino - Proximamente',
+  subtitle: 'Categoria Masculina - Cordoba - 2026',
+  stats: [
+    { end: 6,   label: 'Edicion' },
+    { end: 22,  label: 'Equipos' },
+    { end: 0,   label: 'Fechas' },
+    { end: 250, label: 'Jugadores', suffix: '+' },
+  ],
 };
 
-export function Hero() {
+export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const { mode, toggleMode } = useTournament();
-  const data = HERO_DATA[mode];
+
+  const heroFemenino = useMemo(() => {
+    const fechasJugadas = fechas.filter(f =>
+      partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado')
+    ).length;
+    const jugadorasTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
+
+    return {
+      badge: 'Torneo Femenino - En Curso',
+      subtitle: 'Categoria Femenina - Cordoba - 2026',
+      stats: [
+        { end: 1, label: 'Edicion' },
+        { end: equipos.length || 10, label: 'Equipos' },
+        { end: fechasJugadas, label: 'Fechas' },
+        { end: jugadorasTotal || 200, label: 'Jugadoras' },
+      ],
+    };
+  }, [equipos, partidos, fechas]);
+
+  const data = mode === 'femenino' ? heroFemenino : HERO_MASCULINO;
 
   const rootRef = useRef(null);
   const canvasRef = useRef(null);
@@ -65,8 +72,6 @@ export function Hero() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pausar el render 3D cuando el Hero sale de pantalla o la pestana pierde
-  // foco, para no competir por CPU/GPU con el resto del scroll de la pagina.
   useEffect(() => {
     if (!rootRef.current) return undefined;
     let isIntersecting = false;
@@ -81,8 +86,6 @@ export function Hero() {
     }, { threshold: 0 });
     io.observe(rootRef.current);
 
-    // Cambiar de pestana no dispara el IntersectionObserver (la posicion en
-    // pantalla no cambio), asi que hay que resumir manualmente al volver.
     const onVisibility = () => {
       if (document.visibilityState === 'visible' && isIntersecting) {
         sceneRef.current?.resume();
@@ -139,7 +142,6 @@ export function Hero() {
             <span className="hero-title-line hero-title-accent">STAR BASQUET</span>
           </h1>
 
-
           <button
             type="button"
             className="hero-toggle"
@@ -177,10 +179,3 @@ export function Hero() {
     </section>
   );
 }
-
-
-
-
-
-
-

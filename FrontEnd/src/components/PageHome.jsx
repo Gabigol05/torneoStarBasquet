@@ -13,6 +13,7 @@ import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
 import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats } from '../hooks/useFemeninoStats';
 import { StatsContext }     from '../context/StatsContext';
+import { FavoritoProvider } from '../hooks/useFavorito.jsx';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
 
 function duplicateTicker() {
@@ -95,6 +96,7 @@ export function PageHome() {
   };
 
   return (
+    <FavoritoProvider>
     <StatsContext.Provider value={{ equipos, partidos, fechas, statsPorPartido, isLoading }}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
@@ -124,6 +126,11 @@ export function PageHome() {
       <Footer />
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </StatsContext.Provider>
+    </FavoritoProvider>
   );
 }
+
+
+
+
 

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
 import { Hero }             from './Hero.jsx';
@@ -60,8 +60,41 @@ export function PageHome() {
     isLoading, error, refetch,
   } = useFemeninoStats();
   const { toasts, addToast, removeToast } = useToast();
-  const { isPulling, isRefreshing } = usePullToRefresh(refetch);
   useResultadosToast(equipos, addToast);
+
+  // Chequea si hay una version nueva publicada (comparando el bundle actual
+  // contra el que esta realmente sirviendo el servidor ahora mismo). Si
+  // encuentra una version distinta, recarga y devuelve true. Se usa tanto al
+  // entrar a la app como al deslizar para refrescar (clave para cuando la
+  // app se abre desde el icono de "agregar a inicio", sin boton nativo).
+  const checkForUpdate = useCallback(async () => {
+    try {
+      const res = await fetch('/', { cache: 'no-store' });
+      const html = await res.text();
+      const match = html.match(/<script[^>]+src="([^"]+\.js)"/);
+      const latest = match?.[1];
+      if (!latest) return false;
+
+      const stored = localStorage.getItem('star_basquet_build');
+      if (stored && stored !== latest) {
+        localStorage.setItem('star_basquet_build', latest);
+        window.location.reload();
+        return true;
+      } else if (!stored) {
+        localStorage.setItem('star_basquet_build', latest);
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handlePullRefresh = useCallback(async () => {
+    const reloaded = await checkForUpdate();
+    if (!reloaded) await refetch?.();
+  }, [checkForUpdate, refetch]);
+
+  const { isPulling, isRefreshing } = usePullToRefresh(handlePullRefresh);
 
   useEffect(() => {
     const handler = e => { if (e.detail?.tab) setActiveTab(e.detail.tab); };
@@ -71,30 +104,7 @@ export function PageHome() {
 
   useEffect(() => { duplicateTicker(); }, []);
 
-  // Chequea si hay una version nueva publicada (comparando el bundle actual
-  // contra el que esta realmente sirviendo el servidor ahora mismo) y, si
-  // cambio, recarga una sola vez. Esto es clave para cuando la app se abre
-  // desde el icono de "agregar a inicio", donde no hay boton de recargar.
-  useEffect(() => {
-    const checkForUpdate = async () => {
-      try {
-        const res = await fetch('/', { cache: 'no-store' });
-        const html = await res.text();
-        const match = html.match(/<script[^>]+src="([^"]+\.js)"/);
-        const latest = match?.[1];
-        if (!latest) return;
-
-        const stored = localStorage.getItem('star_basquet_build');
-        if (stored && stored !== latest) {
-          localStorage.setItem('star_basquet_build', latest);
-          window.location.reload();
-        } else if (!stored) {
-          localStorage.setItem('star_basquet_build', latest);
-        }
-      } catch {}
-    };
-    checkForUpdate();
-  }, []);
+  useEffect(() => { checkForUpdate(); }, [checkForUpdate]);
 
   // Detecta ?jugadora=<id> en la URL (viene de un link compartido) y abre
   // el perfil correspondiente automaticamente al cargar la pagina.
@@ -154,9 +164,3 @@ export function PageHome() {
     </FavoritoProvider>
   );
 }
-
-
-
-
-
-

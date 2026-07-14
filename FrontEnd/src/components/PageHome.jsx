@@ -71,6 +71,31 @@ export function PageHome() {
 
   useEffect(() => { duplicateTicker(); }, []);
 
+  // Chequea si hay una version nueva publicada (comparando el bundle actual
+  // contra el que esta realmente sirviendo el servidor ahora mismo) y, si
+  // cambio, recarga una sola vez. Esto es clave para cuando la app se abre
+  // desde el icono de "agregar a inicio", donde no hay boton de recargar.
+  useEffect(() => {
+    const checkForUpdate = async () => {
+      try {
+        const res = await fetch('/', { cache: 'no-store' });
+        const html = await res.text();
+        const match = html.match(/<script[^>]+src="([^"]+\.js)"/);
+        const latest = match?.[1];
+        if (!latest) return;
+
+        const stored = localStorage.getItem('star_basquet_build');
+        if (stored && stored !== latest) {
+          localStorage.setItem('star_basquet_build', latest);
+          window.location.reload();
+        } else if (!stored) {
+          localStorage.setItem('star_basquet_build', latest);
+        }
+      } catch {}
+    };
+    checkForUpdate();
+  }, []);
+
   // Detecta ?jugadora=<id> en la URL (viene de un link compartido) y abre
   // el perfil correspondiente automaticamente al cargar la pagina.
   useEffect(() => {
@@ -129,6 +154,7 @@ export function PageHome() {
     </FavoritoProvider>
   );
 }
+
 
 
 

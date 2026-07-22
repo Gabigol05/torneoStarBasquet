@@ -39,6 +39,10 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
         pct_simples: data.pct_simples ?? 0, pct_dobles: data.pct_dobles ?? 0,
         pct_triples: data.pct_triples ?? 0, mejor_pts: data.mejor_pts ?? 0,
         pts: data.pts ?? 0, reb: data.reb ?? 0, ast: data.ast ?? 0,
+        pts_total: data.pts_total ?? 0, reb_total: data.reb_total ?? 0,
+        ast_total: data.ast_total ?? 0, rob_total: data.rob_total ?? 0,
+        tap_total: data.tap_total ?? 0, val_total: data.val_total ?? 0,
+        per_total: data.per_total ?? 0,
       });
     }
     close();

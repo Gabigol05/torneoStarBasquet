@@ -196,6 +196,12 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                         pct_triples: j.pct_triples  ?? j.tpp ?? 0,
                         mejor_pts:   j.mejor_pts    ?? 0,
                         pts_total:   j.pts_total    ?? 0,
+                        reb_total:   j.reb_total    ?? 0,
+                        ast_total:   j.ast_total    ?? 0,
+                        rob_total:   j.rob_total    ?? 0,
+                        tap_total:   j.tap_total    ?? 0,
+                        val_total:   j.val_total    ?? 0,
+                        per_total:   j.per_total    ?? 0,
                         pts: j.pts_prom ?? j.pts ?? 0,
                         reb: j.reb_prom ?? j.reb ?? 0,
                         ast: j.ast_prom ?? j.ast ?? 0,
@@ -457,6 +463,4 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
       </div>
     </>
   );
-} 
-
-
+}

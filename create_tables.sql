@@ -166,6 +166,10 @@ CREATE TABLE IF NOT EXISTS estadisticas_femenino (
   pts_total        INT          DEFAULT 0,
   reb_total        INT          DEFAULT 0,
   ast_total        INT          DEFAULT 0,
+  rob_total        INT          DEFAULT 0,
+  tap_total        INT          DEFAULT 0,
+  val_total        INT          DEFAULT 0,
+  per_total        INT          DEFAULT 0,
   mejor_pts        INT          DEFAULT 0,
   mejor_pts_rival  TEXT,
   -- Totales de tiros acumulados (para mostrar SC/SF, DC/DF, TC/TF en perfil)

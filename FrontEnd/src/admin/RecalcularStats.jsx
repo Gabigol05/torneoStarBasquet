@@ -45,6 +45,10 @@ async function recalcularTodos(onLog) {
       pts_total:    sum('pts'),
       reb_total:    sum('rd') + sum('ro'),
       ast_total:    sum('as_'),
+      rob_total:    sum('rb'),
+      tap_total:    sum('tp'),
+      val_total:    sum('val'),
+      per_total:    sum('pe'),
       mejor_pts:    Math.max(...allStats.map(r => r.pts ?? 0)),
       updated_at:   new Date().toISOString(),
     }, { onConflict: 'jugadora_id' });
@@ -80,10 +84,10 @@ export default function RecalcularStats() {
 
   return (
     <div>
-      <h2 style={S.title}>🔄 Recalcular todos los promedios</h2>
+      <h2 style={S.title}>🔄 Recalcular todos los promedios y acumulados</h2>
       <p style={S.hint}>
         Recorre todas las jugadoras con partidos cargados y recalcula sus promedios
-        desde cero usando los datos de <code>stats_partido_femenino</code>.
+        y totales acumulados desde cero usando los datos de <code>stats_partido_femenino</code>.
         Usá esto si hubo una corrección manual en Supabase o si sospechás que
         los promedios quedaron desactualizados.
       </p>

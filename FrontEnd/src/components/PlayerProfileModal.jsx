@@ -93,6 +93,15 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
   const pj       = player.pj        ?? 0;
   const mejorPts = player.mejor_pts ?? 0;
 
+  // Totales acumulados — dato principal en el ranking/mérito
+  const ptsTotal = player.pts_total ?? 0;
+  const rebTotal = player.reb_total ?? 0;
+  const astTotal = player.ast_total ?? 0;
+  const robTotal = player.rob_total ?? 0;
+  const tapTotal = player.tap_total ?? 0;
+  const perTotal = player.per_total ?? 0;
+  const valTotal = player.val_total ?? 0;
+
   // Porcentajes
   const pctSimp = player.pct_simples ?? player.tlp ?? 0;
   const pctDob  = player.pct_dobles  ?? player.fgp ?? 0;
@@ -176,16 +185,17 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
           {/* Stats principales */}
           <div className="pp-stats-grid">
             {[
-              { val: pts, lbl: 'PTS', color: '#F0B429' },
-              { val: reb, lbl: 'REB', color: '#60A5FA' },
-              { val: ast, lbl: 'AST', color: '#22D07A' },
-              { val: rob, lbl: 'ROB', color: '#F97316' },
-              { val: tap, lbl: 'TAP', color: '#A78BFA' },
-              { val: per, lbl: 'PÉR', color: '#6B7A99' },
+              { val: ptsTotal, prom: pts, lbl: 'PTS', color: '#F0B429' },
+              { val: rebTotal, prom: reb, lbl: 'REB', color: '#60A5FA' },
+              { val: astTotal, prom: ast, lbl: 'AST', color: '#22D07A' },
+              { val: robTotal, prom: rob, lbl: 'ROB', color: '#F97316' },
+              { val: tapTotal, prom: tap, lbl: 'TAP', color: '#A78BFA' },
+              { val: perTotal, prom: per, lbl: 'PÉR', color: '#6B7A99' },
             ].map(s => (
               <div key={s.lbl} className="pp-stat-box">
                 <div className="pp-stat-val" style={{ color: s.color }}>{s.val}</div>
                 <div className="pp-stat-lbl">{s.lbl}</div>
+                <div className="pp-stat-prom">{s.prom} prom.</div>
               </div>
             ))}
           </div>
@@ -199,7 +209,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
                 <StatCard val={pj}       lbl="Partidos"       color="#EEF2F8"/>
                 <StatCard val={mejorPts} lbl="Mejor partido"  color="#F0B429" sub={mejorPartido ? `vs ${mejorPartido.match}` : 'PTS'}/>
-                <StatCard val={val}      lbl="VAL prom."      color={val >= 0 ? '#22D07A' : '#F04060'}/>
+                <StatCard val={valTotal} lbl="VAL total" color={valTotal >= 0 ? '#22D07A' : '#F04060'} sub={`${val} prom.`}/>
               </div>
 
               {/* ── DESGLOSE DE TIROS ── */}
@@ -315,5 +325,4 @@ const ST = {
     fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, letterSpacing: 1,
     color: '#EEF2F8', marginBottom: 12, textTransform: 'uppercase',
   },
-}; 
-
+};

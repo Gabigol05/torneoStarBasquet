@@ -8,6 +8,7 @@ const DEFAULT_STATS = {
   tap_prom:0, per_prom:0, val_prom:0,
   pct_simples:0, pct_dobles:0, pct_triples:0,
   pts_total:0, reb_total:0, ast_total:0,
+  rob_total:0, tap_total:0, val_total:0, per_total:0,
   mejor_pts:0, mejor_pts_rival:null,
   // aliases cortos para componentes existentes
   pts:0, reb:0, ast:0, rob:0, tap:0, fgp:0, tpp:0, tlp:0,

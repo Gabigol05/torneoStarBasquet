@@ -1,11 +1,17 @@
 ﻿import { useTournament } from '../context/TournamentContext';
 
-function calcLiders(equipos, statKey, n = 3) {
+function calcLiders(equipos, statKey, promKey, n = 3) {
   const all = [];
   for (const eq of equipos) {
     for (const j of eq.jugadoras) {
       const val = j[statKey] ?? 0;
-      if (val > 0) all.push({ nombre: j.nombre, equipo: eq.name, color: eq.color, val });
+      if (val > 0) {
+        all.push({
+          nombre: j.nombre, equipo: eq.name, color: eq.color, val,
+          pj: j.pj ?? 0,
+          prom: promKey ? (j[promKey] ?? 0) : null,
+        });
+      }
     }
   }
   return all.sort((a, b) => b.val - a.val).slice(0, n);
@@ -15,8 +21,8 @@ function getInitials(nombre) {
   return nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
-  const lideres = calcLiders(equipos, statKey);
+function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color }) {
+  const lideres = calcLiders(equipos, statKey, promKey);
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
   return (
@@ -41,12 +47,20 @@ function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
           </div>
           <div className="lc-big-num" style={{ color: color ?? 'var(--fem2)' }}>{top.val}</div>
           <div className="lc-sub">{sub}</div>
+          {top.prom !== null && (
+            <div className="lc-context">
+              {top.pj} PJ · {top.prom} prom/partido
+            </div>
+          )}
           <div className="lc-list">
             {lideres.slice(1).map((l, i) => (
               <div className="lc-row" key={i}>
                 <span className="lc-row-rank">{i + 2}</span>
                 <span>{l.nombre.split(' ').slice(0, 2).join(' ')} - {l.equipo}</span>
-                <span className="lc-row-val">{l.val}</span>
+                <span className="lc-row-val">
+                  {l.val}
+                  {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
+                </span>
               </div>
             ))}
           </div>
@@ -57,13 +71,13 @@ function LeaderCard({ titulo, emoji, statKey, sub, equipos, color }) {
 }
 
 const CATEGORIAS_FEM = [
-  { titulo: 'Puntos',      emoji: '', statKey: 'pts_prom',    sub: 'prom. por partido', color: '#F0B429' },
-  { titulo: 'Rebotes',     emoji: '', statKey: 'reb_prom',    sub: 'prom. por partido', color: '#60A5FA' },
-  { titulo: 'Asistencias', emoji: '', statKey: 'ast_prom',    sub: 'prom. por partido', color: '#22D07A' },
-  { titulo: 'Robos',       emoji: '', statKey: 'rob_prom',    sub: 'prom. por partido', color: '#F97316' },
-  { titulo: 'Tapones',     emoji: '', statKey: 'tap_prom',    sub: 'prom. por partido', color: '#A78BFA' },
-  { titulo: '% Triples',   emoji: '', statKey: 'pct_triples', sub: 'efectividad 3pts',  color: '#FB7185' },
-  { titulo: 'Valoracion',  emoji: '', statKey: 'val_prom',    sub: 'valoracion prom.',  color: '#FCD34D' },
+  { titulo: 'Puntos',      emoji: '', statKey: 'pts_total', promKey: 'pts_prom', sub: 'acumulado en el torneo', color: '#F0B429' },
+  { titulo: 'Rebotes',     emoji: '', statKey: 'reb_total', promKey: 'reb_prom', sub: 'acumulado en el torneo', color: '#60A5FA' },
+  { titulo: 'Asistencias', emoji: '', statKey: 'ast_total', promKey: 'ast_prom', sub: 'acumulado en el torneo', color: '#22D07A' },
+  { titulo: 'Robos',       emoji: '', statKey: 'rob_total', promKey: 'rob_prom', sub: 'acumulado en el torneo', color: '#F97316' },
+  { titulo: 'Tapones',     emoji: '', statKey: 'tap_total', promKey: 'tap_prom', sub: 'acumulado en el torneo', color: '#A78BFA' },
+  { titulo: '% Triples',   emoji: '', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185' },
+  { titulo: 'Valoracion',  emoji: '', statKey: 'val_total', promKey: 'val_prom', sub: 'acumulado en el torneo', color: '#FCD34D' },
 ];
 
 export function LeadersSection({ equipos = [], isLoading = false }) {

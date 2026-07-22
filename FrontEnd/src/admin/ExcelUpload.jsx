@@ -254,6 +254,7 @@ async function recalcularPromedios(jugadoraIds) {
       pct_dobles:  tdc+tdf>0?+((tdc/(tdc+tdf))*100).toFixed(1):0,
       pct_triples: ttc+ttf>0?+((ttc/(ttc+ttf))*100).toFixed(1):0,
       pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
+      rob_total:sum('rb'), tap_total:sum('tp'), val_total:sum('val'), per_total:sum('pe'),
       mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),
     }, { onConflict:'jugadora_id' });
   }
@@ -766,15 +767,3 @@ const s = {
   successBox: {textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
   dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };
-
-
-
-
-
-
-
-
-
-
-
-

@@ -140,7 +140,7 @@ export const equiposFemenino = [
       { id: 'f_uag_07', nombre: 'Serenelli Silvana',         fechaNac: '07/09/1974' },
       { id: 'f_uag_08', nombre: 'Benchat Darian',            fechaNac: '02/12/1996' },
       { id: 'f_uag_09', nombre: 'Mercader Ana Laura',        fechaNac: '01/09/1969' },
-      { id: 'f_uag_10', nombre: 'Bencaht Daiana',            fechaNac: '13/11/1990' },
+      { id: 'f_uag_10', nombre: 'Benchat Daiana',            fechaNac: '13/11/1990' },
       { id: 'f_uag_11', nombre: 'Allende Maria Eugenia',     fechaNac: '24/06/1983' },
       { id: 'f_uag_12', nombre: 'Levitzky Noelia',           fechaNac: '19/10/1983' },
       { id: 'f_uag_13', nombre: 'Arce Mirta Alejandra',      fechaNac: '09/04/1972' },
@@ -288,9 +288,3 @@ export const equiposFemenino = [
     ],
   },
 ];
-
-
-
-
-
-

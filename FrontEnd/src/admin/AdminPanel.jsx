@@ -6,6 +6,7 @@ import PartidosManager from './PartidosManager';
 import StatsEditor from './StatsEditor';
 import UploadHistory from './UploadHistory';
 import RecalcularStats from './RecalcularStats';
+import EncuestasManager from './EncuestasManager';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
 const NAV = [
@@ -14,6 +15,7 @@ const NAV = [
   { id:'partidos',   icon:'📅', label:'Partidos',          desc:'Fixture y resultados'     },
   { id:'stats',      icon:'✏️',  label:'Editar Stats',     desc:'Corrección manual'        },
   { id:'recalcular', icon:'🔄', label:'Recalcular',        desc:'Reprocessar promedios'    },
+  { id:'encuestas',  icon:'🗳️', label:'Encuestas',         desc:'Votaciones publicas'      },
 ];
 
 // ── Indicador Realtime ────────────────────────────────────────────────────────
@@ -217,6 +219,7 @@ export default function AdminPanel() {
           {sec === 'partidos'   && <PartidosManager />}
           {sec === 'stats'      && <StatsEditor />}
           {sec === 'recalcular' && <RecalcularStats />}
+          {sec === 'encuestas'  && <EncuestasManager />}
         </div>
       </main>
     </div>

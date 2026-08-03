@@ -4,6 +4,7 @@ import { MobileHeader }     from './MobileHeader.jsx';
 import { Hero }             from './Hero.jsx';
 import { TorneoView }       from './TorneoView.jsx';
 import { LeadersSection }   from './LeadersSection.jsx';
+import { EncuestasSection } from './EncuestasSection.jsx';
 import { PlayoffsBracket }  from './PlayoffsBracket.jsx';
 import { PlayerProfileModal } from './PlayerProfileModal.jsx';
 import { Footer }           from './Footer.jsx';
@@ -162,6 +163,8 @@ export function PageHome() {
       <TorneoView />
       <div className="full-rule"></div>
       <LeadersSection equipos={equipos} isLoading={isLoading} />
+      <div className="full-rule"></div>
+      <EncuestasSection />
       <div className="full-rule"></div>
       <PlayoffsBracket />
       <Footer />

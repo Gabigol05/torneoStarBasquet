@@ -25,7 +25,7 @@ import logoSanFrancisco   from '../assets/logo_masc_san_francisco.png';
 export const equiposMasculino = [
   { id: 'm_independencia',  name: 'Independencia',    logo: logoIndependencia,  color: '#D4A017' },
   { id: 'm_jurasicos',      name: 'Jurásicos',         logo: logoJurasicos,      color: '#E8A020' },
-  { id: 'm_walkers',        name: "Los Walker's",      logo: logoWalkers,        color: '#dc2626' },
+  { id: 'm_walkers',        name: "Walker's",          logo: logoWalkers,        color: '#dc2626' },
   { id: 'm_nn',             name: 'NN',                logo: logoNN,             color: '#e5e7eb' },
   { id: 'm_north_side',     name: 'North Side',        logo: logoNorthSide,      color: '#f97316' },
   { id: 'm_pueblerinos',    name: 'Pueblerinos',       logo: logoPueblerinos,    color: '#4d7c0f' },

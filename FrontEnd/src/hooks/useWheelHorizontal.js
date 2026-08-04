@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 // Permite scrollear una fila horizontal (chips de equipos, fechas, etc.) en
 // desktop de dos formas, ya que el scrollbar está oculto por CSS y sin esto
@@ -6,14 +6,24 @@ import { useEffect, useRef } from 'react';
 //   1) Rueda del mouse (scroll vertical normal se traduce a scrollLeft).
 //   2) Click + arrastrar (drag-to-scroll), como un carrusel.
 // El touch/trackpad ya funciona solo, vía overflow-x:auto nativo.
+//
+// Usa un "callback ref" (no useRef + useEffect) a propósito: la fila puede
+// vivir dentro de una pestaña que no está montada al cargar la página (ej:
+// "Jugadores"), así que un useEffect con [] como dependencias se ejecutaría
+// una sola vez, ANTES de que el elemento exista, y nunca engancharía nada.
+// El callback ref, en cambio, corre justo cuando React monta/desmonta el
+// nodo real, sin importar cuándo pase eso.
 export function useWheelHorizontal() {
-  const ref = useRef(null);
+  const cleanupRef = useRef(null);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
+  const setRef = useCallback((el) => {
+    // Si había un elemento anterior (ej: la pestaña se desmontó), limpiamos.
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    if (!el) return;
 
-    // ── Rueda del mouse → scroll horizontal ──
     const onWheel = (e) => {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       if (el.scrollWidth <= el.clientWidth) return;
@@ -21,23 +31,19 @@ export function useWheelHorizontal() {
       e.preventDefault();
     };
 
-    // ── Click + arrastrar → scroll horizontal ──
     let isDown = false;
     let dragged = false;
     let startX = 0;
     let startScroll = 0;
 
     const onMouseDown = (e) => {
-      if (e.button !== 0) return; // solo click izquierdo
+      if (e.button !== 0) return;
       if (el.scrollWidth <= el.clientWidth) return;
       isDown = true;
       dragged = false;
       startX = e.pageX;
       startScroll = el.scrollLeft;
       el.classList.add('is-dragging');
-      // Clave: sin esto el navegador arranca su propio drag nativo (de texto
-      // o del botón como "imagen fantasma") que compite con nuestro scroll
-      // manual y hace que se sienta trabado/errático.
       e.preventDefault();
     };
     const onMouseMove = (e) => {
@@ -51,8 +57,6 @@ export function useWheelHorizontal() {
       isDown = false;
       el.classList.remove('is-dragging');
     };
-    // Si hubo arrastre real, cancelamos el click siguiente para que no
-    // dispare el filtro del chip que quedó bajo el cursor al soltar.
     const onClickCapture = (e) => {
       if (dragged) {
         e.stopPropagation();
@@ -68,7 +72,7 @@ export function useWheelHorizontal() {
     el.addEventListener('mouseleave', endDrag);
     el.addEventListener('click', onClickCapture, true);
 
-    return () => {
+    cleanupRef.current = () => {
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mousemove', onMouseMove);
@@ -78,5 +82,5 @@ export function useWheelHorizontal() {
     };
   }, []);
 
-  return ref;
+  return setRef;
 }

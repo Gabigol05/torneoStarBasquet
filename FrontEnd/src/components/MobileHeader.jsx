@@ -2,12 +2,9 @@
 import { GlobalSearch } from './GlobalSearch';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useState } from 'react';
-import { useTournament } from '../context/TournamentContext';
 import { useStats } from '../context/StatsContext';
-import { TournamentSelector } from './TournamentSelector';
 
 export function MobileHeader() {
-  const { mode } = useTournament();
   const { equipos = [] } = useStats();
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
@@ -28,7 +25,6 @@ export function MobileHeader() {
         </div>
 
         <div className="mh-actions">
-          <TournamentSelector compact />
           <GlobalSearch equipos={equipos} onSelectPlayer={setSelectedPlayer} />
           <button
             type="button"

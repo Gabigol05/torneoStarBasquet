@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
-import { TABLAS } from './categoriaAdmin';
+import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -39,7 +39,7 @@ function EstadoBadge({ estado }) {
 }
 
 // ── Formulario de partido ─────────────────────────────────────────────────────
-function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId }) {
+function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId, crearEncuesta, setCrearEncuesta }) {
   const n = v => v === '' ? '' : Number(v);
 
   // Calcular totales desde cuartos
@@ -156,6 +156,14 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
         </div>
       </div>
 
+      {/* Sugerir encuesta */}
+      {!editId && form.estado !== 'finalizado' && (
+        <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, fontSize:13, color:'#8899BB', cursor:'pointer' }}>
+          <input type="checkbox" checked={crearEncuesta} onChange={e => setCrearEncuesta(e.target.checked)} />
+          🗳️ Crear encuesta "¿Quién gana?" automáticamente para este partido
+        </label>
+      )}
+
       {/* Botones */}
       <div style={{ display:'flex', gap:10, marginTop:4 }}>
         <button onClick={onSave} disabled={loading || !form.equipo_local_id || !form.equipo_visit_id}
@@ -169,7 +177,7 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
 }
 
 // ── Carga masiva de fixture ───────────────────────────────────────────────────
-function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
+function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClose }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
@@ -178,6 +186,7 @@ function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
   ]);
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
+  const [crearEncuestas, setCrearEncuestas] = useState(true);
 
   const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
@@ -232,12 +241,36 @@ function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
         hora_inicio:     p.hora_inicio || null,
         estado:          'pendiente',
       }));
-      const { error:pErr } = await supabase.from(tablas.partidos).insert(rows);
+      const { data: inserted, error:pErr } = await supabase
+        .from(tablas.partidos).insert(rows)
+        .select('id, equipo_local_id, equipo_visit_id');
       if (pErr) throw pErr;
 
-      setMsg({ ok:true, text:`✅ Fecha ${jornada} creada con ${validos.length} partido(s)` });
+      // 3. Sugerir encuesta "¿Quién gana?" por cada partido nuevo (opcional)
+      let encuestasOk = 0, encuestasErr = 0;
+      if (crearEncuestas) {
+        for (const p of inserted ?? []) {
+          const eqL = equipos.find(e => e.id === p.equipo_local_id);
+          const eqV = equipos.find(e => e.id === p.equipo_visit_id);
+          try {
+            await sugerirEncuestaQuienGana({
+              categoria, partidoId: p.id, equipoLocal: eqL, equipoVisit: eqV,
+              subtitulo: descripcion || `Fecha ${jornada}`,
+            });
+            encuestasOk++;
+          } catch (e) {
+            console.warn('No se pudo crear la encuesta sugerida:', e.message);
+            encuestasErr++;
+          }
+        }
+      }
+
+      const sufijoEncuestas = crearEncuestas
+        ? (encuestasErr === 0 ? ` · 🗳️ ${encuestasOk} encuesta(s) creada(s)` : ` · 🗳️ ${encuestasOk} encuesta(s) OK, ${encuestasErr} fallaron`)
+        : '';
+      setMsg({ ok:true, text:`✅ Fecha ${jornada} creada con ${validos.length} partido(s)${sufijoEncuestas}` });
       onCrearFecha?.();
-      setTimeout(onClose, 1500);
+      setTimeout(onClose, 1800);
     } catch(err) {
       setMsg({ ok:false, text:`❌ ${err.message}` });
     } finally {
@@ -347,6 +380,11 @@ function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
         </button>
       )}
 
+      <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, fontSize:13, color:'#8899BB', cursor:'pointer' }}>
+        <input type="checkbox" checked={crearEncuestas} onChange={e => setCrearEncuestas(e.target.checked)} />
+        🗳️ Crear encuesta "¿Quién gana?" automáticamente para cada partido de esta fecha
+      </label>
+
       <div style={{ display:'flex', gap:10 }}>
         <button onClick={handleGuardar} disabled={loading||!jornada}
           style={{ ...F.btnPrimary, opacity:loading||!jornada?0.5:1 }}>
@@ -377,6 +415,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   const [view,     setView]     = useState('lista');   // 'lista' | 'nuevo' | 'fixture'
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado,setFiltroEstado]= useState('');
+  const [crearEncuesta, setCrearEncuesta] = useState(true);
 
   useEffect(() => {
     setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
@@ -430,9 +469,25 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         if (error) throw error;
         flash('✅ Partido actualizado');
       } else {
-        const { error } = await supabase.from(tablas.partidos).insert(payload);
+        const { data: nuevo, error } = await supabase.from(tablas.partidos).insert(payload).select('id').single();
         if (error) throw error;
-        flash('✅ Partido agregado');
+
+        let sufijo = '';
+        if (crearEncuesta && payload.estado !== 'finalizado') {
+          const eqL = EQUIPOS.find(e => e.id === payload.equipo_local_id);
+          const eqV = EQUIPOS.find(e => e.id === payload.equipo_visit_id);
+          const fecha = fechas.find(f => f.id === Number(payload.fecha_id));
+          try {
+            await sugerirEncuestaQuienGana({
+              categoria, partidoId: nuevo.id, equipoLocal: eqL, equipoVisit: eqV,
+              subtitulo: fecha ? (fecha.descripcion ?? `Fecha ${fecha.numero}`) : null,
+            });
+            sufijo = ' · 🗳️ encuesta creada';
+          } catch (e) {
+            console.warn('No se pudo crear la encuesta sugerida:', e.message);
+          }
+        }
+        flash(`✅ Partido agregado${sufijo}`);
       }
       setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
       await loadAll();
@@ -522,6 +577,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           fechas={fechas}
           equipos={EQUIPOS}
           tablas={tablas}
+          categoria={categoria}
           onCrearFecha={loadAll}
           onClose={()=>setView('lista')}
         />
@@ -535,6 +591,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           equipos={EQUIPOS}
           onSave={handleSave} onCancel={cancelForm}
           loading={loading} editId={editId}
+          crearEncuesta={crearEncuesta} setCrearEncuesta={setCrearEncuesta}
         />
       )}
 

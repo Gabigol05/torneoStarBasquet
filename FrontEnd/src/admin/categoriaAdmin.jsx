@@ -1,6 +1,8 @@
 // Utilidades compartidas por los componentes del admin que necesitan operar
 // tanto sobre el torneo femenino como el masculino (tablas con sufijo distinto).
 
+import { supabase } from '../lib/supabase';
+
 export const TABLAS = {
   femenino: {
     equipos:        'equipos_femenino',
@@ -27,6 +29,34 @@ export const TABLAS = {
     mvpField:       'mvp_jugador_id',
   },
 };
+
+// Crea automáticamente una encuesta "¿Quién gana?" para un partido recién
+// cargado en el fixture (todavía no jugado). Queda linkeada a ese partido vía
+// partido_id, así el trigger de la base la cierra sola cuando el partido se
+// marca como finalizado (ver update_encuestas_partido.sql).
+export async function sugerirEncuestaQuienGana({ categoria, partidoId, equipoLocal, equipoVisit, subtitulo }) {
+  if (!equipoLocal || !equipoVisit || !partidoId) return null;
+  const { data: enc, error: eErr } = await supabase
+    .from('encuestas')
+    .insert({
+      categoria,
+      pregunta: `¿Quién gana? ${equipoLocal.nombre} vs ${equipoVisit.nombre}`,
+      subtitulo: subtitulo || null,
+      activa: true,
+      partido_id: partidoId,
+    })
+    .select('id')
+    .single();
+  if (eErr) throw eErr;
+
+  const { error: oErr } = await supabase.from('encuesta_opciones').insert([
+    { encuesta_id: enc.id, texto: equipoLocal.nombre, equipo_id: equipoLocal.id, orden: 1 },
+    { encuesta_id: enc.id, texto: equipoVisit.nombre, equipo_id: equipoVisit.id, orden: 2 },
+  ]);
+  if (oErr) throw oErr;
+
+  return enc.id;
+}
 
 export function CategoriaToggle({ categoria, setCategoria }) {
   return (

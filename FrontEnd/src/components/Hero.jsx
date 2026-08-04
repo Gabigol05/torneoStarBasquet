@@ -2,6 +2,13 @@
 import { CounterUp } from './CounterUp';
 import { useTournament } from '../context/TournamentContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
+import sponsorAustral from '../assets/sponsor_austral_bar.png';
+import sponsorLening from '../assets/sponsor_lening.png';
+
+const SPONSORS = [
+  { id: 'austral', name: 'Austral Bar',              logo: sponsorAustral },
+  { id: 'lening',  name: 'Lening Indumentaria Deportiva', logo: sponsorLening },
+];
 
 const MODE_COLORS = {
   masculino: { hex: 0x2f7de8 },
@@ -125,10 +132,20 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
 
       <div className="hero-content">
         <div className="hero-top">
-          <div className="hero-logo">
-            <img src={logoTorneo} alt="Torneo Star Basquet" />
+          <div className="hero-sponsor hero-sponsor-left">
+            <img src={SPONSORS[0].logo} alt={SPONSORS[0].name} />
           </div>
-          <span className="hero-liga-label">Torneo Oficial</span>
+
+          <div className="hero-top-center">
+            <div className="hero-logo">
+              <img src={logoTorneo} alt="Torneo Star Basquet" />
+            </div>
+            <span className="hero-liga-label">Torneo Oficial</span>
+          </div>
+
+          <div className="hero-sponsor hero-sponsor-right">
+            <img src={SPONSORS[1].logo} alt={SPONSORS[1].name} />
+          </div>
         </div>
 
         <div className="hero-center">

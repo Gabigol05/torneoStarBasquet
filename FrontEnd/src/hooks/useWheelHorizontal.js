@@ -28,12 +28,17 @@ export function useWheelHorizontal() {
     let startScroll = 0;
 
     const onMouseDown = (e) => {
+      if (e.button !== 0) return; // solo click izquierdo
       if (el.scrollWidth <= el.clientWidth) return;
       isDown = true;
       dragged = false;
       startX = e.pageX;
       startScroll = el.scrollLeft;
       el.classList.add('is-dragging');
+      // Clave: sin esto el navegador arranca su propio drag nativo (de texto
+      // o del botón como "imagen fantasma") que compite con nuestro scroll
+      // manual y hace que se sienta trabado/errático.
+      e.preventDefault();
     };
     const onMouseMove = (e) => {
       if (!isDown) return;

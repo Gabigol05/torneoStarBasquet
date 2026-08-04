@@ -43,12 +43,18 @@ export function useWheelHorizontal() {
       isDown = true;
       startX = e.pageX;
       startScroll = el.scrollLeft;
-      el.classList.add('is-dragging');
+      // OJO: acá NO se agrega la clase "is-dragging" todavía. Si se agrega
+      // ya en el mousedown, un click normal (sin mover el mouse) también la
+      // activa, y como esa clase pone pointer-events:none en los chips por
+      // CSS, el navegador pierde el mouseup/click sobre el botón y el click
+      // deja de funcionar. Por eso se agrega recién en onMouseMove, una vez
+      // que se confirma que hay un arrastre real.
     };
     const onMouseMove = (e) => {
       if (!isDown) return;
       const delta = e.pageX - startX;
-      if (Math.abs(delta) < 3) return; // ignora micro-movimiento (trackpad tap)
+      if (Math.abs(delta) < 3) return; // ignora micro-movimiento (trackpad tap / click)
+      el.classList.add('is-dragging');
       el.scrollLeft = startScroll - delta;
     };
     const endDrag = () => {

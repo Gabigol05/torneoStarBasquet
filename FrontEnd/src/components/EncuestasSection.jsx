@@ -1,4 +1,5 @@
 import { useEncuestas } from '../hooks/useEncuestas';
+import { useTournament } from '../context/TournamentContext';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 
@@ -72,10 +73,15 @@ function EncuestaCard({ encuesta, opciones, votoElegido, onVotar }) {
 }
 
 export function EncuestasSection() {
+  const { mode } = useTournament();
   const { encuestas, resultados, misVotos, votar, isLoading } = useEncuestas();
 
-  if (isLoading && encuestas.length === 0) return null;
-  if (encuestas.length === 0) return null;
+  // Solo se muestran las encuestas de la categoria activa (o generales), para
+  // no mezclar votaciones de femenino con masculino segun el modo elegido.
+  const encuestasVisibles = encuestas.filter(e => e.categoria === mode || e.categoria === 'general');
+
+  if (isLoading && encuestasVisibles.length === 0) return null;
+  if (encuestasVisibles.length === 0) return null;
 
   const handleVotar = async (encuestaId, opcionId) => {
     await votar(encuestaId, opcionId);
@@ -86,7 +92,7 @@ export function EncuestasSection() {
       <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Participá</p>
       <h2 className="section-heading">Votaciones <span className="gold">2026</span></h2>
       <div className="encuestas-grid">
-        {encuestas.map(encuesta => (
+        {encuestasVisibles.map(encuesta => (
           <EncuestaCard
             key={encuesta.id}
             encuesta={encuesta}

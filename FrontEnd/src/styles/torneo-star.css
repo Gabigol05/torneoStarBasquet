@@ -3353,6 +3353,13 @@ body.theme-femenino {
   background: rgba(8, 12, 18, 0.85);
   border-bottom: 1px solid rgba(255,255,255,0.06);
   transition: border-color 0.3s;
+  /* Fuerza una capa de composicion propia desde el primer paint: en Chrome/Edge,
+     backdrop-filter sobre position:sticky a veces no se pinta hasta el primer
+     scroll/repaint, dejando el navbar "transparente" con los botones flotando
+     sobre el fondo del hero. */
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+  isolation: isolate;
 }
 body.theme-femenino .navbar-sticky {
   border-bottom-color: rgba(232, 24, 122, 0.15);

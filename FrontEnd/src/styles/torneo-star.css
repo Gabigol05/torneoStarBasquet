@@ -4175,6 +4175,21 @@ table tbody tr:hover {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* ── Contenedor con degradado que insinua que hay mas chips a la derecha ── */
+.chips-fade-wrap {
+  position: relative;
+}
+.chips-fade-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  background: linear-gradient(90deg, transparent, var(--dark, #080C12) 85%);
+  pointer-events: none;
+}
+
 /* ── FILTER CHIPS ── */
 .filter-chips {
   display: flex;
@@ -4185,6 +4200,7 @@ table tbody tr:hover {
   scrollbar-width: none;
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
 }
 .filter-chips::-webkit-scrollbar { display: none; }
 

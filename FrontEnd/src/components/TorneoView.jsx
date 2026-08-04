@@ -55,6 +55,7 @@ import { FavoritoCard }     from './FavoritoCard';
 import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
+import { useWheelHorizontal } from '../hooks/useWheelHorizontal';
 
 const TABS = [
   { key: 'tabla',      label: 'Tabla'     },
@@ -266,6 +267,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     statsPorPartido = {},
   } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
+  const filterChipsWheelRef = useWheelHorizontal();
+  const fechaChipsWheelRef  = useWheelHorizontal();
 
   const [activeTab,       setActiveTab]       = useState('tabla');
   const [prevTab,         setPrevTab]         = useState('tabla');
@@ -378,7 +381,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const FechaChips = ({ modo }) => {
     if (fechas.length === 0) return null;
     return (
-      <div className="fecha-chips" style={{ marginBottom: 16 }}>
+      <div className="fecha-chips" ref={fechaChipsWheelRef} style={{ marginBottom: 16 }}>
         <button
           className={`fecha-chip ${!fechaSelId ? 'active' : ''}`}
           onClick={() => setFechaSelId(null)}
@@ -712,24 +715,26 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   onChange={e => setSearchJugadoras(e.target.value)}
                   style={{ marginBottom: '12px' }}/>
 
-                <div className="filter-chips">
-                  <button
-                    className={`chip ${!filterEquipoId ? 'chip-active' : ''}`}
-                    style={!filterEquipoId ? { borderColor: modeColor, color: modeColor } : {}}
-                    onClick={() => setFilterEquipoId(null)}>
-                    Todos
-                  </button>
-                  {equiposFemenino.map(eq => (
-                    <button key={eq.id}
-                      className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
-                      style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
-                      onClick={() => setFilterEquipoId(prev => prev === eq.id ? null : eq.id)}>
-                      <img src={eq.logo} alt="" loading="lazy" decoding="async"
-                        style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
-                        onError={e => { e.target.style.display = 'none'; }}/>
-                      {eq.name}
+                <div className="chips-fade-wrap">
+                  <div className="filter-chips" ref={filterChipsWheelRef}>
+                    <button
+                      className={`chip ${!filterEquipoId ? 'chip-active' : ''}`}
+                      style={!filterEquipoId ? { borderColor: modeColor, color: modeColor } : {}}
+                      onClick={() => setFilterEquipoId(null)}>
+                      Todos
                     </button>
-                  ))}
+                    {equiposFemenino.map(eq => (
+                      <button key={eq.id}
+                        className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
+                        style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
+                        onClick={() => setFilterEquipoId(prev => prev === eq.id ? null : eq.id)}>
+                        <img src={eq.logo} alt="" loading="lazy" decoding="async"
+                          style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
+                          onError={e => { e.target.style.display = 'none'; }}/>
+                        {eq.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="jugadoras-count" style={{ marginBottom: '16px' }}>

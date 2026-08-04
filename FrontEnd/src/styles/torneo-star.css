@@ -4201,8 +4201,11 @@ table tbody tr:hover {
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
   cursor: grab;
+  user-select: none;
 }
 .filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips.is-dragging { cursor: grabbing; scroll-behavior: auto; }
+.filter-chips.is-dragging .chip { pointer-events: none; }
 
 .chip {
   display: inline-flex;

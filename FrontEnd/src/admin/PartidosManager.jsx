@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
-import { CategoriaToggle, TABLAS } from './categoriaAdmin';
+import { TABLAS } from './categoriaAdmin';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -359,8 +359,10 @@ function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────────
-export default function PartidosManager() {
-  const [categoria, setCategoria] = useState('femenino');
+export default function PartidosManager({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
   const EQUIPOS = useMemo(() =>
     ROSTER[categoria].map(e => ({ id: e.id, nombre: e.name ?? e.nombre, color: e.color, logo: e.logo })),
@@ -489,7 +491,6 @@ export default function PartidosManager() {
 
   return (
     <div>
-      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
 
       {/* Msg flash */}
       {msg && (

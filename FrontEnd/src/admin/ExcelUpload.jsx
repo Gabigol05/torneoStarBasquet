@@ -4,7 +4,7 @@ import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
-import { CategoriaToggle, TABLAS } from './categoriaAdmin';
+import { TABLAS } from './categoriaAdmin';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
@@ -283,8 +283,10 @@ async function recalcularPromedios(jugadorIds, tablas) {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export default function ExcelUpload() {
-  const [categoria, setCategoria] = useState('femenino');
+export default function ExcelUpload({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
   const roster = categoria === 'masculino' ? equiposMasculino : equiposFemenino;
   const fuseEq = categoria === 'masculino' ? fuseEqMasc : fuseEqFem;
@@ -530,8 +532,6 @@ export default function ExcelUpload() {
 
   return (
     <div>
-      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
-
       {/* Stepper */}
       <div style={s.stepper}>
         {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([num,lbl],i)=>{

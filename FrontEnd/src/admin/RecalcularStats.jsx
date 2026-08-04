@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { CategoriaToggle, TABLAS } from './categoriaAdmin';
+import { TABLAS } from './categoriaAdmin';
 
 async function recalcularTodos(onLog, tablas) {
   onLog('📋 Obteniendo lista de jugadoras con stats...');
@@ -90,8 +90,10 @@ async function recalcularTodos(onLog, tablas) {
   }
 }
 
-export default function RecalcularStats() {
-  const [categoria, setCategoria] = useState('femenino');
+export default function RecalcularStats({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
 
   const [running, setRunning] = useState(false);
@@ -117,8 +119,6 @@ export default function RecalcularStats() {
 
   return (
     <div>
-      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
-
       <h2 style={S.title}>🔄 Recalcular todos los promedios y acumulados</h2>
       <p style={S.hint}>
         Recorre todas las jugadoras con partidos cargados y recalcula sus promedios

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useRealtimeStatus } from './useRealtimeStatus';
+import { useTournament } from '../context/TournamentContext';
+import { CategoriaToggle } from './categoriaAdmin';
 import ExcelUpload from './ExcelUpload';
 import PartidosManager from './PartidosManager';
 import StatsEditor from './StatsEditor';
@@ -47,23 +49,26 @@ function RealtimeDot({ status, compact = false }) {
 }
 
 // ── Header de sección ──────────────────────────────────────────────────────────
-function SectionHeader({ nav, sec }) {
+function SectionHeader({ nav, sec, categoria, setCategoria, showToggle }) {
   const item = nav.find(n => n.id === sec);
   if (!item) return null;
   return (
     <div style={{ marginBottom:28, paddingBottom:20, borderBottom:'1px solid #1C2535' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-        <div style={{ width:44, height:44, borderRadius:12, background:'rgba(240,180,41,.1)', border:'1px solid rgba(240,180,41,.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
-          {item.icon}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ width:44, height:44, borderRadius:12, background:'rgba(240,180,41,.1)', border:'1px solid rgba(240,180,41,.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+            {item.icon}
+          </div>
+          <div>
+            <h2 style={{ margin:0, fontFamily:"'Bebas Neue',sans-serif", fontSize:26, letterSpacing:1, color:'#EEF2F8' }}>
+              {item.label}
+            </h2>
+            <p style={{ margin:0, fontSize:12, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5 }}>
+              {item.desc}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 style={{ margin:0, fontFamily:"'Bebas Neue',sans-serif", fontSize:26, letterSpacing:1, color:'#EEF2F8' }}>
-            {item.label}
-          </h2>
-          <p style={{ margin:0, fontSize:12, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5 }}>
-            {item.desc}
-          </p>
-        </div>
+        {showToggle && <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />}
       </div>
     </div>
   );
@@ -156,10 +161,14 @@ function Sidebar({ sec, setSec, logout, realtimeStatus, onClose }) {
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────────
+const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular'];
+
 export default function AdminPanel() {
   const { logout }      = useAuth();
+  const { mode }         = useTournament();
   const [sec, setSec]   = useState('excel');
   const [open, setOpen] = useState(false);
+  const [categoria, setCategoria] = useState(mode ?? 'femenino');
   const rtStatus        = useRealtimeStatus();
 
   return (
@@ -213,12 +222,13 @@ export default function AdminPanel() {
       {/* Main content */}
       <main data-admin-main style={S.main}>
         <div style={S.content}>
-          <SectionHeader nav={NAV} sec={sec}/>
-          {sec === 'excel'      && <ExcelUpload />}
-          {sec === 'historial'  && <UploadHistory />}
-          {sec === 'partidos'   && <PartidosManager />}
-          {sec === 'stats'      && <StatsEditor />}
-          {sec === 'recalcular' && <RecalcularStats />}
+          <SectionHeader nav={NAV} sec={sec} categoria={categoria} setCategoria={setCategoria}
+            showToggle={SECCIONES_CON_CATEGORIA.includes(sec)}/>
+          {sec === 'excel'      && <ExcelUpload categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'historial'  && <UploadHistory categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'stats'      && <StatsEditor categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'recalcular' && <RecalcularStats categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'encuestas'  && <EncuestasManager />}
         </div>
       </main>

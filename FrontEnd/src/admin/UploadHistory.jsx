@@ -1,30 +1,48 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { TABLAS } from './categoriaAdmin';
 
-export default function UploadHistory() {
+export default function UploadHistory({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
+  const tablas = TABLAS[categoria];
+
   const [logs,    setLogs]    = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('upload_log')
-      .select('*')
+    const { data, error } = await supabase
+      .from(tablas.uploadLog)
+      .select(`*, ${tablas.fechas}(numero)`)
       .order('cargado_en', { ascending: false })
       .limit(30);
-    setLogs(data ?? []);
+    if (error) {
+      // Fallback por si el embed falla (relación no detectada): traer sin join.
+      const { data: plain } = await supabase
+        .from(tablas.uploadLog)
+        .select('*')
+        .order('cargado_en', { ascending: false })
+        .limit(30);
+      setLogs(plain ?? []);
+    } else {
+      setLogs(data ?? []);
+    }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [categoria]);
 
   const handleDelete = async (id, partidoId) => {
     if (!confirm('¿Eliminar esta carga? Se borrarán las stats del partido asociado.')) return;
     // Borrar el partido (cascade borra stats_partido)
-    if (partidoId) await supabase.from('partidos_femenino').delete().eq('id', partidoId);
-    await supabase.from('upload_log').delete().eq('id', id);
+    if (partidoId) await supabase.from(tablas.partidos).delete().eq('id', partidoId);
+    await supabase.from(tablas.uploadLog).delete().eq('id', id);
     load();
   };
+
+  const numeroFecha = l => l[tablas.fechas]?.numero ?? l.fecha_id ?? '?';
 
   return (
     <div>
@@ -46,14 +64,14 @@ export default function UploadHistory() {
             <div key={l.id} style={s.card}>
               <div style={{ flex:1 }}>
                 <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4, flexWrap:'wrap' }}>
-                  <span style={s.badge}>Fecha {l.fecha_id ?? '?'}</span>
+                  <span style={s.badge}>Fecha {numeroFecha(l)}</span>
                   <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:15 }}>
                     {l.equipo_local} vs {l.equipo_visit}
                   </span>
                 </div>
                 <div style={{ color:'#6B7A99', fontSize:12, marginBottom:4 }}>
-                  📁 {l.archivo_nombre} · 
-                  ✅ {l.jugadoras_ok} jugadoras · 
+                  📁 {l.archivo_nombre} ·
+                  ✅ {l.jugadoras_ok} jugadoras ·
                   {l.jugadoras_skip > 0 && <span style={{ color:'#F0B429' }}> ⚠️ {l.jugadoras_skip} ignoradas</span>}
                 </div>
                 <div style={{ color:'#4A566E', fontSize:11 }}>

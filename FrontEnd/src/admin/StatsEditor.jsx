@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
-import { CategoriaToggle, TABLAS } from './categoriaAdmin';
+import { TABLAS } from './categoriaAdmin';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -152,8 +152,10 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export default function StatsEditor() {
-  const [categoria, setCategoria] = useState('femenino');
+export default function StatsEditor({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
   const roster = ROSTER[categoria];
 
@@ -267,8 +269,6 @@ export default function StatsEditor() {
 
   return (
     <div>
-      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
-
       {/* Warning */}
       <div style={S.warning}>
         <span>⚠️</span>

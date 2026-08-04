@@ -44,12 +44,17 @@ export function useWheelHorizontal() {
       startX = e.pageX;
       startScroll = el.scrollLeft;
       el.classList.add('is-dragging');
-      e.preventDefault();
+      // OJO: sin preventDefault() acá a propósito — eso también cancelaba el
+      // click normal de los chips (filtrar por equipo). El "drag fantasma"
+      // que esto buscaba evitar en realidad lo causa el <img> del logo (las
+      // imágenes son arrastrables por defecto), y eso se resuelve en CSS con
+      // -webkit-user-drag:none / pointer-events:none, no bloqueando el click.
     };
     const onMouseMove = (e) => {
       if (!isDown) return;
       const delta = e.pageX - startX;
       if (Math.abs(delta) > 4) dragged = true;
+      if (!dragged) return;
       el.scrollLeft = startScroll - delta;
       e.preventDefault();
     };

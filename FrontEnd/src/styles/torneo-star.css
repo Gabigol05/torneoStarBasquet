@@ -4206,6 +4206,11 @@ table tbody tr:hover {
 .filter-chips::-webkit-scrollbar { display: none; }
 .filter-chips.is-dragging { cursor: grabbing; scroll-behavior: auto; }
 .filter-chips.is-dragging .chip { pointer-events: none; }
+.filter-chips .chip img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}
 
 .chip {
   display: inline-flex;

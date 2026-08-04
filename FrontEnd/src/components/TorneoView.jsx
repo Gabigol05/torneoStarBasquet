@@ -76,7 +76,7 @@ function buildJugadorasMap(equipos) {
   return map;
 }
 
-// Sistema de copas: banda segun posicion en la tabla (solo femenino, que tiene standings reales)
+// Sistema de copas: banda segun posicion en la tabla (femenino: general; masculino: por zona)
 function bandFor(rank) {
   if (rank <= 4) return { label: 'Copa de Oro', color: '#F0B429', tint: 'rgba(240,180,41,.06)' };
   if (rank <= 8) return { label: 'Copa de Plata', color: '#C7D1DD', tint: 'rgba(199,209,221,.045)' };
@@ -584,13 +584,26 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           <tbody>
                             {lista.length === 0 ? (
                               <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--gray)' }}>Sin equipos asignados a esta zona</td></tr>
-                            ) : lista.map((t, idx) => {
+                            ) : lista.flatMap((t, idx) => {
                               const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
                               const dif = t.pf - t.pc;
-                              return (
-                                <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}>
+                              const band = bandFor(idx + 1);
+                              const isBandStart = idx === 0 || idx === 4 || idx === 8;
+                              const rows = [];
+                              if (isBandStart) {
+                                rows.push(
+                                  <tr key={`band-${zona}-${idx}`}>
+                                    <td colSpan={9} style={{ padding: '12px 16px 6px', fontFamily: "'Barlow Condensed'", fontSize: 10.5, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: band.color, borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,.08)' }}>
+                                      {band.label}
+                                    </td>
+                                  </tr>
+                                );
+                              }
+                              rows.push(
+                                <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
+                                  style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
                                   <td className="team-cell">
-                                    <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
+                                    <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
                                     <img src={t.logo} alt={t.name} decoding="async"
                                       style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
                                       onError={e => { e.target.style.display = 'none'; }}/>
@@ -612,9 +625,29 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                   </td>
                                 </tr>
                               );
+                              return rows;
                             })}
                           </tbody>
                         </table>
+                        <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
+                              Copa de Oro - 1 a 4
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
+                              Copa de Plata - 5 a 8
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
+                              Copa de Bronce - 9+
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>
+                            Desempate: PTS -&gt; DIF -&gt; PF
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

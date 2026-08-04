@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
+import { equiposMasculino } from '../data/masculinoData';
 
 function Skeleton({ w = '100%', h = 16, radius = 4, style = {} }) {
   return (
@@ -38,47 +39,53 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
   const [loading, setLoading] = useState(false);
   const [tab,     setTab]     = useState('resumen');
 
+  const esMasc       = mode === 'masculino';
+  const roster       = esMasc ? equiposMasculino : equiposFemenino;
+  const tablaPartido = esMasc ? 'partidos_masculino' : 'partidos_femenino';
+  const tablaStats   = esMasc ? 'stats_partido_masculino' : 'stats_partido_femenino';
+  const idField      = esMasc ? 'jugador_id' : 'jugadora_id';
+
   useEffect(() => {
     if (!isOpen) return;
     setTab('resumen');
     setData(null);
-    if (!isConfigured || !partidoId || mode !== 'femenino') return;
+    if (!isConfigured || !partidoId) return;
 
     let ignore = false;
     setLoading(true);
     Promise.all([
-      supabase.from('partidos_femenino').select('*').eq('id', partidoId).single(),
-      supabase.from('stats_partido_femenino').select('*').eq('partido_id', partidoId),
+      supabase.from(tablaPartido).select('*').eq('id', partidoId).single(),
+      supabase.from(tablaStats).select('*').eq('partido_id', partidoId),
     ]).then(([{ data: partido }, { data: stats }]) => {
       if (ignore) return;
       if (!partido) { setLoading(false); return; }
 
-      const eqLocal = equiposFemenino.find(e => e.id === partido.equipo_local_id);
-      const eqVisit = equiposFemenino.find(e => e.id === partido.equipo_visit_id);
+      const eqLocal = roster.find(e => e.id === partido.equipo_local_id);
+      const eqVisit = roster.find(e => e.id === partido.equipo_visit_id);
 
       const enrich = (rows, eqId) =>
         (rows ?? [])
           .filter(r => r.equipo_id === eqId)
           .map(r => {
-            const eq  = equiposFemenino.find(e => e.id === r.equipo_id);
-            const jug = eq?.jugadoras.find(j => j.id === r.jugadora_id);
-            return { ...r, nombre: jug?.nombre ?? r.jugadora_id };
+            const eq  = roster.find(e => e.id === r.equipo_id);
+            const jug = eq?.jugadoras?.find(j => j.id === r[idField]);
+            return { ...r, jugadora_id: r[idField], nombre: jug?.nombre ?? r[idField] };
           })
           .sort((a, b) => b.pts - a.pts);
 
       const statsLocal = enrich(stats, partido.equipo_local_id);
       const statsVisit = enrich(stats, partido.equipo_visit_id);
 
-      // MVP: leido directamente desde mvp_jugadora_id (definido por el organizador),
-      // NO recalculado por valoracion.
+      // MVP: leido directamente desde mvp_jugadora_id/mvp_jugador_id (definido por
+      // el organizador), NO recalculado por valoracion.
       let mvpRow = null, mvpNombre = null;
-      const mvpJugId = partido.mvp_jugadora_id;
+      const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
       if (mvpJugId) {
-        mvpRow = (stats ?? []).find(r => r.jugadora_id === mvpJugId) ?? null;
-        const mvpEq = eqLocal?.jugadoras.find(j => j.id === mvpJugId)
+        mvpRow = (stats ?? []).find(r => r[idField] === mvpJugId) ?? null;
+        const mvpEq = eqLocal?.jugadoras?.find(j => j.id === mvpJugId)
           ? eqLocal
-          : (eqVisit?.jugadoras.find(j => j.id === mvpJugId) ? eqVisit : null);
-        mvpNombre = mvpEq?.jugadoras.find(j => j.id === mvpJugId)?.nombre ?? null;
+          : (eqVisit?.jugadoras?.find(j => j.id === mvpJugId) ? eqVisit : null);
+        mvpNombre = mvpEq?.jugadoras?.find(j => j.id === mvpJugId)?.nombre ?? null;
       }
 
       setData({ partido, eqLocal, eqVisit, statsLocal, statsVisit, mvpRow, mvpNombre });
@@ -130,7 +137,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   Final
                 </span>
                 <span style={{ color: 'var(--gray)', fontFamily: "'Barlow Condensed'", fontWeight: 600, letterSpacing: '2px', fontSize: '12px' }}>
-                  TORNEO FEMENINO
+                  {esMasc ? 'TORNEO MASCULINO' : 'TORNEO FEMENINO'}
                 </span>
               </div>
 
@@ -235,7 +242,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                   <thead>
                     <tr>
-                      {['#','Jugadora','PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
+                      {['#', esMasc ? 'Jugador' : 'Jugadora', 'PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
                         <th key={h} style={{ background:'#141C2A', color:'#6B7A99', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>

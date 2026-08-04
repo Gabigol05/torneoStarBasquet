@@ -1,8 +1,10 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
+import { equiposMasculino } from '../data/masculinoData';
+import { CategoriaToggle, TABLAS } from './categoriaAdmin';
 
-const EQUIPOS = equiposFemenino.map(e => ({ id: e.id, nombre: e.name ?? e.nombre, color: e.color, logo: e.logo }));
+const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
 const EMPTY_PARTIDO = {
   equipo_local_id:'', equipo_visit_id:'',
@@ -12,8 +14,8 @@ const EMPTY_PARTIDO = {
   fecha_id:'', hora_inicio:'', lugar:'', estado:'pendiente',
 };
 
-function LogoEq({ id, size=28 }) {
-  const eq = EQUIPOS.find(e => e.id === id);
+function LogoEq({ id, equipos, size=28 }) {
+  const eq = equipos.find(e => e.id === id);
   if (!eq) return <div style={{ width:size, height:size, borderRadius:'50%', background:'#1C2535' }}/>;
   return (
     <img src={eq.logo} alt={eq.nombre}
@@ -37,7 +39,7 @@ function EstadoBadge({ estado }) {
 }
 
 // ── Formulario de partido ─────────────────────────────────────────────────────
-function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId }) {
+function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId }) {
   const n = v => v === '' ? '' : Number(v);
 
   // Calcular totales desde cuartos
@@ -62,7 +64,7 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
             onChange={e => setForm(f => ({...f, equipo_local_id:e.target.value}))}
             style={F.input}>
             <option value="">— Seleccionar —</option>
-            {EQUIPOS.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            {equipos.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
         </div>
         <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:10, color:'#4A566E', fontFamily:"'Bebas Neue',sans-serif", fontSize:20 }}>VS</div>
@@ -72,7 +74,7 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
             onChange={e => setForm(f => ({...f, equipo_visit_id:e.target.value}))}
             style={F.input}>
             <option value="">— Seleccionar —</option>
-            {EQUIPOS.filter(e => e.id !== form.equipo_local_id).map(e => (
+            {equipos.filter(e => e.id !== form.equipo_local_id).map(e => (
               <option key={e.id} value={e.id}>{e.nombre}</option>
             ))}
           </select>
@@ -95,8 +97,8 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
             </thead>
             <tbody>
               {[
-                { label:'Local',    prefix:'local',  color: EQUIPOS.find(e=>e.id===form.equipo_local_id)?.color??'#EEF2F8', total:totalLocal },
-                { label:'Visitante',prefix:'visit',  color: EQUIPOS.find(e=>e.id===form.equipo_visit_id)?.color??'#EEF2F8', total:totalVisit },
+                { label:'Local',    prefix:'local',  color: equipos.find(e=>e.id===form.equipo_local_id)?.color??'#EEF2F8', total:totalLocal },
+                { label:'Visitante',prefix:'visit',  color: equipos.find(e=>e.id===form.equipo_visit_id)?.color??'#EEF2F8', total:totalVisit },
               ].map(({ label, prefix, color, total }) => (
                 <tr key={prefix}>
                   <td style={{ ...F.qtd, fontWeight:700, color, textAlign:'left', paddingLeft:4, whiteSpace:'nowrap' }}>
@@ -167,7 +169,7 @@ function PartidoForm({ form, setForm, fechas, onSave, onCancel, loading, editId 
 }
 
 // ── Carga masiva de fixture ───────────────────────────────────────────────────
-function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
+function FixtureMasivo({ fechas, equipos, tablas, onCrearFecha, onClose }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
@@ -194,7 +196,7 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
     try {
       // 1. Crear/obtener fecha
       const { data:fd, error:fErr } = await supabase
-        .from('fechas_femenino')
+        .from(tablas.fechas)
         .upsert({
           numero:      Number(jornada),
           fecha_dia:   fechaDia || null,
@@ -205,7 +207,7 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
 
       // Verificar duplicados antes de insertar
       const { data: existentes, error: exErr } = await supabase
-        .from('partidos_femenino')
+        .from(tablas.partidos)
         .select('equipo_local_id, equipo_visit_id')
         .eq('fecha_id', fd.id);
       if (exErr) throw exErr;
@@ -214,7 +216,7 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
         (e.equipo_local_id === a && e.equipo_visit_id === b) ||
         (e.equipo_local_id === b && e.equipo_visit_id === a)
       );
-      const nombreEqLocal = id => EQUIPOS.find(eq => eq.id === id)?.nombre ?? id;
+      const nombreEqLocal = id => equipos.find(eq => eq.id === id)?.nombre ?? id;
       const duplicados = validos.filter(p => yaExiste(p.equipo_local_id, p.equipo_visit_id));
       if (duplicados.length > 0) {
         const nombres = duplicados.map(p => `${nombreEqLocal(p.equipo_local_id)} vs ${nombreEqLocal(p.equipo_visit_id)}`).join(', ');
@@ -230,7 +232,7 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
         hora_inicio:     p.hora_inicio || null,
         estado:          'pendiente',
       }));
-      const { error:pErr } = await supabase.from('partidos_femenino').insert(rows);
+      const { error:pErr } = await supabase.from(tablas.partidos).insert(rows);
       if (pErr) throw pErr;
 
       setMsg({ ok:true, text:`✅ Fecha ${jornada} creada con ${validos.length} partido(s)` });
@@ -302,9 +304,9 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
               <div style={{ flex:1, minWidth:160 }}>
                 <select value={p.equipo_local_id}
                   onChange={e => updatePartido(i,'equipo_local_id',e.target.value)}
-                  style={{ ...F.input, borderColor: p.equipo_local_id ? EQUIPOS.find(eq=>eq.id===p.equipo_local_id)?.color+'40' : '#1C2535' }}>
+                  style={{ ...F.input, borderColor: p.equipo_local_id ? equipos.find(eq=>eq.id===p.equipo_local_id)?.color+'40' : '#1C2535' }}>
                   <option value="">Local —</option>
-                  {EQUIPOS.filter(eq => !usedLocal.includes(eq.id) || eq.id===p.equipo_local_id).map(eq => (
+                  {equipos.filter(eq => !usedLocal.includes(eq.id) || eq.id===p.equipo_local_id).map(eq => (
                     <option key={eq.id} value={eq.id}>{eq.nombre}</option>
                   ))}
                 </select>
@@ -313,9 +315,9 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
               <div style={{ flex:1, minWidth:160 }}>
                 <select value={p.equipo_visit_id}
                   onChange={e => updatePartido(i,'equipo_visit_id',e.target.value)}
-                  style={{ ...F.input, borderColor: p.equipo_visit_id ? EQUIPOS.find(eq=>eq.id===p.equipo_visit_id)?.color+'40' : '#1C2535' }}>
+                  style={{ ...F.input, borderColor: p.equipo_visit_id ? equipos.find(eq=>eq.id===p.equipo_visit_id)?.color+'40' : '#1C2535' }}>
                   <option value="">Visitante —</option>
-                  {EQUIPOS.filter(eq => eq.id !== p.equipo_local_id && (!usedVisit.includes(eq.id) || eq.id===p.equipo_visit_id)).map(eq => (
+                  {equipos.filter(eq => eq.id !== p.equipo_local_id && (!usedVisit.includes(eq.id) || eq.id===p.equipo_visit_id)).map(eq => (
                     <option key={eq.id} value={eq.id}>{eq.nombre}</option>
                   ))}
                 </select>
@@ -358,6 +360,12 @@ function FixtureMasivo({ fechas, onCrearFecha, onClose }) {
 
 // ── Panel principal ───────────────────────────────────────────────────────────
 export default function PartidosManager() {
+  const [categoria, setCategoria] = useState('femenino');
+  const tablas = TABLAS[categoria];
+  const EQUIPOS = useMemo(() =>
+    ROSTER[categoria].map(e => ({ id: e.id, nombre: e.name ?? e.nombre, color: e.color, logo: e.logo })),
+    [categoria]);
+
   const [partidos, setPartidos] = useState([]);
   const [fechas,   setFechas]   = useState([]);
   const [form,     setForm]     = useState(EMPTY_PARTIDO);
@@ -368,12 +376,16 @@ export default function PartidosManager() {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado,setFiltroEstado]= useState('');
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
+    setFiltroFecha(''); setFiltroEstado('');
+    loadAll();
+  }, [categoria]);
 
   const loadAll = async () => {
     const [{ data:ps }, { data:fs }] = await Promise.all([
-      supabase.from('partidos_femenino').select('*').order('fecha_id',{ascending:true}),
-      supabase.from('fechas_femenino').select('*').order('numero',{ascending:true}),
+      supabase.from(tablas.partidos).select('*').order('fecha_id',{ascending:true}),
+      supabase.from(tablas.fechas).select('*').order('numero',{ascending:true}),
     ]);
     setPartidos(ps ?? []);
     setFechas(fs ?? []);
@@ -387,7 +399,7 @@ export default function PartidosManager() {
 
     if (!editId && form.fecha_id) {
       const { data: dupes, error: dupErr } = await supabase
-        .from('partidos_femenino')
+        .from(tablas.partidos)
         .select('id')
         .eq('fecha_id', form.fecha_id)
         .or(`and(equipo_local_id.eq.${form.equipo_local_id},equipo_visit_id.eq.${form.equipo_visit_id}),and(equipo_local_id.eq.${form.equipo_visit_id},equipo_visit_id.eq.${form.equipo_local_id})`);
@@ -412,11 +424,11 @@ export default function PartidosManager() {
         q3_visit: Number(form.q3_visit||0), q4_visit: Number(form.q4_visit||0), ot_visit: Number(form.ot_visit||0),
       };
       if (editId) {
-        const { error } = await supabase.from('partidos_femenino').update(payload).eq('id',editId);
+        const { error } = await supabase.from(tablas.partidos).update(payload).eq('id',editId);
         if (error) throw error;
         flash('✅ Partido actualizado');
       } else {
-        const { error } = await supabase.from('partidos_femenino').insert(payload);
+        const { error } = await supabase.from(tablas.partidos).insert(payload);
         if (error) throw error;
         flash('✅ Partido agregado');
       }
@@ -438,17 +450,17 @@ export default function PartidosManager() {
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este partido y todas sus estadísticas?')) return;
-    const { error: logErr } = await supabase.from('upload_log').delete().eq('partido_id', id);
+    const { error: logErr } = await supabase.from(tablas.uploadLog).delete().eq('partido_id', id);
     if (logErr) { flash(`Error borrando log de carga: ${logErr.message}`, false); return; }
-    const { error: statsErr } = await supabase.from('stats_partido_femenino').delete().eq('partido_id', id);
+    const { error: statsErr } = await supabase.from(tablas.stats).delete().eq('partido_id', id);
     if (statsErr) { flash(`Error borrando stats: ${statsErr.message}`, false); return; }
-    const { error } = await supabase.from('partidos_femenino').delete().eq('id',id);
+    const { error } = await supabase.from(tablas.partidos).delete().eq('id',id);
     if (error) { flash(`Error: ${error.message}`, false); return; }
     await loadAll(); flash('✅ Eliminado');
   };
 
   const handleEstado = async (id, estado) => {
-    await supabase.from('partidos_femenino').update({ estado }).eq('id',id);
+    await supabase.from(tablas.partidos).update({ estado }).eq('id',id);
     await loadAll();
   };
 
@@ -477,6 +489,8 @@ export default function PartidosManager() {
 
   return (
     <div>
+      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
+
       {/* Msg flash */}
       {msg && (
         <div style={{ padding:'10px 14px', borderRadius:8, marginBottom:16, fontSize:14,
@@ -505,6 +519,8 @@ export default function PartidosManager() {
       {view==='fixture' && (
         <FixtureMasivo
           fechas={fechas}
+          equipos={EQUIPOS}
+          tablas={tablas}
           onCrearFecha={loadAll}
           onClose={()=>setView('lista')}
         />
@@ -515,6 +531,7 @@ export default function PartidosManager() {
         <PartidoForm
           form={form} setForm={setForm}
           fechas={fechas}
+          equipos={EQUIPOS}
           onSave={handleSave} onCancel={cancelForm}
           loading={loading} editId={editId}
         />
@@ -575,7 +592,7 @@ export default function PartidosManager() {
                         {/* Equipos + marcador */}
                         <div style={{ flex:1, minWidth:220 }}>
                           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                            <LogoEq id={p.equipo_local_id} size={24}/>
+                            <LogoEq id={p.equipo_local_id} equipos={EQUIPOS} size={24}/>
                             <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:14 }}>{nombreEq(p.equipo_local_id)}</span>
                             {p.estado==='finalizado' && (
                               <>
@@ -588,7 +605,7 @@ export default function PartidosManager() {
                               <span style={{ color:'#4A566E', margin:'0 6px' }}>vs</span>
                             )}
                             <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:14 }}>{nombreEq(p.equipo_visit_id)}</span>
-                            <LogoEq id={p.equipo_visit_id} size={24}/>
+                            <LogoEq id={p.equipo_visit_id} equipos={EQUIPOS} size={24}/>
                           </div>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                             <EstadoBadge estado={p.estado}/>
@@ -657,12 +674,3 @@ const F = {
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
 };
-
-
-
-
-
-
-
-
-

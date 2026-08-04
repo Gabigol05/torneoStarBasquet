@@ -5,6 +5,7 @@ import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
+import { TournamentSelector } from './TournamentSelector';
 
 function dispatchTabChange(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
@@ -90,6 +91,8 @@ export function Navbar() {
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <TournamentSelector />
+
           <GlobalSearch
             equipos={equipos}
             onSelectPlayer={setSelectedPlayer}

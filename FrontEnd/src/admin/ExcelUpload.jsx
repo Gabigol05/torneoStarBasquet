@@ -1,26 +1,31 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
+import { equiposMasculino } from '../data/masculinoData';
+import { CategoriaToggle, TABLAS } from './categoriaAdmin';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
-const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f'`]/g,'').toLowerCase().trim();
+const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
 
-// ─── Índice fuzzy completo ────────────────────────────────────────────────────
-const TODAS_JUGADORAS = equiposFemenino.flatMap(eq =>
+// ─── Índice fuzzy de EQUIPOS (estático para ambas categorías) ─────────────────
+const fuseEqFem  = new Fuse(equiposFemenino,  { keys: [{ name:'name', weight:1 }], threshold: 0.4 });
+const fuseEqMasc = new Fuse(equiposMasculino, { keys: [{ name:'name', weight:1 }], threshold: 0.4 });
+
+// ─── Índice fuzzy de JUGADORAS/ES — femenino es estático (roster fijo) ────────
+const TODAS_JUGADORAS_FEM = equiposFemenino.flatMap(eq =>
   eq.jugadoras.filter(j => j && j.nombre).map(j => {
     const partes = j.nombre.trim().split(/\s+/);
     return {
       id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
-      equipoId: eq.id, equipo: eq.nombre, equipoNorm: normStr(eq.nombre),
+      equipoId: eq.id, equipo: eq.name, equipoNorm: normStr(eq.name),
       t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
       t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
     };
   })
 );
-
-const fuseJugadoras = new Fuse(TODAS_JUGADORAS, {
+const fuseJugadorasFem = new Fuse(TODAS_JUGADORAS_FEM, {
   keys: [
     { name:'t0', weight:0.35 }, { name:'t1', weight:0.35 },
     { name:'t2', weight:0.2  }, { name:'t3', weight:0.1  },
@@ -29,24 +34,35 @@ const fuseJugadoras = new Fuse(TODAS_JUGADORAS, {
   threshold: 0.38, minMatchCharLength: 2, includeScore: true,
 });
 
-const fuseEq = new Fuse(equiposFemenino, {
-  keys: [{ name:'name', weight:1 }], threshold: 0.4,
-});
-
-// ─── Resolver jugadora: aliases → fuzzy ──────────────────────────────────────
-let aliasesCache = null; // cache en memoria de la sesión
-
-async function cargarAliases() {
-  if (aliasesCache) return aliasesCache;
-  const { data } = await supabase.from('nombre_aliases').select('*');
-  aliasesCache = data ?? [];
-  return aliasesCache;
+// Masculino NO tiene roster estático — los jugadores se van creando a medida
+// que se cargan los Excel. El índice fuzzy se arma dinámicamente desde la
+// tabla jugadores_masculino (ver buildIndiceJugadoresMasc en el componente).
+function buildFuseJugadores(lista) {
+  return new Fuse(lista, {
+    keys: [
+      { name:'t0', weight:0.35 }, { name:'t1', weight:0.35 },
+      { name:'t2', weight:0.2  }, { name:'t3', weight:0.1  },
+      { name:'nombreNorm', weight:0.4 },
+    ],
+    threshold: 0.38, minMatchCharLength: 2, includeScore: true,
+  });
 }
 
-async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
+// ─── Resolver jugadora: aliases → fuzzy → (masculino) nuevo jugador ──────────
+const aliasesCache = { femenino: null, masculino: null };
+
+async function cargarAliases(categoria, tablas) {
+  if (aliasesCache[categoria]) return aliasesCache[categoria];
+  const { data } = await supabase.from(tablas.aliases).select('*');
+  aliasesCache[categoria] = data ?? [];
+  return aliasesCache[categoria];
+}
+
+async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
+  const { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras } = ctx;
   if (!nombreRaw) return { jugadora: null, method: 'empty', score: 1 };
   const clean    = normStr(String(nombreRaw));
-  const aliases  = await cargarAliases();
+  const aliases  = await cargarAliases(categoria, tablas);
   const eqMatch  = equipoHint ? fuseEq.search(equipoHint)[0]?.item : null;
   const equipoId = eqMatch?.id;
 
@@ -55,7 +71,8 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
     a.alias_norm === clean && (!equipoId || a.equipo_id === equipoId)
   );
   if (aliasExacto) {
-    const jug = TODAS_JUGADORAS.find(j => j.id === aliasExacto.jugadora_id);
+    const jugId = aliasExacto[tablas.jugadorIdField];
+    const jug = todasJugadoras.find(j => j.id === jugId);
     if (jug) return { jugadora: jug, method: 'alias', score: 0 };
   }
 
@@ -63,8 +80,7 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
   const buscarConFiltro = (texto) => {
     const resultados = fuseJugadoras.search(texto);
     if (!equipoId) return resultados;
-    const enEq = resultados.filter(r => r.item.equipoId === equipoId);
-    return enEq;
+    return resultados.filter(r => r.item.equipoId === equipoId);
   };
 
   const candidatosNormal = buscarConFiltro(clean);
@@ -78,19 +94,23 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
   if (mejorInvertido && (!mejorNormal || (mejorInvertido.score ?? 1) < (mejorNormal.score ?? 1))) {
     candidatos = candidatosInvertido;
   }
-  if (candidatos.length === 0) return { jugadora: null, method: 'not_found', score: 1 };
 
-  // 3️⃣ Desambiguar por número de camiseta si hay empate
+  if (candidatos.length === 0) {
+    // Masculino: si no existe todavía, se crea al publicar (no se descarta).
+    if (categoria === 'masculino' && equipoId) {
+      return { jugadora: null, method: 'nuevo', score: 0, nuevoEquipoId: equipoId };
+    }
+    return { jugadora: null, method: 'not_found', score: 1 };
+  }
+
+  // 3️⃣ Desambiguar por número de camiseta si hay empate (solo caso conocido femenino)
   const top    = candidatos[0];
   const second = candidatos[1];
-  if (second && Math.abs((top.score??1) - (second.score??1)) < 0.05 && numeroJugadora != null) {
-    // Para Giraudo: nro 10 = María Jose, nro 12 = Ivana
-    const NUMERO_MAP = {
-      'f_pilar': { 10: 'f_psc_01', 12: 'f_psc_03' },
-    };
+  if (categoria === 'femenino' && second && Math.abs((top.score??1) - (second.score??1)) < 0.05 && numeroJugadora != null) {
+    const NUMERO_MAP = { 'f_pilar': { 10: 'f_psc_01', 12: 'f_psc_03' } };
     const byNum = NUMERO_MAP[equipoId]?.[numeroJugadora];
     if (byNum) {
-      const jug = TODAS_JUGADORAS.find(j => j.id === byNum);
+      const jug = todasJugadoras.find(j => j.id === byNum);
       if (jug) return { jugadora: jug, method: 'numero', score: 0.1 };
     }
   }
@@ -99,13 +119,14 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora = null) {
 }
 
 // ─── Guardar alias nuevo si es un match fuzzy confirmado ─────────────────────
-async function guardarAlias(alias, jugadoraId, equipoId) {
+async function guardarAlias(alias, jugadoraId, equipoId, ctx) {
+  const { categoria, tablas } = ctx;
   const aliasNorm = normStr(alias);
-  await supabase.from('nombre_aliases').upsert({
-    alias, alias_norm: aliasNorm, jugadora_id: jugadoraId,
+  await supabase.from(tablas.aliases).upsert({
+    alias, alias_norm: aliasNorm, [tablas.jugadorIdField]: jugadoraId,
     equipo_id: equipoId, confirmado: true,
   }, { onConflict: 'alias_norm,equipo_id', ignoreDuplicates: true });
-  aliasesCache = null; // invalidar cache
+  aliasesCache[categoria] = null; // invalidar cache
 }
 
 // ─── Índices exactos de columnas ──────────────────────────────────────────────
@@ -226,27 +247,28 @@ function parsearExcel(wb) {
 }
 
 // ─── Resolver todas las jugadoras async ───────────────────────────────────────
-async function resolverJugadoras(bruto) {
+async function resolverJugadoras(bruto, ctx) {
   const resolved = [];
   for (const j of bruto) {
-    const { jugadora, method, score } = await resolverJugadora(j.nombreRaw, j.equipoRaw, j.numero);
-    resolved.push({ ...j, jugadora, matchMethod: method, matchScore: score });
+    const r = await resolverJugadora(j.nombreRaw, j.equipoRaw, j.numero, ctx);
+    resolved.push({ ...j, jugadora: r.jugadora, matchMethod: r.method, matchScore: r.score, nuevoEquipoId: r.nuevoEquipoId });
   }
   return resolved;
 }
 
 // ─── Recalcular promedios (fallback si el trigger no está activo) ─────────────
-async function recalcularPromedios(jugadoraIds) {
-  for (const jugId of [...new Set(jugadoraIds)]) {
+async function recalcularPromedios(jugadorIds, tablas) {
+  const idField = tablas.jugadorIdField;
+  for (const jugId of [...new Set(jugadorIds)]) {
     const { data } = await supabase
-      .from('stats_partido_femenino')
+      .from(tablas.stats)
       .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
-      .eq('jugadora_id', jugId);
+      .eq(idField, jugId);
     if (!data?.length) continue;
     const k=data.length, sum=key=>data.reduce((a,r)=>a+(r[key]??0),0), avg=key=>+(sum(key)/k).toFixed(1);
     const tsc=sum('sc'),tsf=sum('sf'),tdc=sum('dc'),tdf=sum('df'),ttc=sum('tc'),ttf=sum('tf');
-    await supabase.from('estadisticas_femenino').upsert({
-      jugadora_id:jugId, pj:k,
+    await supabase.from(tablas.estadisticas).upsert({
+      [idField]:jugId, pj:k,
       pts_prom:avg('pts'), reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
       ast_prom:avg('as_'), rob_prom:avg('rb'), tap_prom:avg('tp'),
       per_prom:avg('pe'), val_prom:avg('val'),
@@ -256,12 +278,41 @@ async function recalcularPromedios(jugadoraIds) {
       pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
       rob_total:sum('rb'), tap_total:sum('tp'), val_total:sum('val'), per_total:sum('pe'),
       mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),
-    }, { onConflict:'jugadora_id' });
+    }, { onConflict:idField });
   }
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ExcelUpload() {
+  const [categoria, setCategoria] = useState('femenino');
+  const tablas = TABLAS[categoria];
+  const roster = categoria === 'masculino' ? equiposMasculino : equiposFemenino;
+  const fuseEq = categoria === 'masculino' ? fuseEqMasc : fuseEqFem;
+
+  // Índice de jugadores para fuzzy matching. Femenino: estático. Masculino: se
+  // trae de la base cada vez que se cambia de categoría (crece con cada carga).
+  const [jugadoresMasc, setJugadoresMasc] = useState([]);
+  useEffect(() => {
+    if (categoria !== 'masculino') return;
+    (async () => {
+      const { data } = await supabase.from(tablas.jugadores).select('*');
+      const equipoNombre = id => equiposMasculino.find(e => e.id === id)?.name ?? id;
+      setJugadoresMasc((data ?? []).map(j => {
+        const partes = (j.nombre ?? '').trim().split(/\s+/);
+        return {
+          id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
+          equipoId: j.equipo_id, equipo: equipoNombre(j.equipo_id), equipoNorm: normStr(equipoNombre(j.equipo_id)),
+          t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
+          t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
+        };
+      }));
+    })();
+  }, [categoria]);
+
+  const todasJugadoras  = categoria === 'masculino' ? jugadoresMasc : TODAS_JUGADORAS_FEM;
+  const fuseJugadoras   = useMemo(() => categoria === 'masculino' ? buildFuseJugadores(jugadoresMasc) : fuseJugadorasFem, [categoria, jugadoresMasc]);
+  const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras };
+
   const [step,      setStep]      = useState('archivo');
   const [parsed,    setParsed]    = useState(null);    // datos del parser (sin resolver)
   const [jugadoras, setJugadoras] = useState([]);      // jugadoras resueltas
@@ -275,8 +326,11 @@ export default function ExcelUpload() {
 
   const reset = () => {
     setStep('archivo'); setParsed(null); setJugadoras([]);
-    setFileName(''); setLog([]); setDuplicate(null); aliasesCache=null;
+    setFileName(''); setLog([]); setDuplicate(null);
   };
+
+  useEffect(() => { reset(); }, [categoria]);
+
   const addLog = msg => setLog(l => [...l, msg]);
 
   const handleFile = async (e) => {
@@ -292,7 +346,7 @@ export default function ExcelUpload() {
         if (result.errores.length > 0) { setParsed(result); return; }
 
         setResolving(true);
-        const resolved = await resolverJugadoras(result.jugadorasBruto);
+        const resolved = await resolverJugadoras(result.jugadorasBruto, ctx);
         setParsed({ ...result, jugadoras: resolved });
         setJugadoras(resolved);
         setResolving(false);
@@ -307,14 +361,14 @@ export default function ExcelUpload() {
   // ── Verificar duplicado ──
   const checkDuplicate = async (eqLId, eqVId, fechaNum) => {
     const { data: fechaData, error: fechaErr } = await supabase
-      .from('fechas_femenino')
+      .from(tablas.fechas)
       .select('id')
       .eq('numero', Number(fechaNum))
       .maybeSingle();
     if (fechaErr) throw new Error(`ver fecha: ${fechaErr.message}`);
     if (!fechaData) return null;
     const { data: dupes, error: dupesErr } = await supabase
-      .from('partidos_femenino')
+      .from(tablas.partidos)
       .select('id, puntos_local, puntos_visit, estado')
       .eq('fecha_id', fechaData.id)
       .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
@@ -333,7 +387,7 @@ export default function ExcelUpload() {
       if (!mL.length) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
       if (!mV.length) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
       const eqLId = mL[0].item.id, eqVId = mV[0].item.id;
-      addLog(`✅ ${mL[0].item.nombre} vs ${mV[0].item.nombre}`);
+      addLog(`✅ ${mL[0].item.name} vs ${mV[0].item.name}`);
 
       // Check duplicado
       if (!forceOverwrite) {
@@ -344,7 +398,7 @@ export default function ExcelUpload() {
       } else {
         const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
         if (dupe) {
-          await supabase.from('partidos_femenino').delete().eq('id', dupe.id);
+          await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
           addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
         }
       }
@@ -352,7 +406,7 @@ export default function ExcelUpload() {
       // Fecha
       addLog('📅 Creando fecha...');
       const { data:fd, error:fErr } = await supabase
-        .from('fechas_femenino')
+        .from(tablas.fechas)
         .upsert({ numero:Number(jornada), descripcion:`Fecha ${jornada}` }, { onConflict:'numero' })
         .select('id').single();
       if (fErr) throw new Error(`Fecha: ${fErr.message}`);
@@ -362,7 +416,7 @@ export default function ExcelUpload() {
       addLog('🏀 Insertando partido...');
       const m=parsed.marcador, p=parsed.pct;
       const { data:pd, error:pErr } = await supabase
-        .from('partidos_femenino')
+        .from(tablas.partidos)
         .insert({
           fecha_id:fd.id, equipo_local_id:eqLId, equipo_visit_id:eqVId,
           q1_local:m.local.q1, q2_local:m.local.q2, q3_local:m.local.q3,
@@ -379,9 +433,29 @@ export default function ExcelUpload() {
       addLog(`   Local:  Q1=${m.local.q1} Q2=${m.local.q2} Q3=${m.local.q3} Q4=${m.local.q4}`);
       addLog(`   Visita: Q1=${m.visit.q1} Q2=${m.visit.q2} Q3=${m.visit.q3} Q4=${m.visit.q4}`);
 
+      // Masculino: crear en la base los jugadores nuevos (method === 'nuevo')
+      // antes de insertar stats, para tener su id real.
+      let jugadorasResueltas = jugadoras;
+      const nuevos = jugadoras.filter(j => j.matchMethod === 'nuevo' && !j.jugadora);
+      if (nuevos.length > 0) {
+        addLog(`🆕 Creando ${nuevos.length} jugador(es) nuevo(s)...`);
+        for (const nj of nuevos) {
+          const idGenerado = `${nj.nuevoEquipoId}_${normStr(nj.nombreRaw).replace(/\s+/g,'_')}${nj.numero ? '_'+nj.numero : ''}`;
+          const { data: creado, error: cErr } = await supabase
+            .from(tablas.jugadores)
+            .upsert({ id: idGenerado, equipo_id: nj.nuevoEquipoId, nombre: nj.nombreRaw, numero: nj.numero }, { onConflict:'id' })
+            .select('*').single();
+          if (cErr) throw new Error(`Creando jugador "${nj.nombreRaw}": ${cErr.message}`);
+          jugadorasResueltas = jugadorasResueltas.map(j =>
+            j === nj ? { ...j, jugadora: { id: creado.id, nombre: creado.nombre, equipoId: creado.equipo_id } } : j
+          );
+        }
+        setJugadoras(jugadorasResueltas);
+      }
+
       // Stats
-      const jugOk   = jugadoras.filter(j => j.jugadora);
-      const jugSkip = jugadoras.filter(j => !j.jugadora);
+      const jugOk   = jugadorasResueltas.filter(j => j.jugadora);
+      const jugSkip = jugadorasResueltas.filter(j => !j.jugadora);
       addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length>0?` (${jugSkip.length} no resueltas)`:''}...`);
 
       // Detectar colisiones: dos filas del Excel resueltas a la MISMA jugadora real.
@@ -400,39 +474,39 @@ export default function ExcelUpload() {
       }
       if (jugOk.length > 0) {
         const statsRows = jugOk.map(j => ({
-          partido_id:pd.id, jugadora_id:j.jugadora.id, equipo_id:j.jugadora.equipoId,
+          partido_id:pd.id, [tablas.jugadorIdField]:j.jugadora.id, equipo_id:j.jugadora.equipoId,
           numero:j.numero, sc:j.sc, sf:j.sf, dc:j.dc, df:j.df,
           tc:j.tc, tf:j.tf, as_:j.as_,
           rd:j.rd, ro:j.ro, fp:j.fp, ft:j.ft, fa:j.fa,
           rb:j.rb, tp:j.tp, pe:j.pe, ca:j.ca, pts:j.pts, val:j.val,
         }));
         const { error:sErr } = await supabase
-          .from('stats_partido_femenino')
-          .upsert(statsRows, { onConflict:'partido_id,jugadora_id' });
+          .from(tablas.stats)
+          .upsert(statsRows, { onConflict:`partido_id,${tablas.jugadorIdField}` });
         if (sErr) throw new Error(`Stats: ${sErr.message}`);
 
-        // Guardar aliases fuzzy como confirmados
+        // Guardar aliases fuzzy como confirmados (no aplica a jugadores recién creados)
         const fuzzyMatches = jugOk.filter(j => j.matchMethod==='fuzzy' && j.matchScore<0.35);
         for (const j of fuzzyMatches) {
-          await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId);
+          await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
         }
         if (fuzzyMatches.length>0) addLog(`💾 ${fuzzyMatches.length} aliases guardados para futuras cargas`);
 
         // MVP
         const mvp = statsRows.reduce((b,r) => !b||r.val>b.val?r:b, null);
         if (mvp) {
-          await supabase.from('partidos_femenino').update({ mvp_jugadora_id:mvp.jugadora_id }).eq('id',pd.id);
-          const mvpNombre = jugOk.find(j=>j.jugadora?.id===mvp.jugadora_id)?.jugadora?.nombre??'';
+          await supabase.from(tablas.partidos).update({ [tablas.mvpField]: mvp[tablas.jugadorIdField] }).eq('id',pd.id);
+          const mvpNombre = jugOk.find(j=>j.jugadora?.id===mvp[tablas.jugadorIdField])?.jugadora?.nombre??'';
           addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
         }
 
         addLog('🔄 Recalculando promedios...');
-        await recalcularPromedios(statsRows.map(r=>r.jugadora_id));
+        await recalcularPromedios(statsRows.map(r=>r[tablas.jugadorIdField]), tablas);
         addLog('✅ Promedios actualizados');
       }
 
       // Log de carga
-      await supabase.from('upload_log').insert({
+      await supabase.from(tablas.uploadLog).insert({
         fecha_id:fd.id, partido_id:pd.id, archivo_nombre:fileName,
         equipo_local:parsed.equipoLocal, equipo_visit:parsed.equipoVisit,
         jugadoras_ok:jugOk.length, jugadoras_skip:jugSkip.length,
@@ -449,12 +523,15 @@ export default function ExcelUpload() {
 
   const localJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoLocal);
   const visitJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoVisit);
-  const jugOkCount = jugadoras.filter(j => j.jugadora).length;
-  const jugNoCount = jugadoras.filter(j => !j.jugadora).length;
+  const jugOkCount = jugadoras.filter(j => j.jugadora || j.matchMethod === 'nuevo').length;
+  const jugNoCount = jugadoras.filter(j => !j.jugadora && j.matchMethod !== 'nuevo').length;
   const jugWarnCount = jugadoras.filter(j => j.jugadora && j.matchScore > 0.25).length;
+  const jugNuevoCount = jugadoras.filter(j => j.matchMethod === 'nuevo').length;
 
   return (
     <div>
+      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
+
       {/* Stepper */}
       <div style={s.stepper}>
         {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([num,lbl],i)=>{
@@ -476,6 +553,11 @@ export default function ExcelUpload() {
       {/* ── PASO 1: Archivo ── */}
       {step==='archivo' && (
         <>
+          {categoria === 'masculino' && (
+            <div style={s.warnBox}>
+              Los jugadores que no existan todavía en la base se van a crear automáticamente al publicar.
+            </div>
+          )}
           <div style={s.metaRow}>
             <div style={s.metaGroup}>
               <label style={s.label}>N° DE FECHA *</label>
@@ -563,6 +645,12 @@ export default function ExcelUpload() {
               <span style={s.resumenDot('#22D07A')}/>
               <span style={{color:'#22D07A',fontWeight:700}}>{jugOkCount} resueltas</span>
             </div>
+            {jugNuevoCount>0 && (
+              <div style={s.resumenItem}>
+                <span style={s.resumenDot('#60A5FA')}/>
+                <span style={{color:'#60A5FA'}}>{jugNuevoCount} jugador(es) nuevo(s)</span>
+              </div>
+            )}
             {jugWarnCount>0 && (
               <div style={s.resumenItem}>
                 <span style={s.resumenDot('#F0B429')}/>
@@ -583,7 +671,7 @@ export default function ExcelUpload() {
               <div style={s.teamLabel}>
                 {label}
                 <span style={{color:'#4A566E',fontSize:13,fontFamily:'Barlow Condensed',marginLeft:10}}>
-                  {jugs.filter(j=>j.jugadora).length}/{jugs.length} jugadoras
+                  {jugs.filter(j=>j.jugadora||j.matchMethod==='nuevo').length}/{jugs.length} jugadoras
                 </span>
               </div>
               <div style={{overflowX:'auto'}}>
@@ -597,10 +685,11 @@ export default function ExcelUpload() {
                   </thead>
                   <tbody>
                     {jugs.map((j,i)=>{
-                      const color = !j.jugadora ? '#F04060' : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
-                      const methodBadge = !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
+                      const esNuevo = j.matchMethod === 'nuevo';
+                      const color = (!j.jugadora && !esNuevo) ? '#F04060' : esNuevo ? '#60A5FA' : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
+                      const methodBadge = esNuevo ? '🆕' : !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
                       return (
-                        <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:j.jugadora?1:0.4}}>
+                        <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:(j.jugadora||esNuevo)?1:0.4}}>
                           <td style={s.td}>{j.numero??'–'}</td>
                           <td style={{...s.td,textAlign:'left',minWidth:180}}>
                             <div style={{color,fontWeight:600,fontSize:13}}>
@@ -608,7 +697,7 @@ export default function ExcelUpload() {
                             </div>
                             <div style={{color:'#4A566E',fontSize:10}}>
                               {j.nombreRaw}
-                              {j.matchMethod && j.jugadora && (
+                              {j.matchMethod && (j.jugadora || esNuevo) && (
                                 <span style={{marginLeft:6,color: j.matchMethod==='alias'?'#22D07A':'#6B7A99'}}>
                                   [{j.matchMethod}]
                                 </span>

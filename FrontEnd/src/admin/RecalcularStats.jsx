@@ -1,25 +1,44 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { CategoriaToggle, TABLAS } from './categoriaAdmin';
 
-async function recalcularTodos(onLog) {
+async function recalcularTodos(onLog, tablas) {
   onLog('📋 Obteniendo lista de jugadoras con stats...');
 
-  const { data: statsRows, error } = await supabase
-    .from('stats_partido_femenino')
-    .select('jugadora_id');
+  const idField = tablas.jugadorIdField;
 
-  if (error) throw new Error(error.message);
+  // Paginado: no confiar en el límite default de 1000 filas de Supabase
+  let statsRows = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data, error } = await supabase
+      .from(tablas.stats)
+      .select(idField)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    statsRows = statsRows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
 
-  const ids = [...new Set((statsRows ?? []).map(r => r.jugadora_id))];
+  const ids = [...new Set(statsRows.map(r => r[idField]))];
   onLog(`🔢 ${ids.length} jugadoras con partidos cargados`);
 
   let ok = 0;
+  let fallidas = [];
   for (const jugId of ids) {
-    const { data: allStats } = await supabase
-      .from('stats_partido_femenino')
+    const { data: allStats, error: errFetch } = await supabase
+      .from(tablas.stats)
       .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
-      .eq('jugadora_id', jugId);
+      .eq(idField, jugId);
 
+    if (errFetch) {
+      onLog(`❌ ${jugId}: error leyendo stats — ${errFetch.message}`);
+      fallidas.push(jugId);
+      continue;
+    }
     if (!allStats?.length) continue;
 
     const k   = allStats.length;
@@ -29,8 +48,8 @@ async function recalcularTodos(onLog) {
     const tdc = sum('dc'), tdf = sum('df');
     const ttc = sum('tc'), ttf = sum('tf');
 
-    await supabase.from('estadisticas_femenino').upsert({
-      jugadora_id:  jugId,
+    const { error: errUpsert } = await supabase.from(tablas.estadisticas).upsert({
+      [idField]:    jugId,
       pj:           k,
       pts_prom:     avg('pts'),
       reb_prom:     +((sum('rd') + sum('ro')) / k).toFixed(1),
@@ -51,16 +70,30 @@ async function recalcularTodos(onLog) {
       per_total:    sum('pe'),
       mejor_pts:    Math.max(...allStats.map(r => r.pts ?? 0)),
       updated_at:   new Date().toISOString(),
-    }, { onConflict: 'jugadora_id' });
+    }, { onConflict: idField });
+
+    if (errUpsert) {
+      onLog(`❌ ${jugId}: error guardando — ${errUpsert.message}`);
+      fallidas.push(jugId);
+      continue;
+    }
 
     ok++;
   }
 
   onLog(`✅ ${ok} jugadoras recalculadas`);
-  onLog('🎉 ¡Listo! El sitio ya refleja los promedios actualizados.');
+  if (fallidas.length > 0) {
+    onLog(`⚠️ ${fallidas.length} jugadoras fallaron: ${fallidas.join(', ')}`);
+    onLog('Volvé a correr el recálculo — si vuelven a fallar las mismas, avisá al desarrollador.');
+  } else {
+    onLog('🎉 ¡Listo! El sitio ya refleja los promedios y acumulados actualizados.');
+  }
 }
 
 export default function RecalcularStats() {
+  const [categoria, setCategoria] = useState('femenino');
+  const tablas = TABLAS[categoria];
+
   const [running, setRunning] = useState(false);
   const [log,     setLog]     = useState([]);
   const [done,    setDone]    = useState(false);
@@ -73,7 +106,7 @@ export default function RecalcularStats() {
     setLog([]);
     setDone(false);
     try {
-      await recalcularTodos(addLog);
+      await recalcularTodos(addLog, tablas);
       setDone(true);
     } catch (err) {
       addLog(`❌ Error: ${err.message}`);
@@ -84,10 +117,12 @@ export default function RecalcularStats() {
 
   return (
     <div>
+      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
+
       <h2 style={S.title}>🔄 Recalcular todos los promedios y acumulados</h2>
       <p style={S.hint}>
         Recorre todas las jugadoras con partidos cargados y recalcula sus promedios
-        y totales acumulados desde cero usando los datos de <code>stats_partido_femenino</code>.
+        y totales acumulados desde cero usando los datos de <code>{tablas.stats}</code>.
         Usá esto si hubo una corrección manual en Supabase o si sospechás que
         los promedios quedaron desactualizados.
       </p>

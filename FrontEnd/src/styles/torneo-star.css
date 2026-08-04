@@ -1024,6 +1024,43 @@ nav {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ══════════════════════════════
+   ZONAS (masculino: tabla dividida en Zona A / Zona B)
+══════════════════════════════ */
+.zonas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.zona-tabla {
+  display: flex;
+  flex-direction: column;
+}
+
+.zona-tabla-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(16px, 2vw, 20px);
+  letter-spacing: 2px;
+  padding: 10px clamp(12px, 2vw, 20px);
+  background: var(--dark4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.zona-tabla .table-wrap {
+  border-radius: 0 0 8px 8px;
+  border-top: none;
+}
+
+@media (max-width: 860px) {
+  .zonas-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

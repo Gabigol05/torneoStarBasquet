@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
+import { equiposMasculino } from '../data/masculinoData';
+import { CategoriaToggle, TABLAS } from './categoriaAdmin';
+
+const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
 // ─── Columnas de stats con categorías ────────────────────────────────────────
 const GRUPOS = [
@@ -149,6 +153,10 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function StatsEditor() {
+  const [categoria, setCategoria] = useState('femenino');
+  const tablas = TABLAS[categoria];
+  const roster = ROSTER[categoria];
+
   const [equipoId,  setEquipoId]  = useState('');
   const [busqueda,  setBusqueda]  = useState('');
   const [statsMap,  setStatsMap]  = useState({});
@@ -157,26 +165,46 @@ export default function StatsEditor() {
   const [loading,   setLoading]   = useState(false);
   const [msg,       setMsg]       = useState(null);
   const [viewMode,  setViewMode]  = useState('tabla'); // 'tabla' | 'cards'
+  // Masculino no tiene roster estático (los jugadores se cargan vía Excel a la
+  // tabla jugadores_masculino), así que hay que traerlo de la base.
+  const [rosterMasc, setRosterMasc] = useState([]);
 
-  const equipo = equiposFemenino.find(e => e.id === equipoId);
+  const equipoBase = roster.find(e => e.id === equipoId);
+  const equipo = equipoBase
+    ? { ...equipoBase, jugadoras: categoria === 'masculino' ? rosterMasc : equipoBase.jugadoras }
+    : null;
+
+  useEffect(() => {
+    setEquipoId(''); setStatsMap({}); setEdited({}); setBusqueda(''); setRosterMasc([]);
+  }, [categoria]);
 
   useEffect(() => {
     if (!equipoId) return;
-    loadStats();
     setEdited({});
+    (async () => {
+      let jugadoras = equipoBase?.jugadoras ?? [];
+      if (categoria === 'masculino') {
+        const { data } = await supabase.from(tablas.jugadores).select('*').eq('equipo_id', equipoId);
+        jugadoras = (data ?? []).map(j => ({ id: j.id, nombre: j.nombre, fechaNac: j.fecha_nac }));
+        setRosterMasc(jugadoras);
+      }
+      await loadStats(jugadoras);
+    })();
   }, [equipoId]);
 
-  const loadStats = async () => {
-    if (!equipo) return;
+  const loadStats = async (jugadorasOverride) => {
+    if (!equipoBase) return;
     setLoading(true);
-    const ids = equipo.jugadoras.map(j => j.id);
+    const jugadoras = jugadorasOverride ?? (categoria === 'masculino' ? rosterMasc : equipoBase.jugadoras);
+    const ids = jugadoras.map(j => j.id);
+    if (ids.length === 0) { setStatsMap({}); setLoading(false); return; }
     const { data, error } = await supabase
-      .from('estadisticas_femenino')
+      .from(tablas.estadisticas)
       .select('*')
-      .in('jugadora_id', ids);
+      .in(tablas.jugadorIdField, ids);
     if (!error) {
       const map = {};
-      for (const row of data ?? []) map[row.jugadora_id] = row;
+      for (const row of data ?? []) map[row[tablas.jugadorIdField]] = row;
       setStatsMap(map);
     }
     setLoading(false);
@@ -200,14 +228,14 @@ export default function StatsEditor() {
     setSaving(true);
     try {
       const upserts = keys.map(jugId => ({
-        jugadora_id:  jugId,
+        [tablas.jugadorIdField]: jugId,
         ...(statsMap[jugId] ?? {}),
         ...edited[jugId],
         updated_at: new Date().toISOString(),
       }));
       const { error } = await supabase
-        .from('estadisticas_femenino')
-        .upsert(upserts, { onConflict:'jugadora_id' });
+        .from(tablas.estadisticas)
+        .upsert(upserts, { onConflict: tablas.jugadorIdField });
       if (error) throw error;
       flash(`✅ ${upserts.length} jugadora(s) guardadas`);
       await loadStats();
@@ -221,7 +249,7 @@ export default function StatsEditor() {
 
   const handleReset = async (jugId) => {
     if (!confirm('¿Borrar todas las estadísticas de esta jugadora?')) return;
-    await supabase.from('estadisticas_femenino').delete().eq('jugadora_id', jugId);
+    await supabase.from(tablas.estadisticas).delete().eq(tablas.jugadorIdField, jugId);
     await loadStats();
     flash('✅ Stats reseteadas');
   };
@@ -239,6 +267,8 @@ export default function StatsEditor() {
 
   return (
     <div>
+      <CategoriaToggle categoria={categoria} setCategoria={setCategoria} />
+
       {/* Warning */}
       <div style={S.warning}>
         <span>⚠️</span>
@@ -267,7 +297,7 @@ export default function StatsEditor() {
           <label style={S.label}>EQUIPO</label>
           <select value={equipoId} onChange={e => setEquipoId(e.target.value)} style={S.select}>
             <option value="">— Seleccionar equipo —</option>
-            {equiposFemenino.map(e => (
+            {roster.map(e => (
               <option key={e.id} value={e.id}>{e.name ?? e.nombre}</option>
             ))}
           </select>

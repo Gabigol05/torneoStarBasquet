@@ -19,7 +19,8 @@ function StatSkeleton() {
   );
 }
 
-export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPartido, partidos, fechas, onSelectPlayer }) {
+export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPartido, partidos, fechas, onSelectPlayer, mode = 'femenino' }) {
+  const esFem = mode === 'femenino';
   const [activeTab,      setActiveTab]      = useState('jugadoras');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
@@ -88,7 +89,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
         isOpen={!!selectedMatch}
         onClose={() => setSelectedMatch(null)}
         partidoId={selectedMatch}
-        mode="femenino"
+        mode={mode}
       />
 
       <div className="team-page-overlay">
@@ -124,7 +125,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   </div>
                 )}
                 <div className="team-page-meta">
-                  <span className="team-page-badge">♀ Torneo Femenino</span>
+                  <span className="team-page-badge">{esFem ? '♀ Torneo Femenino' : '♂ Torneo Masculino'}</span>
                   <span className="team-page-badge"
                     style={{ background: `${team.color}22`, borderColor: `${team.color}55`, color: team.color }}>
                     #{posicion} en la tabla
@@ -141,7 +142,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
             {/* TABS */}
             <div className="team-page-tabs">
               {[
-                { key: 'jugadoras',  label: '👥 Jugadoras'  },
+                { key: 'jugadoras',  label: esFem ? '👥 Jugadoras' : '👥 Jugadores'  },
                 { key: 'resultados', label: '📋 Resultados' },
                 { key: 'proximos',   label: '📅 Próximos'   },
                 { key: 'tabla',      label: '📊 Posición'   },
@@ -163,12 +164,12 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
             {activeTab === 'jugadoras' && (
               <div>
                 <input type="text" className="search-bar"
-                  placeholder="Buscar jugadora..."
+                  placeholder={esFem ? 'Buscar jugadora...' : 'Buscar jugador...'}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   style={{ marginBottom: '20px' }}/>
                 <div className="tp-jugadoras-count">
-                  {filteredJugadoras.length} jugadoras inscriptas
+                  {filteredJugadoras.length} {esFem ? 'jugadoras inscriptas' : 'jugadores inscriptos'}
                 </div>
 
                 <div className="tp-jugadoras-grid">
@@ -443,7 +444,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                     { lbl: 'Pts Contra',       val: team.pc },
                     { lbl: 'Diferencia',       val: dif > 0 ? `+${dif}` : dif },
                     { lbl: 'Efectividad',      val: pct },
-                    { lbl: 'Jugadoras',        val: team.jugadoras.length },
+                    { lbl: esFem ? 'Jugadoras' : 'Jugadores', val: team.jugadoras.length },
                   ].map((s, i) => (
                     <div key={i} className="tp-team-stat-box">
                       <div className="tp-team-stat-val" style={{ color: team.color }}>

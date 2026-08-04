@@ -12,7 +12,9 @@ import { BottomNav }        from './BottomNav.jsx';
 import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx';
 import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
 import { useScrollReveal }  from '../hooks/useScrollReveal';
-import { useFemeninoStats } from '../hooks/useFemeninoStats';
+import { useFemeninoStats }  from '../hooks/useFemeninoStats';
+import { useMasculinoStats } from '../hooks/useMasculinoStats';
+import { useTournament }     from '../context/TournamentContext';
 import { StatsContext }     from '../context/StatsContext';
 import { FavoritoProvider } from '../hooks/useFavorito.jsx';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
@@ -62,12 +64,15 @@ export function PageHome() {
   useScrollReveal();
   const [activeTab, setActiveTab] = useState('inicio');
   const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
+  const { mode } = useTournament();
+  const statsFem  = useFemeninoStats();
+  const statsMasc = useMasculinoStats();
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
-  } = useFemeninoStats();
+  } = mode === 'masculino' ? statsMasc : statsFem;
   const { toasts, addToast, removeToast } = useToast();
-  useResultadosToast(equipos, addToast);
+  useResultadosToast(mode === 'femenino' ? equipos : [], addToast);
 
   // Chequea si hay una version nueva publicada (comparando el bundle actual
   // contra el que esta realmente sirviendo el servidor ahora mismo). Si

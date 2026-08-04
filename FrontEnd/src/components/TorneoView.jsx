@@ -47,7 +47,6 @@ function TableSkeleton() {
   );
 }
 
-import { equiposMasculino } from '../data/masculinoData';
 import { useTournament }    from '../context/TournamentContext';
 import { GameCenterModal }  from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
@@ -370,6 +369,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     }),
     [equiposFemenino]);
 
+  // Masculino: tabla dividida en Zona A / Zona B (asignación en equipos_masculino.zona)
+  const zonaA = useMemo(() => equiposOrdenados.filter(t => t.zona === 'A'), [equiposOrdenados]);
+  const zonaB = useMemo(() => equiposOrdenados.filter(t => t.zona === 'B'), [equiposOrdenados]);
+
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
   const FechaChips = ({ modo }) => {
@@ -394,7 +397,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     );
   };
 
-  if (selectedTeamFem && mode === 'femenino') {
+  if (selectedTeamFem) {
     return (
       <TeamPageFem
         team={selectedTeamFem}
@@ -405,6 +408,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         partidos={partidos}
         fechas={fechas}
         onSelectPlayer={handleSelectPlayer}
+        mode={mode}
       />
     );
   }
@@ -444,7 +448,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 Temporada Regular
               </div>
               <div style={{ fontFamily: "'Bebas Neue'", fontSize: '28px', letterSpacing: '2px', color: modeColor, marginTop: '4px' }}>
-                {mode === 'femenino' && fechas.length > 0 ? (() => {
+                {fechas.length > 0 ? (() => {
                   const jugadas = fechas.filter(f => partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado'));
                   return jugadas.length > 0 ? `Fecha ${Math.max(...jugadas.map(f => f.numero))}` : 'Jornada 1';
                 })() : 'Jornada 1'}
@@ -452,9 +456,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
             </div>
           </div>
 
-          {mode === 'femenino' && <FavoritoCard onSelectTeam={handleSelectTeam}/>}
+          <FavoritoCard onSelectTeam={handleSelectTeam}/>
 
-          {statsError && mode === 'femenino' && (
+          {statsError && (
             <div className="stats-error-banner">
               Error al cargar estadisticas. Reintentando...
             </div>
@@ -484,7 +488,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'tabla' && (
               <div>
-                {isLoadingStats ? <TableSkeleton/> : (
+                {isLoadingStats ? <TableSkeleton/> : mode === 'femenino' ? (
                   <div className="table-wrap">
                     <table>
                       <thead>
@@ -497,90 +501,122 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         </tr>
                       </thead>
                       <tbody>
-                        {mode === 'femenino' ? (
-                          equiposOrdenados.flatMap((t, idx) => {
-                            const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
-                            const dif = t.pf - t.pc;
-                            const band = bandFor(idx + 1);
-                            const isBandStart = idx === 0 || idx === 4 || idx === 8;
-                            const rows = [];
-                            if (isBandStart) {
-                              rows.push(
-                                <tr key={`band-${idx}`}>
-                                  <td colSpan={9} style={{ padding: '12px 16px 6px', fontFamily: "'Barlow Condensed'", fontSize: 10.5, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: band.color, borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,.08)' }}>
-                                    {band.label}
-                                  </td>
-                                </tr>
-                              );
-                            }
+                        {equiposOrdenados.flatMap((t, idx) => {
+                          const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
+                          const dif = t.pf - t.pc;
+                          const band = bandFor(idx + 1);
+                          const isBandStart = idx === 0 || idx === 4 || idx === 8;
+                          const rows = [];
+                          if (isBandStart) {
                             rows.push(
-                              <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
-                                style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
-                                <td className="team-cell">
-                                  <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
-                                  <img src={t.logo} alt={t.name} decoding="async"
-                                    style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
-                                    onError={e => { e.target.style.display = 'none'; }}/>
-                                  <span className="team-name-txt">{t.name}</span>
-                                  {esFavorito(t.id) && <span className="fav-star">*</span>}
-                                </td>
-                                <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
-                                <td>{t.pf}</td><td>{t.pc}</td>
-                                <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
-                                <td className="pct-td">{pct}</td>
-                                <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
-                                <td className="td-racha">
-                                  {t.historial?.slice(-5).map((h, i) => (
-                                    <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
-                                      {h.resultado}
-                                    </span>
-                                  ))}
-                                  {!t.historial?.length && <span className="racha-nd">-</span>}
+                              <tr key={`band-${idx}`}>
+                                <td colSpan={9} style={{ padding: '12px 16px 6px', fontFamily: "'Barlow Condensed'", fontSize: 10.5, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: band.color, borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,.08)' }}>
+                                  {band.label}
                                 </td>
                               </tr>
                             );
-                            return rows;
-                          })
-                        ) : (
-                          equiposMasculino.map((t, idx) => (
-                            <tr key={t.id}>
+                          }
+                          rows.push(
+                            <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
+                              style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
                               <td className="team-cell">
-                                <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
+                                <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
                                 <img src={t.logo} alt={t.name} decoding="async"
-                                  style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}/>
+                                  style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
+                                  onError={e => { e.target.style.display = 'none'; }}/>
                                 <span className="team-name-txt">{t.name}</span>
+                                {esFavorito(t.id) && <span className="fav-star">*</span>}
                               </td>
-                              <td>{t.pg + t.pp}</td><td>{t.pg}</td><td>{t.pp}</td>
-                              <td>-</td><td>-</td><td>-</td>
-                              <td className="pct-td">-</td>
+                              <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
+                              <td>{t.pf}</td><td>{t.pc}</td>
+                              <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
+                              <td className="pct-td">{pct}</td>
                               <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
-                              <td className="td-racha"><span className="racha-nd">-</span></td>
+                              <td className="td-racha">
+                                {t.historial?.slice(-5).map((h, i) => (
+                                  <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
+                                    {h.resultado}
+                                  </span>
+                                ))}
+                                {!t.historial?.length && <span className="racha-nd">-</span>}
+                              </td>
                             </tr>
-                          ))
-                        )}
+                          );
+                          return rows;
+                        })}
                       </tbody>
                     </table>
-                    {mode === 'femenino' && (
-                      <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
-                            Copa de Oro - 1 a 4
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
-                            Copa de Plata - 5 a 8
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
-                            Copa de Bronce - 9+
-                          </div>
+                    <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
+                          Copa de Oro - 1 a 4
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>
-                          Desempate: PTS -&gt; DIF -&gt; PF
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
+                          Copa de Plata - 5 a 8
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
+                          Copa de Bronce - 9+
                         </div>
                       </div>
-                    )}
+                      <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>
+                        Desempate: PTS -&gt; DIF -&gt; PF
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="zonas-grid">
+                    {[{ zona: 'A', lista: zonaA }, { zona: 'B', lista: zonaB }].map(({ zona, lista }) => (
+                      <div className="table-wrap zona-tabla" key={zona}>
+                        <div className="zona-tabla-title" style={{ color: modeColor }}>ZONA {zona}</div>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
+                              <th>PJ</th><th>G</th><th>P</th>
+                              <th>PF</th><th>PC</th><th>DIF</th><th>%</th>
+                              <th style={{ color: modeColor }}>PTS</th>
+                              <th className="th-racha">Forma</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lista.length === 0 ? (
+                              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--gray)' }}>Sin equipos asignados a esta zona</td></tr>
+                            ) : lista.map((t, idx) => {
+                              const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
+                              const dif = t.pf - t.pc;
+                              return (
+                                <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}>
+                                  <td className="team-cell">
+                                    <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
+                                    <img src={t.logo} alt={t.name} decoding="async"
+                                      style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
+                                      onError={e => { e.target.style.display = 'none'; }}/>
+                                    <span className="team-name-txt">{t.name}</span>
+                                    {esFavorito(t.id) && <span className="fav-star">*</span>}
+                                  </td>
+                                  <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
+                                  <td>{t.pf}</td><td>{t.pc}</td>
+                                  <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
+                                  <td className="pct-td">{pct}</td>
+                                  <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
+                                  <td className="td-racha">
+                                    {t.historial?.slice(-5).map((h, i) => (
+                                      <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
+                                        {h.resultado}
+                                      </span>
+                                    ))}
+                                    {!t.historial?.length && <span className="racha-nd">-</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -588,63 +624,49 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'resultados' && (
               <div>
-                {mode === 'femenino' ? (
-                  <>
-                    <FechaChips modo="resultados"/>
-                    {isLoadingStats ? <ResultSkeleton/> : (
-                      partidosFinalizados.length === 0 ? (
-                        <EmptyState icon="B" title="Sin resultados todavia"
-                          sub="Los resultados apareceran aca en cuanto se cargue el primer partido."/>
-                      ) : (
-                        <div className="results-grid">
-                          {partidosFinalizados.map(p => (
-                            <MatchResultCard key={p.id} partido={p}
-                              equiposFem={equiposFemenino}
-                              jugadorasMap={jugadorasMap}
-                              fechas={fechas}
-                              onClick={() => setSelectedMatch(p.id)}/>
-                          ))}
-                        </div>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <EmptyState icon="B" title="Resultados del torneo masculino"
-                    sub="Proximamente disponibles."/>
+                <FechaChips modo="resultados"/>
+                {isLoadingStats ? <ResultSkeleton/> : (
+                  partidosFinalizados.length === 0 ? (
+                    <EmptyState icon="B" title="Sin resultados todavia"
+                      sub="Los resultados apareceran aca en cuanto se cargue el primer partido."/>
+                  ) : (
+                    <div className="results-grid">
+                      {partidosFinalizados.map(p => (
+                        <MatchResultCard key={p.id} partido={p}
+                          equiposFem={equiposFemenino}
+                          jugadorasMap={jugadorasMap}
+                          fechas={fechas}
+                          onClick={() => setSelectedMatch(p.id)}/>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
             )}
 
             {activeTab === 'fixture' && (
               <div>
-                {mode === 'femenino' ? (
-                  <>
-                    <FechaChips modo="fixture"/>
-                    {isLoadingStats ? <ResultSkeleton/> : (
-                      partidosPendientes.length === 0 ? (
-                        <EmptyState icon="C" title="Sin partidos en esta fecha"
-                          sub="Todavia no hay partidos cargados para esta fecha."/>
-                      ) : (
-                        <div className="fixture-grid">
-                          {partidosPendientes.map(p => (
-                            p.estado === 'finalizado' ? (
-                              <MatchResultCard key={p.id} partido={p}
-                                equiposFem={equiposFemenino}
-                                jugadorasMap={jugadorasMap}
-                                fechas={fechas}
-                                onClick={() => setSelectedMatch(p.id)}/>
-                            ) : (
-                              <FixtureCard key={p.id} partido={p}
-                                equiposFem={equiposFemenino} fechas={fechas}/>
-                            )
-                          ))}
-                        </div>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <EmptyState icon="C" title="Fixture masculino"
-                    sub="Se publicara proximamente."/>
+                <FechaChips modo="fixture"/>
+                {isLoadingStats ? <ResultSkeleton/> : (
+                  partidosPendientes.length === 0 ? (
+                    <EmptyState icon="C" title="Sin partidos en esta fecha"
+                      sub="Todavia no hay partidos cargados para esta fecha."/>
+                  ) : (
+                    <div className="fixture-grid">
+                      {partidosPendientes.map(p => (
+                        p.estado === 'finalizado' ? (
+                          <MatchResultCard key={p.id} partido={p}
+                            equiposFem={equiposFemenino}
+                            jugadorasMap={jugadorasMap}
+                            fechas={fechas}
+                            onClick={() => setSelectedMatch(p.id)}/>
+                        ) : (
+                          <FixtureCard key={p.id} partido={p}
+                            equiposFem={equiposFemenino} fechas={fechas}/>
+                        )
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
             )}
@@ -657,92 +679,82 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   onChange={e => setSearchJugadoras(e.target.value)}
                   style={{ marginBottom: '12px' }}/>
 
-                {mode === 'femenino' && (
-                  <div className="filter-chips">
-                    <button
-                      className={`chip ${!filterEquipoId ? 'chip-active' : ''}`}
-                      style={!filterEquipoId ? { borderColor: modeColor, color: modeColor } : {}}
-                      onClick={() => setFilterEquipoId(null)}>
-                      Todos
+                <div className="filter-chips">
+                  <button
+                    className={`chip ${!filterEquipoId ? 'chip-active' : ''}`}
+                    style={!filterEquipoId ? { borderColor: modeColor, color: modeColor } : {}}
+                    onClick={() => setFilterEquipoId(null)}>
+                    Todos
+                  </button>
+                  {equiposFemenino.map(eq => (
+                    <button key={eq.id}
+                      className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
+                      style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
+                      onClick={() => setFilterEquipoId(prev => prev === eq.id ? null : eq.id)}>
+                      <img src={eq.logo} alt="" loading="lazy" decoding="async"
+                        style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
+                        onError={e => { e.target.style.display = 'none'; }}/>
+                      {eq.name}
                     </button>
-                    {equiposFemenino.map(eq => (
-                      <button key={eq.id}
-                        className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
-                        style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
-                        onClick={() => setFilterEquipoId(prev => prev === eq.id ? null : eq.id)}>
-                        <img src={eq.logo} alt="" loading="lazy" decoding="async"
-                          style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
-                          onError={e => { e.target.style.display = 'none'; }}/>
-                        {eq.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  ))}
+                </div>
 
                 <div className="jugadoras-count" style={{ marginBottom: '16px' }}>
                   {jugadorasFiltradas.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}
                 </div>
 
                 <div className="players-grid">
-                  {mode === 'femenino' ? (
-                    isLoadingStats ? (
-                      Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="player-item">
-                          <Skel w={44} h={44} radius={22} mb={0} style={{ flexShrink: 0 }}/>
-                          <div style={{ flex: 1 }}>
-                            <Skel w="70%" h={14} mb={6}/>
-                            <Skel w="50%" h={11} mb={0}/>
-                          </div>
+                  {isLoadingStats ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="player-item">
+                        <Skel w={44} h={44} radius={22} mb={0} style={{ flexShrink: 0 }}/>
+                        <div style={{ flex: 1 }}>
+                          <Skel w="70%" h={14} mb={6}/>
+                          <Skel w="50%" h={11} mb={0}/>
                         </div>
-                      ))
-                    ) : jugadorasFiltradas.length === 0 ? (
-                      <div style={{ gridColumn: '1/-1' }}>
-                        <EmptyState icon="?"
-                          title={searchJugadoras ? `Sin resultados para "${searchJugadoras}"` : 'Sin jugadoras'}
-                          sub="Proba con otro nombre o equipo" showIG={false}/>
                       </div>
-                    ) : (
-                      jugadorasFiltradas.map(j => (
-                        <div className="player-item" key={j.id}
-                          onClick={() => handleSelectPlayer({
-                            ...j,
-                            id: j.id, name: j.nombre, team: j.equipo,
-                            fechaNac: j.fechaNac, equipoId: j.equipoId,
-                            color: j.equipoColor,
-                            sc_total: j.sc_total ?? 0, sf_total: j.sf_total ?? 0,
-                            dc_total: j.dc_total ?? 0, df_total: j.df_total ?? 0,
-                            tc_total: j.tc_total ?? 0, tf_total: j.tf_total ?? 0,
-                            sc_prom:  j.sc_prom  ?? 0, dc_prom: j.dc_prom ?? 0,
-                            tc_prom:  j.tc_prom  ?? 0,
-                          })}>
-                          <div className="player-item-avatar"
-                            style={{ background: `${j.equipoColor}22`, border: `1.5px solid ${j.equipoColor}55` }}>
-                            <span style={{ fontFamily: "'Barlow Condensed'", fontSize: '14px', fontWeight: '700', color: j.equipoColor }}>
-                              {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="player-item-info">
-                            <div className="player-item-name">{j.nombre}</div>
-                            <div className="player-item-team">{j.equipo}</div>
-                            {(j.pts_prom ?? 0) > 0 && (
-                              <div className="player-item-stats">
-                                <span style={{ color: '#F0B429' }}>{j.pts_prom} PTS</span>
-                                <span style={{ color: '#4A566E' }}> - </span>
-                                <span>{j.reb_prom} REB</span>
-                                <span style={{ color: '#4A566E' }}> - </span>
-                                <span>{j.ast_prom} AST</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )
-                  ) : (
-                    <div style={{textAlign:"center",padding:"3rem",color:"#6B7A99"}}>
-                      <div style={{fontSize:32,marginBottom:12}}>B</div>
-                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#EEF2F8",marginBottom:8}}>Proximamente</div>
-                      <div style={{fontSize:13}}>Los jugadores del torneo masculino se cargaran pronto</div>
+                    ))
+                  ) : jugadorasFiltradas.length === 0 ? (
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <EmptyState icon="?"
+                        title={searchJugadoras ? `Sin resultados para "${searchJugadoras}"` : (mode === 'femenino' ? 'Sin jugadoras' : 'Sin jugadores')}
+                        sub={mode === 'femenino' ? 'Proba con otro nombre o equipo' : 'Los planteles se van a ir cargando desde el panel'} showIG={false}/>
                     </div>
+                  ) : (
+                    jugadorasFiltradas.map(j => (
+                      <div className="player-item" key={j.id}
+                        onClick={() => handleSelectPlayer({
+                          ...j,
+                          id: j.id, name: j.nombre, team: j.equipo,
+                          fechaNac: j.fechaNac, equipoId: j.equipoId,
+                          color: j.equipoColor,
+                          sc_total: j.sc_total ?? 0, sf_total: j.sf_total ?? 0,
+                          dc_total: j.dc_total ?? 0, df_total: j.df_total ?? 0,
+                          tc_total: j.tc_total ?? 0, tf_total: j.tf_total ?? 0,
+                          sc_prom:  j.sc_prom  ?? 0, dc_prom: j.dc_prom ?? 0,
+                          tc_prom:  j.tc_prom  ?? 0,
+                        })}>
+                        <div className="player-item-avatar"
+                          style={{ background: `${j.equipoColor}22`, border: `1.5px solid ${j.equipoColor}55` }}>
+                          <span style={{ fontFamily: "'Barlow Condensed'", fontSize: '14px', fontWeight: '700', color: j.equipoColor }}>
+                            {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="player-item-info">
+                          <div className="player-item-name">{j.nombre}</div>
+                          <div className="player-item-team">{j.equipo}</div>
+                          {(j.pts_prom ?? 0) > 0 && (
+                            <div className="player-item-stats">
+                              <span style={{ color: '#F0B429' }}>{j.pts_prom} PTS</span>
+                              <span style={{ color: '#4A566E' }}> - </span>
+                              <span>{j.reb_prom} REB</span>
+                              <span style={{ color: '#4A566E' }}> - </span>
+                              <span>{j.ast_prom} AST</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -750,75 +762,48 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'equipos' && (
               <div className="teams-grid">
-                {mode === 'femenino' ? (
-                  equiposFemenino.map(team => (
-                    <div
-                      className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
-                      key={team.id}
-                      onClick={() => {
-                        const isTouch = window.matchMedia('(hover: none)').matches;
-                        if (isTouch && tappedCard !== team.id) setTappedCard(team.id);
-                        else { setTappedCard(null); handleSelectTeam(team); }
-                      }}
-                      onMouseLeave={() => setTappedCard(null)}>
-                      <button
-                        className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
-                        onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
-                        title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}>
-                        {esFavorito(team.id) ? '*' : 'o'}
-                      </button>
-                      <div className="flip-card-inner">
-                        <div className="flip-card-front">
-                          <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
-                            <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
-                              onError={e => { e.target.style.background = 'var(--dark4)'; }}/>
-                          </div>
-                          <h3 className="fc-name">{team.name}</h3>
-                          <div className="fc-subtitle">{team.jugadoras.length} jugadoras</div>
-                          {team.pj > 0 && (
-                            <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
-                              {team.pg}G - {team.pp}P
-                            </div>
-                          )}
+                {equiposFemenino.map(team => (
+                  <div
+                    className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
+                    key={team.id}
+                    onClick={() => {
+                      const isTouch = window.matchMedia('(hover: none)').matches;
+                      if (isTouch && tappedCard !== team.id) setTappedCard(team.id);
+                      else { setTappedCard(null); handleSelectTeam(team); }
+                    }}
+                    onMouseLeave={() => setTappedCard(null)}>
+                    <button
+                      className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
+                      onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
+                      title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}>
+                      {esFavorito(team.id) ? '*' : 'o'}
+                    </button>
+                    <div className="flip-card-inner">
+                      <div className="flip-card-front">
+                        <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
+                          <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
+                            onError={e => { e.target.style.background = 'var(--dark4)'; }}/>
                         </div>
-                        <div className="flip-card-back">
-                          <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
-                          <div className="fc-record-label">RECORD ACTUAL</div>
-                          <div className="fc-record-val" style={{ color: team.color }}>{team.pg} - {team.pp}</div>
-                          <div className="fc-team-name">{team.name}</div>
-                          <div style={{ marginTop: '12px', fontSize: '13px', fontFamily: "'Barlow Condensed'", color: 'var(--gray)', letterSpacing: '1px' }}>
-                            TAP PARA VER PLANTEL
+                        <h3 className="fc-name">{team.name}</h3>
+                        <div className="fc-subtitle">{team.jugadoras.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}</div>
+                        {team.pj > 0 && (
+                          <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
+                            {team.pg}G - {team.pp}P
                           </div>
+                        )}
+                      </div>
+                      <div className="flip-card-back">
+                        <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
+                        <div className="fc-record-label">RECORD ACTUAL</div>
+                        <div className="fc-record-val" style={{ color: team.color }}>{team.pg} - {team.pp}</div>
+                        <div className="fc-team-name">{team.name}</div>
+                        <div style={{ marginTop: '12px', fontSize: '13px', fontFamily: "'Barlow Condensed'", color: 'var(--gray)', letterSpacing: '1px' }}>
+                          TAP PARA VER PLANTEL
                         </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  equiposMasculino.map(team => (
-                    <div className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`} key={team.id}
-                      onClick={() => {
-                        const isTouch = window.matchMedia('(hover: none)').matches;
-                        if (isTouch) setTappedCard(tappedCard === team.id ? null : team.id);
-                      }}
-                      onMouseLeave={() => setTappedCard(null)}>
-                      <div className="flip-card-inner">
-                        <div className="flip-card-front">
-                          <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
-                            <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"/>
-                          </div>
-                          <h3 className="fc-name">{team.name}</h3>
-                          <div className="fc-subtitle">{team.pg}G - {team.pp}P</div>
-                        </div>
-                        <div className="flip-card-back">
-                          <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
-                          <div className="fc-record-label">RECORD ACTUAL</div>
-                          <div className="fc-record-val" style={{ color: team.color }}>{team.record}</div>
-                          <div className="fc-team-name">{team.name}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </div>
             )}
 

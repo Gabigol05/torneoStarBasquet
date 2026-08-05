@@ -65,7 +65,7 @@ export function useResultadosToast(equipos, addToast) {
       const curr = snapshot[eq.id];
       if (curr > prev) {
         // Hay partido nuevo — obtener el último
-        const ultimo = eq.partidos[eq.partidos.length - 1];
+        const ultimo = eq.historial?.[eq.historial.length - 1];
         addToast({
           icon: ultimo?.resultado === 'G' ? '🏆' : '🏀',
           title: `Nuevo resultado — ${eq.name}`,

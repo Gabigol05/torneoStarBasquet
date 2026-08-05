@@ -28,7 +28,14 @@ function AdminRoute() {
   // arrancaba en false y un admin ya logueado veía un flash del formulario
   // de login antes de que la sesión se confirmara. Ahora se espera a loading.
   if (loading) return <AdminLoadingFallback />;
-  return authed ? <AdminPanel /> : <AdminLogin />;
+  // El <Suspense> queda acotado solo a donde realmente hace falta (acá, para
+  // el lazy-load del admin) y no envolviendo toda la app — mejor práctica,
+  // aunque el crash real de masc/fem no era este (ver ToastSystem.jsx).
+  return (
+    <Suspense fallback={<AdminLoadingFallback />}>
+      {authed ? <AdminPanel /> : <AdminLogin />}
+    </Suspense>
+  );
 }
 
 export default function App() {
@@ -36,13 +43,11 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <Suspense fallback={<AdminLoadingFallback />}>
-            <Routes>
-              <Route path="/"       element={<PageHome />} />
-              <Route path="/admin"  element={<AdminRoute />} />
-              <Route path="/admin/*" element={<AdminRoute />} />
-            </Routes>
-          </Suspense>
+          <Routes>
+            <Route path="/"       element={<PageHome />} />
+            <Route path="/admin"  element={<AdminRoute />} />
+            <Route path="/admin/*" element={<AdminRoute />} />
+          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

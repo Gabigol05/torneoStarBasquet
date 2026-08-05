@@ -420,6 +420,33 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   const [filtroEstado,setFiltroEstado]= useState('');
   const [crearEncuesta, setCrearEncuesta] = useState(true);
   const { confirm, ConfirmDialog } = useConfirm();
+  // Edición de una fecha existente (número/descripción/día) — antes no había
+  // forma de corregir el día de un fixture ya cargado si se aplazaba o
+  // cambiaba de fecha; solo se podía fijar al crearlo la primera vez.
+  const [editandoFechaId, setEditandoFechaId] = useState(null);
+  const [fechaEditForm, setFechaEditForm] = useState({ numero:'', descripcion:'', fecha_dia:'' });
+
+  const abrirEditFecha = (fecha) => {
+    setEditandoFechaId(fecha.id);
+    setFechaEditForm({
+      numero: fecha.numero ?? '',
+      descripcion: fecha.descripcion ?? '',
+      fecha_dia: fecha.fecha_dia ?? '',
+    });
+  };
+
+  const guardarFecha = async () => {
+    if (!fechaEditForm.numero) { flash('Ingresá el número de fecha', false); return; }
+    const { error } = await supabase.from(tablas.fechas).update({
+      numero: Number(fechaEditForm.numero),
+      descripcion: fechaEditForm.descripcion || null,
+      fecha_dia: fechaEditForm.fecha_dia || null,
+    }).eq('id', editandoFechaId);
+    if (error) { flash(`Error actualizando fecha: ${error.message}`, false); return; }
+    setEditandoFechaId(null);
+    flash('✅ Fecha actualizada');
+    loadAll();
+  };
 
   useEffect(() => {
     setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
@@ -641,8 +668,43 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                     <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:1, color:'#F0B429' }}>
                       {fecha ? (fecha.descripcion ?? `Fecha ${fecha.numero}`) : 'Sin fecha asignada'}
                     </div>
+                    {fecha?.fecha_dia && (
+                      <div style={{ fontSize:12, color:'#6B7A99' }}>
+                        📅 {new Date(fecha.fecha_dia + 'T00:00:00').toLocaleDateString('es-AR')}
+                      </div>
+                    )}
                     <div style={{ fontSize:11, color:'#4A566E' }}>{ps.length} partido(s)</div>
+                    {fecha && (
+                      <button onClick={() => abrirEditFecha(fecha)} title="Editar día/nombre de esta fecha"
+                        style={{ marginLeft:'auto', background:'transparent', border:'1px solid #1C2535', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:13 }}>
+                        ✏️
+                      </button>
+                    )}
                   </div>
+
+                  {/* Editor inline de la fecha (número/nombre/día) */}
+                  {fecha && editandoFechaId === fecha.id && (
+                    <div style={{ background:'#0E1420', border:'1px solid rgba(240,180,41,.25)', borderRadius:10, padding:14, marginBottom:14, display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
+                      <div style={{ minWidth:100 }}>
+                        <label style={F.label}>NÚMERO</label>
+                        <input type="number" value={fechaEditForm.numero} style={F.input}
+                          onChange={e => setFechaEditForm(f => ({ ...f, numero:e.target.value }))}/>
+                      </div>
+                      <div style={{ flex:1, minWidth:160 }}>
+                        <label style={F.label}>NOMBRE / DESCRIPCIÓN</label>
+                        <input type="text" value={fechaEditForm.descripcion} style={F.input}
+                          placeholder={`Fecha ${fechaEditForm.numero || ''}`}
+                          onChange={e => setFechaEditForm(f => ({ ...f, descripcion:e.target.value }))}/>
+                      </div>
+                      <div style={{ minWidth:160 }}>
+                        <label style={F.label}>DÍA</label>
+                        <input type="date" value={fechaEditForm.fecha_dia} style={F.input}
+                          onChange={e => setFechaEditForm(f => ({ ...f, fecha_dia:e.target.value }))}/>
+                      </div>
+                      <button onClick={guardarFecha} style={F.btnPrimary}>Guardar</button>
+                      <button onClick={() => setEditandoFechaId(null)} style={F.btnSec}>Cancelar</button>
+                    </div>
+                  )}
 
                   {/* Partidos de esta fecha */}
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>

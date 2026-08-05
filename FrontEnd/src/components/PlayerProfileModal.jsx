@@ -1,5 +1,6 @@
 ﻿import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 // ─── Share button ─────────────────────────────────────────────────────────────
 function ShareButton({ player, pts, reb, ast, addToast }) {
@@ -259,21 +260,34 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {chartData.length > 1 && (
                 <div style={{ marginBottom: 24 }}>
                   <div style={ST.sectionTitle}>📈 Puntos por fecha</div>
-                  <div style={{ width: '100%', height: 160 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                        <XAxis dataKey="match" stroke="#6b7280" tick={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}/>
-                        <YAxis stroke="#6b7280" tick={{ fontFamily: 'Bebas Neue', fontSize: 15 }}/>
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: 8, color: '#fff' }}
-                          itemStyle={{ color: '#FACC15', fontFamily: 'Bebas Neue', fontSize: 18 }}
-                        />
-                        <Line type="monotone" dataKey="pts" stroke="#FACC15" strokeWidth={3}
-                          dot={{ r: 4, fill: '#FACC15', stroke: '#08101a', strokeWidth: 2 }}
-                          activeDot={{ r: 6 }} name="PTS"/>
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {/* ⚠️ FIX: recharts tira un error asíncrono (vía su propio
+                      resize-observer interno) cuando el modal se cierra justo
+                      mientras el gráfico está recalculando tamaño — antes eso
+                      no se veía porque otro bug (hooks) crasheaba la app
+                      primero; al arreglar ese bug quedó expuesto este. Un
+                      ErrorBoundary local hace que, si vuelve a pasar, solo
+                      desaparezca el gráfico en vez de tumbar todo el sitio. */}
+                  <ErrorBoundary fallback={
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#6B7A99', fontSize: 13 }}>
+                      No se pudo cargar el gráfico
+                    </div>
+                  }>
+                    <div style={{ width: '100%', height: 160 }}>
+                      <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                        <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                          <XAxis dataKey="match" stroke="#6b7280" tick={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}/>
+                          <YAxis stroke="#6b7280" tick={{ fontFamily: 'Bebas Neue', fontSize: 15 }}/>
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: 8, color: '#fff' }}
+                            itemStyle={{ color: '#FACC15', fontFamily: 'Bebas Neue', fontSize: 18 }}
+                          />
+                          <Line type="monotone" dataKey="pts" stroke="#FACC15" strokeWidth={3}
+                            dot={{ r: 4, fill: '#FACC15', stroke: '#08101a', strokeWidth: 2 }}
+                            activeDot={{ r: 6 }} name="PTS"/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </ErrorBoundary>
                 </div>
               )}
 

@@ -26,6 +26,10 @@ export class ErrorBoundary extends Component {
 
   render() {
     if (this.state.hasError) {
+      // Si se pasa un fallback (para envolver una sección puntual, como un
+      // gráfico), se usa eso en vez de tumbar toda la pantalla — así un error
+      // aislado (por ej. de una librería de terceros) no rompe el resto del sitio.
+      if (this.props.fallback !== undefined) return this.props.fallback;
       return (
         <div style={{
           minHeight: '100vh', display: 'flex', flexDirection: 'column',

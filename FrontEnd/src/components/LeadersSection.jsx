@@ -25,12 +25,14 @@ function getInitials(nombre) {
   return (nombre ?? '?').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color }) {
+function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color, mode }) {
   const lideres = calcLiders(equipos, statKey, promKey);
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
+  // ⚠️ FIX: la clase quedaba "fem" fija siempre — en masculino se veían las
+  // cards con la línea rosa/fem en vez del celeste/masc ya definido en CSS.
   return (
-    <div className="leader-card fem">
+    <div className={`leader-card ${mode === 'masculino' ? 'masc' : 'fem'}`}>
       <div className="lc-stat-label">{emoji} {titulo}</div>
       {!hayDatos ? (
         <div className="lc-empty-state">
@@ -114,7 +116,7 @@ export function LeadersSection({ equipos = [], isLoading = false }) {
         ) : (
           <div className="leaders-grid">
             {LIDER_CATEGORIAS.map(cat => (
-              <LeaderCard key={cat.statKey} {...cat} equipos={equipos}/>
+              <LeaderCard key={cat.statKey} {...cat} equipos={equipos} mode={mode}/>
             ))}
           </div>
         )}

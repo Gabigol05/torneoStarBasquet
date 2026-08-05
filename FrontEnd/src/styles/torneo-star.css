@@ -76,7 +76,17 @@ html {
 }
 
 body {
-  background: var(--bg-body, var(--dark)); transition: background-color 0.6s ease-in-out;
+  background-color: var(--bg-body, var(--dark));
+  /* Textura sutil de líneas diagonales — se ve en todas las secciones
+     (el Hero la tapa con su propio fondo WebGL, así que no se nota ahí). */
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  transition: background-color 0.6s ease-in-out;
   color: var(--white);
   font-family: 'Barlow', sans-serif;
   overflow-x: hidden;
@@ -5068,3 +5078,267 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   color: #08101a;
 }
 .cf-btn-ok:hover { background: #ffc84a; }
+
+/* ══ LEADER CARD FLIP (v2) ═══════════════════════════════════════ */
+.leader-flip {
+  perspective: 1600px;
+  cursor: pointer;
+  min-height: 260px;
+}
+.leader-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.leader-flip-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+.leader-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.leader-flip-face.front { position: relative; }
+.leader-flip-face.back {
+  transform: rotateY(180deg);
+  overflow-y: auto;
+}
+
+.lc-strength-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-top: clamp(8px, 1.2vw, 10px);
+}
+.lc-strength-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.lc-row-strength {
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-top: 3px;
+}
+.lc-row-strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.lc-list-full {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.lc-flip-hint {
+  margin-top: clamp(8px, 1.2vw, 10px);
+  padding-top: clamp(8px, 1.2vw, 10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+
+/* ══ ENCUESTAS v2 (voting redesign) ══════════════════════════════ */
+.votaciones-band {
+  position: relative;
+}
+
+.encuesta-card-v2 {
+  background: var(--dark3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: clamp(16px, 2.5vw, 20px);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+.encuesta-card-v2::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.encuesta-card-v2.tag-fem::before  { background: linear-gradient(90deg, var(--fem), var(--fem2)); }
+.encuesta-card-v2.tag-masc::before { background: linear-gradient(90deg, var(--masc), var(--masc2)); }
+.encuesta-card-v2.tag-gen::before  { background: linear-gradient(90deg, var(--gold), var(--gold2)); }
+.encuesta-card-v2:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.ev-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: clamp(10px, 1.5vw, 14px);
+}
+.ev-subtitulo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(11px, 1.3vw, 13px);
+  color: var(--gray);
+  letter-spacing: 0.5px;
+}
+
+.ev-question {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: clamp(15px, 2vw, 17px);
+  color: var(--white);
+  letter-spacing: 0.3px;
+  margin-bottom: clamp(12px, 2vw, 16px);
+  line-height: 1.3;
+}
+
+.ev-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ev-opcion-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--dark4);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ev-opcion-btn:hover {
+  background: var(--color-primary, var(--dark5));
+  border-color: var(--border-primary-strong, rgba(255, 255, 255, 0.18));
+  color: #fff;
+}
+.ev-opcion-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+.ev-opcion-btn:hover .ev-opcion-radio {
+  border-color: #fff;
+}
+.ev-opcion-txt {
+  flex: 1;
+}
+.ev-opcion-arrow {
+  color: var(--gray);
+  transition: transform 0.2s;
+}
+.ev-opcion-btn:hover .ev-opcion-arrow {
+  transform: translateX(3px);
+  color: #fff;
+}
+
+.ev-resultados {
+  display: flex;
+  flex-direction: column;
+}
+.ev-result-row {
+  margin-bottom: 14px;
+}
+.ev-result-row:last-of-type {
+  margin-bottom: 8px;
+}
+.ev-result-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.ev-result-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+  min-width: 0;
+}
+.ev-result-label span:not(.ev-crown):not(.ev-your-vote) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ev-crown {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+.ev-your-vote {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: rgba(240, 180, 41, 0.15);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.ev-pct-big {
+  flex-shrink: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: var(--gray);
+}
+.ev-result-row.leading .ev-pct-big {
+  color: var(--gold);
+}
+.ev-pct-sign {
+  font-size: 12px;
+}
+
+.ev-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--dark5);
+  overflow: hidden;
+}
+.ev-bar-fill {
+  height: 100%;
+  background: var(--gray2);
+  transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.ev-bar-fill.leading {
+  background: var(--color-primary, var(--gold));
+}
+.ev-bar-fill.mine {
+  background: var(--gold);
+}
+
+.ev-total {
+  margin-top: 4px;
+  text-align: right;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  color: var(--gray);
+  letter-spacing: 0.5px;
+}

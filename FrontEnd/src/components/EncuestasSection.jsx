@@ -23,49 +23,57 @@ function OpcionLogo({ equipoId, size = 22 }) {
 function EncuestaCard({ encuesta, opciones, votoElegido, onVotar }) {
   const totalVotos = opciones.reduce((sum, o) => sum + Number(o.votos || 0), 0);
   const yaVoto = votoElegido != null;
+  const catClass = CATEGORIA_CLASS[encuesta.categoria] ?? 'tag-gen';
+  const maxVotos = Math.max(0, ...opciones.map(o => Number(o.votos || 0)));
 
   return (
-    <div className="match-card encuesta-card">
-      <div className="mc-header">
-        <span className={`encuesta-tag ${CATEGORIA_CLASS[encuesta.categoria] ?? 'tag-gen'}`}>
+    <div className={`encuesta-card-v2 reveal-on-scroll ${catClass}`}>
+      <div className="ev-header">
+        <span className={`encuesta-tag ${catClass}`}>
           {CATEGORIA_LABEL[encuesta.categoria] ?? 'GENERAL'}
         </span>
-        {encuesta.subtitulo && <span className="mc-date">{encuesta.subtitulo}</span>}
+        {encuesta.subtitulo && <span className="ev-subtitulo">{encuesta.subtitulo}</span>}
       </div>
 
-      <div className="vote-question" style={{ marginBottom: 14, textAlign: 'left' }}>
-        {encuesta.pregunta}
-      </div>
+      <div className="ev-question">{encuesta.pregunta}</div>
 
       {!yaVoto ? (
-        <div className="encuesta-opciones">
+        <div className="ev-opciones">
           {opciones.map(o => (
-            <button key={o.opcion_id} className="vote-btn encuesta-opcion-btn"
+            <button key={o.opcion_id} className="ev-opcion-btn"
               onClick={() => onVotar(encuesta.id, o.opcion_id)}>
+              <span className="ev-opcion-radio" />
               <OpcionLogo equipoId={o.equipo_id} />
-              <span>{o.texto}</span>
+              <span className="ev-opcion-txt">{o.texto}</span>
+              <span className="ev-opcion-arrow">→</span>
             </button>
           ))}
         </div>
       ) : (
-        <div className="vote-results fade-refresh" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+        <div className="ev-resultados fade-refresh">
           {opciones.map(o => {
-            const pct = totalVotos > 0 ? Math.round((Number(o.votos || 0) / totalVotos) * 100) : 0;
+            const votos = Number(o.votos || 0);
+            const pct = totalVotos > 0 ? Math.round((votos / totalVotos) * 100) : 0;
             const elegida = o.opcion_id === votoElegido;
+            const liderando = votos === maxVotos && maxVotos > 0;
             return (
-              <div key={o.opcion_id} className="encuesta-opcion-row">
-                <div className="encuesta-opcion-row-label">
-                  <OpcionLogo equipoId={o.equipo_id} size={18} />
-                  <span className={elegida ? 'winner' : ''}>{o.texto}{elegida ? ' ✓' : ''}</span>
-                  <span className="encuesta-pct">{pct}%</span>
+              <div key={o.opcion_id} className={`ev-result-row${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`}>
+                <div className="ev-result-top">
+                  <div className="ev-result-label">
+                    <OpcionLogo equipoId={o.equipo_id} size={20} />
+                    <span>{o.texto}</span>
+                    {liderando && <span className="ev-crown" title="Liderando">♛</span>}
+                    {elegida && <span className="ev-your-vote">TU VOTO</span>}
+                  </div>
+                  <div className="ev-pct-big">{pct}<span className="ev-pct-sign">%</span></div>
                 </div>
-                <div className="encuesta-bar">
-                  <div className={`encuesta-bar-fill${elegida ? ' mine' : ''}`} style={{ width: `${pct}%` }} />
+                <div className="ev-bar-track">
+                  <div className={`ev-bar-fill${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`} style={{ width: `${pct}%` }} />
                 </div>
               </div>
             );
           })}
-          <div className="encuesta-total">{totalVotos} voto{totalVotos === 1 ? '' : 's'}</div>
+          <div className="ev-total">{totalVotos} voto{totalVotos === 1 ? '' : 's'} totales</div>
         </div>
       )}
     </div>
@@ -76,16 +84,11 @@ export function EncuestasSection({ addToast } = {}) {
   const { mode } = useTournament();
   const { encuestas, resultados, misVotos, votar, isLoading } = useEncuestas();
 
-  // Solo se muestran las encuestas de la categoria activa (o generales), para
-  // no mezclar votaciones de femenino con masculino segun el modo elegido.
   const encuestasVisibles = encuestas.filter(e => e.categoria === mode || e.categoria === 'general');
 
   if (isLoading && encuestasVisibles.length === 0) return null;
   if (encuestasVisibles.length === 0) return null;
 
-  // ⚠️ FIX: antes se descartaba el resultado de votar() y el usuario nunca
-  // se enteraba si su voto falló (ya votó, sin conexión, etc.) — ahora se
-  // avisa con un toast en cualquiera de los dos casos.
   const handleVotar = async (encuestaId, opcionId) => {
     const res = await votar(encuestaId, opcionId);
     if (!res) return;
@@ -97,20 +100,22 @@ export function EncuestasSection({ addToast } = {}) {
   };
 
   return (
-    <section className="page-section" id="votaciones">
-      <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Participá</p>
-      <h2 className="section-heading">Votaciones <span className="gold">2026</span></h2>
-      <div className="encuestas-grid">
-        {encuestasVisibles.map(encuesta => (
-          <EncuestaCard
-            key={encuesta.id}
-            encuesta={encuesta}
-            opciones={resultados[encuesta.id] ?? []}
-            votoElegido={misVotos[encuesta.id]}
-            onVotar={handleVotar}
-          />
-        ))}
-      </div>
-    </section>
+    <div className="votaciones-band">
+      <section className="page-section" id="votaciones" style={{ position: 'relative', zIndex: 1 }}>
+        <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>✦ Participá</p>
+        <h2 className="section-heading">Votaciones <span className="gold">2026</span></h2>
+        <div className="encuestas-grid">
+          {encuestasVisibles.map(encuesta => (
+            <EncuestaCard
+              key={encuesta.id}
+              encuesta={encuesta}
+              opciones={resultados[encuesta.id] ?? []}
+              votoElegido={misVotos[encuesta.id]}
+              onVotar={handleVotar}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

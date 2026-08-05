@@ -1,29 +1,53 @@
-﻿import { useMemo, useRef, useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
+﻿import { useMemo } from 'react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
-// ⚠️ FIX: reemplaza a <ResponsiveContainer> de recharts. Esa librería mide el
-// contenedor con SU PROPIO ResizeObserver interno y, si el modal se cierra
-// justo cuando ese observer está por disparar, el callback llega tarde (via
-// un MessagePort, fuera del ciclo normal de React) e intenta leer el tamaño
-// de un contenedor que ya no existe — eso es lo que tiraba la app entera.
-// Con un ResizeObserver propio, controlado acá y desconectado en el cleanup
-// del useEffect, ese callback tardío directamente no puede dispararse más.
-function useContainerSize() {
-  const ref = useRef(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+// ⚠️ FIX: se reemplazó recharts (LineChart/ResponsiveContainer) por este
+// mini gráfico SVG propio. Ni sacando ResponsiveContainer se pudo evitar el
+// crash — recharts sigue teniendo internamente un manejo de resize/estado
+// (via MessagePort) que revienta cuando el modal se cierra en el momento
+// justo, sin importar si se usa ResponsiveContainer o no. Como este gráfico
+// es simple (una sola línea de puntos por fecha) y recharts no se usa en
+// ningún otro lugar del sitio, se saca la dependencia por completo para este
+// caso: cero librería de terceros, cero posibilidad de que vuelva a pasar.
+// El viewBox fijo + preserveAspectRatio hace que escale solo con CSS, sin
+// necesitar medir el contenedor con JS (por eso tampoco hace falta ningún
+// ResizeObserver acá).
+function MiniLineChart({ data, color = '#FACC15' }) {
+  if (!data || data.length < 2) return null;
+  const W = 100, H = 40, padY = 4;
+  const values = data.map(d => d.pts ?? 0);
+  const max = Math.max(...values, 1);
+  const min = Math.min(0, ...values);
+  const range = (max - min) || 1;
+  const stepX = W / (data.length - 1);
+  const points = data.map((d, i) => ({
+    x: i * stepX,
+    y: H - padY - (((d.pts ?? 0) - min) / range) * (H - padY * 2),
+    ...d,
+  }));
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ');
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const update = () => setSize({ width: el.clientWidth, height: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  return [ref, size];
+  return (
+    <div style={{ width: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block', overflow: 'visible' }}>
+        <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke"
+          strokeLinecap="round" strokeLinejoin="round"/>
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.4} fill={color} stroke="#08101a" strokeWidth={1}
+            vectorEffect="non-scaling-stroke">
+            <title>{p.match}: {p.pts} pts</title>
+          </circle>
+        ))}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, gap: 4 }}>
+        {data.map((d, i) => (
+          <span key={i} style={{ fontSize: 10, color: '#6b7280', fontFamily: "'Barlow Condensed',sans-serif", whiteSpace: 'nowrap' }}>
+            {d.match}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ─── Share button ─────────────────────────────────────────────────────────────
@@ -141,8 +165,6 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
     if (!historialGrafico.length) return null;
     return historialGrafico.reduce((b, r) => (r.pts > (b?.pts ?? -1) ? r : b), null);
   }, [historialGrafico]);
-
-  const [chartWrapRef, chartSize] = useContainerSize();
 
   if (!isOpen || !player) return null;
 
@@ -286,38 +308,14 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {chartData.length > 1 && (
                 <div style={{ marginBottom: 24 }}>
                   <div style={ST.sectionTitle}>📈 Puntos por fecha</div>
-                  {/* ⚠️ FIX: ya no se usa <ResponsiveContainer> de recharts —
-                      medía el contenedor con su propio ResizeObserver interno
-                      y, si el modal se cerraba justo cuando ese observer
-                      estaba por disparar, el callback llegaba tarde (fuera
-                      del ciclo de React) e intentaba leer un contenedor que
-                      ya no existía, tirando la app entera. Ahora el tamaño lo
-                      mide un ResizeObserver propio (useContainerSize, arriba)
-                      que se desconecta en el cleanup del useEffect, así ese
-                      callback tardío no puede volver a dispararse. El
-                      ErrorBoundary local queda igual, como red de contención
-                      adicional por si la librería falla por otro motivo. */}
+                  {/* El ErrorBoundary local queda como red de contención
+                      adicional, aunque ya no dependa de recharts. */}
                   <ErrorBoundary fallback={
                     <div style={{ padding: '20px', textAlign: 'center', color: '#6B7A99', fontSize: 13 }}>
                       No se pudo cargar el gráfico
                     </div>
                   }>
-                    <div ref={chartWrapRef} style={{ width: '100%', height: 160 }}>
-                      {chartSize.width > 0 && chartSize.height > 0 && (
-                        <LineChart width={chartSize.width} height={chartSize.height} data={chartData}
-                          margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                          <XAxis dataKey="match" stroke="#6b7280" tick={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}/>
-                          <YAxis stroke="#6b7280" tick={{ fontFamily: 'Bebas Neue', fontSize: 15 }}/>
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: 8, color: '#fff' }}
-                            itemStyle={{ color: '#FACC15', fontFamily: 'Bebas Neue', fontSize: 18 }}
-                          />
-                          <Line type="monotone" dataKey="pts" stroke="#FACC15" strokeWidth={3}
-                            dot={{ r: 4, fill: '#FACC15', stroke: '#08101a', strokeWidth: 2 }}
-                            activeDot={{ r: 6 }} name="PTS"/>
-                        </LineChart>
-                      )}
-                    </div>
+                    <MiniLineChart data={chartData} color="#FACC15"/>
                   </ErrorBoundary>
                 </div>
               )}

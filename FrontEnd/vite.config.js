@@ -35,7 +35,6 @@ export default defineConfig({
         manualChunks: {
           xlsx: ['xlsx'],
           three: ['three'],
-          recharts: ['recharts'],
         },
       },
     },

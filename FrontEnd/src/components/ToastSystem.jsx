@@ -59,9 +59,13 @@ export function useResultadosToast(equipos, addToast) {
       return;
     }
 
-    // Comparar con snapshot anterior
+    // Comparar con snapshot anterior. Un equipo que no estaba en el snapshot
+    // previo (ej: se acaba de cambiar de masculino a femenino, IDs distintos)
+    // no tiene base de comparación real — se ignora esa vez para no disparar
+    // un toast de "nuevo resultado" para TODOS los equipos del modo nuevo.
     for (const eq of equipos) {
-      const prev = prevRef.current[eq.id] ?? 0;
+      if (!(eq.id in prevRef.current)) continue;
+      const prev = prevRef.current[eq.id];
       const curr = snapshot[eq.id];
       if (curr > prev) {
         // Hay partido nuevo — obtener el último

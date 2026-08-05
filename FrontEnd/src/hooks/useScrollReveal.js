@@ -1,12 +1,20 @@
 import { useEffect } from 'react';
 
-// Agrega la clase 'in-view' a todos los elementos .reveal-on-scroll
-// cuando entran al viewport. Se llama una vez al montar el layout.
+// Agrega la clase 'in-view' a todos los elementos .reveal-on-scroll cuando
+// entran al viewport.
+//
+// OJO: muchas secciones (Lideres, Encuestas, etc.) recien agregan sus
+// elementos ".reveal-on-scroll" al DOM despues de que terminan de cargar
+// datos de Supabase — no estan presentes en el primer render. Un solo
+// querySelectorAll al montar (como antes) se los pierde para siempre y
+// quedan con opacity:0 permanente si esa carga tarda un toque mas de lo
+// normal (por eso a veces se ven y a veces no, segun la velocidad de red
+// de cada visitante). Por eso ademas del escaneo inicial se usa un
+// MutationObserver que vuelve a barrer el DOM cada vez que se agregan
+// nodos nuevos, así cualquier tarjeta que aparezca despues tambien queda
+// observada.
 export function useScrollReveal() {
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal-on-scroll');
-    if (!els.length) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -19,7 +27,18 @@ export function useScrollReveal() {
       { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
     );
 
-    els.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+    const observeNew = () => {
+      document.querySelectorAll('.reveal-on-scroll:not(.in-view)').forEach(el => observer.observe(el));
+    };
+
+    observeNew();
+
+    const mutationObserver = new MutationObserver(observeNew);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      mutationObserver.disconnect();
+    };
   }, []);
 }

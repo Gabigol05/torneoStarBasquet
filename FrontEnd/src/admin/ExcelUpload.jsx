@@ -507,8 +507,14 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           .upsert(statsRows, { onConflict:`partido_id,${tablas.jugadorIdField}` });
         if (sErr) throw new Error(`Stats: ${sErr.message}`);
 
-        // Guardar aliases fuzzy como confirmados (no aplica a jugadores recién creados)
-        const fuzzyMatches = jugOk.filter(j => j.matchMethod==='fuzzy' && j.matchScore<0.35);
+        // Guardar como alias confirmado cualquier match por fuzzy/numero que se
+        // haya publicado — antes solo se guardaba si el puntaje daba mejor que
+        // 0.35, así que un nombre que quedaba en "confianza media" (0.35-0.38)
+        // pedía revisión cada semana para siempre, aunque el mismo match ya se
+        // hubiera publicado bien antes. El propio acto de publicar (después de
+        // ver la vista previa con el color de advertencia) YA es la confirmación
+        // del admin — de acá en adelante ese nombre entra directo sin advertencia.
+        const fuzzyMatches = jugOk.filter(j => j.matchMethod==='fuzzy' || j.matchMethod==='numero');
         for (const j of fuzzyMatches) {
           await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
         }

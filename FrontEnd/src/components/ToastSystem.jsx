@@ -41,10 +41,16 @@ export function ToastContainer({ toasts, onRemove }) {
 // ── HOOK que detecta nuevos resultados del backend ────────────
 // Compara el snapshot anterior con el nuevo y emite un toast
 // si aparece un partido nuevo en algún equipo
-export function useResultadosToast(equipos, addToast) {
+export function useResultadosToast(equipos, addToast, isLoading = false) {
   const prevRef = useRef(null);
 
   useEffect(() => {
+    // Mientras todavía está cargando, "equipos" puede ser el placeholder
+    // (historial:[] para todos). Si tomáramos ese placeholder como snapshot
+    // base, en cuanto llegaran los datos reales TODOS los equipos con
+    // partidos ya jugados parecerían "resultado nuevo" a la vez. Se espera
+    // a que termine de cargar para recién ahí fijar la base de comparación.
+    if (isLoading) return;
     if (!equipos?.length) return;
 
     // Construir snapshot actual: equipoId → cantidad de partidos
@@ -53,7 +59,8 @@ export function useResultadosToast(equipos, addToast) {
       snapshot[eq.id] = eq.historial?.length ?? 0;
     }
 
-    // Primera carga: solo guardar snapshot sin mostrar toast
+    // Primera carga (con datos reales ya disponibles): solo guardar
+    // snapshot sin mostrar toast.
     if (prevRef.current === null) {
       prevRef.current = snapshot;
       return;

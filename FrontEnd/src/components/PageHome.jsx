@@ -78,7 +78,7 @@ export function PageHome() {
   const { toasts, addToast, removeToast } = useToast();
   // `equipos` ya refleja el modo activo (línea de arriba), antes esto se
   // limitaba a femenino y el masculino nunca mostraba el aviso de "nuevo resultado".
-  useResultadosToast(equipos, addToast);
+  useResultadosToast(equipos, addToast, isLoading);
 
   // Chequea si hay una version nueva publicada (comparando el bundle actual
   // contra el que esta realmente sirviendo el servidor ahora mismo). Si

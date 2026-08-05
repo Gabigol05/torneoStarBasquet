@@ -2,8 +2,12 @@
 
 function calcLiders(equipos, statKey, promKey, n = 3) {
   const all = [];
-  for (const eq of equipos) {
-    for (const j of eq.jugadoras) {
+  for (const eq of equipos ?? []) {
+    // ⚠️ FIX: antes esto solo se ejecutaba para femenino (el masculino
+    // mostraba un bloque estático aparte). Al unificarlo para las dos
+    // categorías, hay que blindar contra un equipo sin jugadoras cargadas
+    // todavía — de otro modo un `for...of` sobre undefined tira la app entera.
+    for (const j of eq.jugadoras ?? []) {
       const val = j[statKey] ?? 0;
       if (val > 0) {
         all.push({
@@ -18,7 +22,7 @@ function calcLiders(equipos, statKey, promKey, n = 3) {
 }
 
 function getInitials(nombre) {
-  return nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+  return (nombre ?? '?').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
 function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color }) {
@@ -41,7 +45,7 @@ function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color }) {
               {getInitials(top.nombre)}
             </div>
             <div>
-              <div className="lc-player-name">{top.nombre.split(' ').slice(0, 2).join(' ')}</div>
+              <div className="lc-player-name">{(top.nombre ?? '').split(' ').slice(0, 2).join(' ')}</div>
               <div className="lc-team-name">{top.equipo}</div>
             </div>
           </div>
@@ -56,7 +60,7 @@ function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color }) {
             {lideres.slice(1).map((l, i) => (
               <div className="lc-row" key={i}>
                 <span className="lc-row-rank">{i + 2}</span>
-                <span>{l.nombre.split(' ').slice(0, 2).join(' ')} - {l.equipo}</span>
+                <span>{(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}</span>
                 <span className="lc-row-val">
                   {l.val}
                   {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}

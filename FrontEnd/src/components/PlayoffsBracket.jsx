@@ -10,12 +10,12 @@ const CUPS = [
 
 // Mismo criterio de orden que la tabla de posiciones (TorneoView): PTS -> DIF -> PF.
 function sortByStandings(equipos) {
-  return [...equipos].sort((a, b) => {
-    const ptsA = a.pg * 2 + a.pp, ptsB = b.pg * 2 + b.pp;
+  return [...(equipos ?? [])].sort((a, b) => {
+    const ptsA = (a.pg ?? 0) * 2 + (a.pp ?? 0), ptsB = (b.pg ?? 0) * 2 + (b.pp ?? 0);
     if (ptsB !== ptsA) return ptsB - ptsA;
-    const difA = a.pf - a.pc, difB = b.pf - b.pc;
+    const difA = (a.pf ?? 0) - (a.pc ?? 0), difB = (b.pf ?? 0) - (b.pc ?? 0);
     if (difB !== difA) return difB - difA;
-    return b.pf - a.pf;
+    return (b.pf ?? 0) - (a.pf ?? 0);
   });
 }
 

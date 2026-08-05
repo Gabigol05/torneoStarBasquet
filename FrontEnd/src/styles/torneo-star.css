@@ -3706,6 +3706,7 @@ table tbody tr:hover {
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.mh-spin svg { animation: spin 0.7s linear; }
 
 /* ── TOAST de nuevo resultado ── */
 .toast-container {
@@ -5002,4 +5003,68 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 @keyframes gcPopIn {
   from { opacity: 0; transform: scale(.94) translateY(10px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
-} 
+}
+
+/* ── ConfirmModal: reemplaza los confirm()/alert() nativos del panel admin ── */
+.cf-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(8, 12, 18, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: gcFadeIn 0.2s ease forwards;
+}
+.cf-modal {
+  background: #0E1420;
+  border: 1px solid #1C2535;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+  animation: gcPopIn 0.2s ease forwards;
+}
+.cf-modal-msg {
+  color: #EEF2F8;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  white-space: pre-line;
+}
+.cf-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.cf-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.cf-btn-cancel {
+  background: transparent;
+  border-color: #1C2535;
+  color: #8899BB;
+}
+.cf-btn-cancel:hover { background: rgba(255,255,255,.04); }
+.cf-btn-danger {
+  background: rgba(240,64,96,.15);
+  border-color: rgba(240,64,96,.4);
+  color: #F04060;
+}
+.cf-btn-danger:hover { background: rgba(240,64,96,.25); }
+.cf-btn-ok {
+  background: #F0B429;
+  border-color: #F0B429;
+  color: #08101a;
+}
+.cf-btn-ok:hover { background: #ffc84a; }

@@ -180,7 +180,10 @@ async function fetchTodo() {
 }
 
 // ─── Hook principal ───────────────────────────────────────────────────────────
-export function useMasculinoStats() {
+// `enabled`: si es false, no pide datos ni abre el canal de Realtime — se usa
+// para no traer el masculino cuando el sitio está mostrando el femenino (y
+// viceversa), ya que antes PageHome llamaba los dos hooks siempre a la vez.
+export function useMasculinoStats(enabled = true) {
   const [equipos,         setEquipos]         = useState(buildEquiposBase);
   const [partidos,        setPartidos]        = useState([]);
   const [fechas,          setFechas]          = useState([]);
@@ -213,9 +216,13 @@ export function useMasculinoStats() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!enabled) return;
+    refresh();
+  }, [refresh, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!isConfigured || !supabase) return;
     const channel = supabase
       .channel('torneo-masc-rt')
@@ -233,7 +240,7 @@ export function useMasculinoStats() {
         }
       });
     return () => supabase.removeChannel(channel);
-  }, [refresh]);
+  }, [refresh, enabled]);
 
   return {
     equipos, partidos, fechas, statsPorPartido,

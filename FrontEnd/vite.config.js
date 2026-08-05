@@ -26,4 +26,18 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Separa las librerías más pesadas en su propio chunk, para que no
+        // vayan mezcladas con el bundle principal ni se re-descarguen enteras
+        // cada vez que cambia código de la app (mejor cacheo entre deploys).
+        manualChunks: {
+          xlsx: ['xlsx'],
+          three: ['three'],
+          recharts: ['recharts'],
+        },
+      },
+    },
+  },
 });

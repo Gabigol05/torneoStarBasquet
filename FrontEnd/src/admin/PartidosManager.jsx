@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -187,6 +188,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
   const [crearEncuestas, setCrearEncuestas] = useState(true);
+  const { confirm: confirmDup, ConfirmDialog: ConfirmDialogFixture } = useConfirm();
 
   const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
@@ -229,7 +231,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
       const duplicados = validos.filter(p => yaExiste(p.equipo_local_id, p.equipo_visit_id));
       if (duplicados.length > 0) {
         const nombres = duplicados.map(p => `${nombreEqLocal(p.equipo_local_id)} vs ${nombreEqLocal(p.equipo_visit_id)}`).join(', ');
-        const confirmar = confirm(`Ya existen partidos cargados para: ${nombres}. Continuar y agregarlos de nuevo?`);
+        const confirmar = await confirmDup(`Ya existen partidos cargados para: ${nombres}. Continuar y agregarlos de nuevo?`);
         if (!confirmar) { setLoading(false); return; }
       }
       // 2. Insertar partidos
@@ -280,6 +282,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
 
   return (
     <div style={{ background:'#0E1420', border:'1px solid rgba(240,180,41,.25)', borderRadius:14, padding:'1.5rem', marginBottom:20 }}>
+      {ConfirmDialogFixture}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, letterSpacing:1, color:'#F0B429' }}>
@@ -416,6 +419,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado,setFiltroEstado]= useState('');
   const [crearEncuesta, setCrearEncuesta] = useState(true);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   useEffect(() => {
     setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
@@ -446,7 +450,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         .or(`and(equipo_local_id.eq.${form.equipo_local_id},equipo_visit_id.eq.${form.equipo_visit_id}),and(equipo_local_id.eq.${form.equipo_visit_id},equipo_visit_id.eq.${form.equipo_local_id})`);
       if (dupErr) { flash(`Error verificando duplicados: ${dupErr.message}`, false); return; }
       if (dupes?.length > 0) {
-        const confirmar = confirm('Ya existe un partido entre estos equipos en esta fecha. Agregar de todas formas?');
+        const confirmar = await confirm('Ya existe un partido entre estos equipos en esta fecha. Agregar de todas formas?');
         if (!confirmar) return;
       }
     }
@@ -506,7 +510,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar este partido y todas sus estadísticas?')) return;
+    if (!(await confirm('¿Eliminar este partido y todas sus estadísticas?'))) return;
     const { error: logErr } = await supabase.from(tablas.uploadLog).delete().eq('partido_id', id);
     if (logErr) { flash(`Error borrando log de carga: ${logErr.message}`, false); return; }
     const { error: statsErr } = await supabase.from(tablas.stats).delete().eq('partido_id', id);
@@ -546,6 +550,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
   return (
     <div>
+      {ConfirmDialog}
 
       {/* Msg flash */}
       {msg && (

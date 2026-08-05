@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 const ROSTER = {
   femenino:  equiposFemenino.map(e => ({ id: e.id, nombre: e.name, color: e.color })),
@@ -155,6 +156,7 @@ export default function EncuestasManager() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]       = useState(null);
   const [abiertaId, setAbiertaId] = useState(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const flash = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 3000); };
 
@@ -208,7 +210,7 @@ export default function EncuestasManager() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta encuesta y todos sus votos? No se puede deshacer.')) return;
+    if (!(await confirm('¿Eliminar esta encuesta y todos sus votos? No se puede deshacer.'))) return;
     const { error } = await supabase.from('encuestas').delete().eq('id', id);
     if (error) { flash(`Error: ${error.message}`, false); return; }
     await loadAll();
@@ -217,6 +219,7 @@ export default function EncuestasManager() {
 
   return (
     <div>
+      {ConfirmDialog}
       {msg && (
         <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14,
           background: msg.ok ? 'rgba(34,208,122,.1)' : 'rgba(240,64,96,.1)',

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -158,6 +159,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
   const roster = ROSTER[categoria];
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [equipoId,  setEquipoId]  = useState('');
   const [busqueda,  setBusqueda]  = useState('');
@@ -250,7 +252,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   };
 
   const handleReset = async (jugId) => {
-    if (!confirm('¿Borrar todas las estadísticas de esta jugadora?')) return;
+    if (!(await confirm('¿Borrar todas las estadísticas de esta jugadora?'))) return;
     await supabase.from(tablas.estadisticas).delete().eq(tablas.jugadorIdField, jugId);
     await loadStats();
     flash('✅ Stats reseteadas');
@@ -269,6 +271,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
   return (
     <div>
+      {ConfirmDialog}
       {/* Warning */}
       <div style={S.warning}>
         <span>⚠️</span>

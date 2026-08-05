@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 export default function UploadHistory({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('femenino');
   const categoria    = categoriaProp ?? categoriaLocal;
   const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [logs,    setLogs]    = useState([]);
   const [loading, setLoading] = useState(true);
+  const [justDeleted, setJustDeleted] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -35,10 +38,15 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
   useEffect(() => { load(); }, [categoria]);
 
   const handleDelete = async (id, partidoId) => {
-    if (!confirm('¿Eliminar esta carga? Se borrarán las stats del partido asociado.')) return;
+    const ok = await confirm('¿Eliminar esta carga? Se borrarán las stats del partido asociado.');
+    if (!ok) return;
     // Borrar el partido (cascade borra stats_partido)
     if (partidoId) await supabase.from(tablas.partidos).delete().eq('id', partidoId);
     await supabase.from(tablas.uploadLog).delete().eq('id', id);
+    // ⚠️ FIX: borrar una carga no recalculaba los promedios agregados —
+    // quedaban desactualizados hasta que alguien se acordara de ir a
+    // "Recalcular Stats" a mano. Ahora se lo recordamos explícitamente.
+    setJustDeleted(true);
     load();
   };
 
@@ -50,6 +58,14 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
       <p style={s.hint}>Cada partido subido queda registrado. Podés ver warnings y eliminar cargas erróneas.</p>
 
       <button onClick={load} style={s.btnRefresh}>↻ Actualizar</button>
+
+      {justDeleted && (
+        <div style={s.recalcWarn}>
+          ⚠️ Borraste una carga — los promedios pueden haber quedado desactualizados.
+          Andá a <b>Recalcular Stats</b> para dejarlos al día.
+          <button onClick={() => setJustDeleted(false)} style={s.recalcWarnClose}>✕</button>
+        </div>
+      )}
 
       {loading ? (
         <p style={{ color:'#6B7A99', padding:'2rem 0' }}>Cargando...</p>
@@ -97,11 +113,21 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
           ))}
         </div>
       )}
+      {ConfirmDialog}
     </div>
   );
 }
 
 const s = {
+  recalcWarn: {
+    display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '10px 14px',
+    borderRadius: 8, background: 'rgba(240,180,41,.08)', border: '1px solid rgba(240,180,41,.35)',
+    color: '#F0B429', fontSize: 13, fontFamily: "'Barlow Condensed',sans-serif",
+  },
+  recalcWarnClose: {
+    marginLeft: 'auto', background: 'transparent', border: 'none', color: '#F0B429',
+    cursor: 'pointer', fontSize: 14, flexShrink: 0,
+  },
   title:      { color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:24, letterSpacing:1, marginBottom:8 },
   hint:       { color:'#6B7A99', fontSize:13, marginBottom:16, lineHeight:1.6 },
   btnRefresh: { padding:'8px 16px', background:'transparent', border:'1px solid #1C2535', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:13, marginBottom:4 },

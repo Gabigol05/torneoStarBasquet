@@ -4,9 +4,22 @@ import { PlayerProfileModal } from './PlayerProfileModal';
 import { useState } from 'react';
 import { useStats } from '../context/StatsContext';
 
-export function MobileHeader() {
+export function MobileHeader({ onRefresh } = {}) {
   const { equipos = [] } = useStats();
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ⚠️ FIX: antes este botón hacía window.location.reload() completo —
+  // perdía la posición de scroll, el tab activo y cualquier filtro elegido
+  // solo para traer datos nuevos. Ahora usa el mismo refetch suave que ya
+  // usa "deslizar para refrescar" en PageHome (con fallback a reload si por
+  // algún motivo no se recibe la función, para no romper nada).
+  const handleRefreshClick = async () => {
+    if (!onRefresh) { window.location.reload(); return; }
+    setRefreshing(true);
+    try { await onRefresh(); }
+    finally { setTimeout(() => setRefreshing(false), 500); }
+  };
 
   return (
     <>
@@ -28,9 +41,10 @@ export function MobileHeader() {
           <GlobalSearch equipos={equipos} onSelectPlayer={setSelectedPlayer} />
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="mh-social-btn"
-            title="Recargar"
+            onClick={handleRefreshClick}
+            className={`mh-social-btn${refreshing ? ' mh-spin' : ''}`}
+            title="Actualizar"
+            disabled={refreshing}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M23 4v6h-6"/>

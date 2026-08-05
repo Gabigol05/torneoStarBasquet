@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 async function recalcularTodos(onLog, tablas) {
   onLog('📋 Obteniendo lista de jugadoras con stats...');
@@ -99,11 +100,12 @@ export default function RecalcularStats({ categoria: categoriaProp, setCategoria
   const [running, setRunning] = useState(false);
   const [log,     setLog]     = useState([]);
   const [done,    setDone]    = useState(false);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const addLog = msg => setLog(l => [...l, msg]);
 
   const handleRun = async () => {
-    if (!confirm('¿Recalcular todos los promedios? Esto puede tardar unos segundos.')) return;
+    if (!(await confirm('¿Recalcular todos los promedios? Esto puede tardar unos segundos.'))) return;
     setRunning(true);
     setLog([]);
     setDone(false);
@@ -119,6 +121,7 @@ export default function RecalcularStats({ categoria: categoriaProp, setCategoria
 
   return (
     <div>
+      {ConfirmDialog}
       <h2 style={S.title}>🔄 Recalcular todos los promedios y acumulados</h2>
       <p style={S.hint}>
         Recorre todas las jugadoras con partidos cargados y recalcula sus promedios

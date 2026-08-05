@@ -2,7 +2,7 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 // ─── Share button ─────────────────────────────────────────────────────────────
-function ShareButton({ player, pts, reb, ast }) {
+function ShareButton({ player, pts, reb, ast, addToast }) {
   const handleShare = async () => {
     const url = window.location.origin + window.location.pathname + '?jugadora=' + player.id;
     const text = `🏀 ${player.name} — ${player.team}\nPTS: ${pts} | REB: ${reb} | AST: ${ast}\nTorneo Star Básquet 2026`;
@@ -12,7 +12,11 @@ function ShareButton({ player, pts, reb, ast }) {
     } else {
       try {
         await navigator.clipboard.writeText(text);
-        alert('¡Copiado al portapapeles!');
+        // Usa el mismo sistema de toasts del sitio si está disponible; si no
+        // (instancias del modal que todavía no lo reciben como prop), cae al
+        // alert() nativo como antes para no perder el aviso.
+        if (addToast) addToast({ icon: '🔗', title: '¡Copiado al portapapeles!', duration: 2500 });
+        else alert('¡Copiado al portapapeles!');
       } catch (_) {}
     }
   };
@@ -79,7 +83,40 @@ function TiroRow({ label, conv, fall, pct, color, promConv }) {
 }
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
-export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, partidos, fechas }) {
+export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, partidos, fechas, addToast }) {
+  // ⚠️ FIX: los hooks tienen que llamarse SIEMPRE, en el mismo orden, sin
+  // importar isOpen/player — por eso van antes del "return null" de abajo
+  // (este componente queda montado de forma persistente y solo cambia isOpen).
+  const historialGrafico = useMemo(() => {
+    if (!player || !statsPorPartido || !partidos || !fechas) return [];
+    return partidos
+      .filter(p =>
+        p.estado === 'finalizado' &&
+        (p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId)
+      )
+      .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0))
+      .map(p => {
+        const st    = statsPorPartido?.[p.id]?.[player.id];
+        const fecha = fechas.find(f => f.id === p.fecha_id);
+        return {
+          match: fecha ? `F${fecha.numero}` : `P${p.id}`,
+          pts:   st?.pts ?? 0,
+          reb:   (st?.rd ?? 0) + (st?.ro ?? 0),
+          ast:   st?.as_ ?? 0,
+          sc: st?.sc ?? 0, sf: st?.sf ?? 0,
+          dc: st?.dc ?? 0, df: st?.df ?? 0,
+          tc: st?.tc ?? 0, tf: st?.tf ?? 0,
+          val: st?.val ?? 0,
+        };
+      })
+      .filter(d => d.pts > 0 || d.reb > 0 || d.ast > 0);
+  }, [statsPorPartido, partidos, fechas, player?.id, player?.equipoId]);
+
+  const mejorPartido = useMemo(() => {
+    if (!historialGrafico.length) return null;
+    return historialGrafico.reduce((b, r) => (r.pts > (b?.pts ?? -1) ? r : b), null);
+  }, [historialGrafico]);
+
   if (!isOpen || !player) return null;
 
   // Stats promedios — con fallbacks seguros
@@ -120,41 +157,9 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
 
   const hayStats = pj > 0;
 
-  // ⚠️ FIX: historialGrafico con useMemo para no recalcular en cada render
-  const historialGrafico = useMemo(() => {
-    if (!statsPorPartido || !partidos || !fechas) return [];
-    return partidos
-      .filter(p =>
-        p.estado === 'finalizado' &&
-        (p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId)
-      )
-      .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0))
-      .map(p => {
-        const st    = statsPorPartido?.[p.id]?.[player.id];
-        const fecha = fechas.find(f => f.id === p.fecha_id);
-        return {
-          match: fecha ? `F${fecha.numero}` : `P${p.id}`,
-          pts:   st?.pts ?? 0,
-          reb:   (st?.rd ?? 0) + (st?.ro ?? 0),
-          ast:   st?.as_ ?? 0,
-          sc: st?.sc ?? 0, sf: st?.sf ?? 0,
-          dc: st?.dc ?? 0, df: st?.df ?? 0,
-          tc: st?.tc ?? 0, tf: st?.tf ?? 0,
-          val: st?.val ?? 0,
-        };
-      })
-      .filter(d => d.pts > 0 || d.reb > 0 || d.ast > 0);
-  }, [statsPorPartido, partidos, fechas, player.id, player.equipoId]);
-
   const chartData = historialGrafico.length > 0
     ? historialGrafico
     : (hayStats ? [{ match: '–', pts, reb, ast }] : []);
-
-  // ⚠️ FIX: mejor partido destacado con contexto (rival + fecha)
-  const mejorPartido = useMemo(() => {
-    if (!historialGrafico.length) return null;
-    return historialGrafico.reduce((b, r) => (r.pts > (b?.pts ?? -1) ? r : b), null);
-  }, [historialGrafico]);
 
   return (
     <div className="gc-overlay" onClick={onClose}>
@@ -163,7 +168,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         {/* ── Card superior ── */}
         <div className="pp-card">
           <div className="pp-card-actions">
-            <ShareButton player={player} pts={pts} reb={reb} ast={ast}/>
+            <ShareButton player={player} pts={pts} reb={reb} ast={ast} addToast={addToast}/>
             <button className="gc-close-btn" onClick={onClose}>&times;</button>
           </div>
 

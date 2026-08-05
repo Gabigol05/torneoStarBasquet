@@ -50,7 +50,7 @@ export function useResultadosToast(equipos, addToast) {
     // Construir snapshot actual: equipoId → cantidad de partidos
     const snapshot = {};
     for (const eq of equipos) {
-      snapshot[eq.id] = eq.partidos?.length ?? 0;
+      snapshot[eq.id] = eq.historial?.length ?? 0;
     }
 
     // Primera carga: solo guardar snapshot sin mostrar toast

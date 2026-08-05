@@ -65,14 +65,20 @@ export function PageHome() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
   const { mode } = useTournament();
-  const statsFem  = useFemeninoStats();
-  const statsMasc = useMasculinoStats();
+  // Antes los dos hooks pedían datos y abrían su canal de Realtime siempre,
+  // aunque solo se ve un modo a la vez — cada visitante hacía el doble de
+  // queries/websockets de lo necesario. Ahora solo el hook del modo activo
+  // hace fetch/subscribe; el otro se activa recién si el usuario cambia de modo.
+  const statsFem  = useFemeninoStats(mode !== 'masculino');
+  const statsMasc = useMasculinoStats(mode === 'masculino');
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
   } = mode === 'masculino' ? statsMasc : statsFem;
   const { toasts, addToast, removeToast } = useToast();
-  useResultadosToast(mode === 'femenino' ? equipos : [], addToast);
+  // `equipos` ya refleja el modo activo (línea de arriba), antes esto se
+  // limitaba a femenino y el masculino nunca mostraba el aviso de "nuevo resultado".
+  useResultadosToast(equipos, addToast);
 
   // Chequea si hay una version nueva publicada (comparando el bundle actual
   // contra el que esta realmente sirviendo el servidor ahora mismo). Si
@@ -154,6 +160,7 @@ export function PageHome() {
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+        addToast={addToast}
       />
       {/* Desktop */}
       <div className="desktop-only">
@@ -161,7 +168,7 @@ export function PageHome() {
       </div>
       {/* Mobile */}
       <div className="mobile-only">
-        <MobileHeader />
+        <MobileHeader onRefresh={handlePullRefresh} />
       </div>
       <Hero equipos={equipos} partidos={partidos} fechas={fechas} />
       <div className="full-rule"></div>
@@ -169,7 +176,7 @@ export function PageHome() {
       <div className="full-rule"></div>
       <LeadersSection equipos={equipos} isLoading={isLoading} />
       <div className="full-rule"></div>
-      <EncuestasSection />
+      <EncuestasSection addToast={addToast} />
       <div className="full-rule"></div>
       <PlayoffsBracket />
       <Footer />

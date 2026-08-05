@@ -375,6 +375,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // Masculino: tabla dividida en Zona A / Zona B (asignación en equipos_masculino.zona)
   const zonaA = useMemo(() => equiposOrdenados.filter(t => t.zona === 'A'), [equiposOrdenados]);
   const zonaB = useMemo(() => equiposOrdenados.filter(t => t.zona === 'B'), [equiposOrdenados]);
+  // ⚠️ FIX: antes un equipo sin zona asignada en la base (zona !== 'A'/'B')
+  // desaparecía sin aviso de la tabla, porque no entraba en zonaA ni zonaB.
+  // Ahora se muestra un aviso explícito con los equipos afectados.
+  const sinZona = useMemo(() => equiposOrdenados.filter(t => t.zona !== 'A' && t.zona !== 'B'), [equiposOrdenados]);
 
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
@@ -570,6 +574,16 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     </div>
                   </div>
                 ) : (
+                  <>
+                  {sinZona.length > 0 && (
+                    <div style={{
+                      marginBottom: 14, padding: '10px 14px', borderRadius: 8,
+                      background: 'rgba(240,180,41,.08)', border: '1px solid rgba(240,180,41,.35)',
+                      fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, color: '#F0B429',
+                    }}>
+                      ⚠️ {sinZona.length} equipo{sinZona.length === 1 ? '' : 's'} sin zona asignada (no aparece{sinZona.length === 1 ? '' : 'n'} en la tabla): {sinZona.map(t => t.name).join(', ')}
+                    </div>
+                  )}
                   <div className="zonas-grid">
                     {[{ zona: 'A', lista: zonaA }, { zona: 'B', lista: zonaB }].map(({ zona, lista }) => (
                       <div className="table-wrap zona-tabla" key={zona}>
@@ -654,6 +668,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       </div>
                     ))}
                   </div>
+                  </>
                 )}
               </div>
             )}

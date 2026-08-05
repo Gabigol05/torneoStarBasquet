@@ -72,7 +72,7 @@ function EncuestaCard({ encuesta, opciones, votoElegido, onVotar }) {
   );
 }
 
-export function EncuestasSection() {
+export function EncuestasSection({ addToast } = {}) {
   const { mode } = useTournament();
   const { encuestas, resultados, misVotos, votar, isLoading } = useEncuestas();
 
@@ -83,8 +83,17 @@ export function EncuestasSection() {
   if (isLoading && encuestasVisibles.length === 0) return null;
   if (encuestasVisibles.length === 0) return null;
 
+  // ⚠️ FIX: antes se descartaba el resultado de votar() y el usuario nunca
+  // se enteraba si su voto falló (ya votó, sin conexión, etc.) — ahora se
+  // avisa con un toast en cualquiera de los dos casos.
   const handleVotar = async (encuestaId, opcionId) => {
-    await votar(encuestaId, opcionId);
+    const res = await votar(encuestaId, opcionId);
+    if (!res) return;
+    if (!res.ok) {
+      addToast?.({ icon: '⚠️', title: 'No se pudo votar', sub: res.message, duration: 4500 });
+    } else {
+      addToast?.({ icon: '🗳️', title: '¡Voto registrado!', duration: 3000 });
+    }
   };
 
   return (

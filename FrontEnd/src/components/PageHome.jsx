@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
+import { WaveBackground }   from './WaveBackground.jsx';
 import { Hero }             from './Hero.jsx';
 import { TorneoView }       from './TorneoView.jsx';
 import { LeadersSection }   from './LeadersSection.jsx';
@@ -151,6 +152,7 @@ export function PageHome() {
   return (
     <FavoritoProvider>
     <StatsContext.Provider value={{ equipos, partidos, fechas, statsPorPartido, isLoading }}>
+      <WaveBackground />
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
       <PlayerProfileModal

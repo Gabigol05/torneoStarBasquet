@@ -77,15 +77,6 @@ html {
 
 body {
   background-color: var(--bg-body, var(--dark));
-  /* Textura sutil de líneas diagonales — se ve en todas las secciones
-     (el Hero la tapa con su propio fondo WebGL, así que no se nota ahí). */
-  background-image: repeating-linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.025) 0px,
-    rgba(255, 255, 255, 0.025) 1px,
-    transparent 1px,
-    transparent 7px
-  );
   transition: background-color 0.6s ease-in-out;
   color: var(--white);
   font-family: 'Barlow', sans-serif;
@@ -5341,4 +5332,47 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   font-size: 11px;
   color: var(--gray);
   letter-spacing: 0.5px;
+}
+
+/* ══ WAVE BACKGROUND ══════════════════════════════════════════════
+   Una sola capa fija detras de toda la pagina (no una por seccion),
+   asi el costo es constante sin importar el largo de la pagina. Solo
+   anima "transform" (compositor puro, no dispara layout/paint) y el
+   color sale de --color-primary/--color-accent (ya cambian solos con
+   body.theme-masculino/theme-femenino), asi que el cambio de modo no
+   re-renderiza nada de esto. El Hero pinta encima con su propio fondo,
+   por eso ahi no se nota. */
+.wave-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.wave-bg-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-main, transparent);
+}
+.wave-bg svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.wave-bg .wv {
+  animation-name: wave-bg-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.wave-bg.is-paused .wv {
+  animation-play-state: paused;
+}
+@keyframes wave-bg-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-200px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wave-bg .wv { animation: none; }
 }

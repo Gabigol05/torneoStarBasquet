@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /admin/
 
-Sitemap: https://torneostarbasquet.com/sitemap.xml
+Sitemap: https://www.torneostarbasquet.com.ar/sitemap.xml

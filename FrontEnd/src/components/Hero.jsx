@@ -15,17 +15,6 @@ const MODE_COLORS = {
   femenino: { hex: 0xe8187a },
 };
 
-const HERO_MASCULINO = {
-  badge: 'Torneo Masculino - Proximamente',
-  subtitle: 'Categoria Masculina - Cordoba - 2026',
-  stats: [
-    { end: 6,   label: 'Edicion' },
-    { end: 22,  label: 'Equipos' },
-    { end: 0,   label: 'Fechas' },
-    { end: 250, label: 'Jugadores', suffix: '+' },
-  ],
-};
-
 export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const { mode, toggleMode } = useTournament();
 
@@ -47,7 +36,29 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     };
   }, [equipos, partidos, fechas]);
 
-  const data = mode === 'femenino' ? heroFemenino : HERO_MASCULINO;
+  // Antes era un objeto fijo (HERO_MASCULINO) con "Proximamente" y "0 Fechas"
+  // pegado con alfileres — se iba a quedar diciendo eso para siempre. Ahora
+  // calcula todo en vivo, igual que el femenino, y el badge pasa solo de
+  // "Arranca Pronto" a "En Curso" apenas se carga el primer partido finalizado.
+  const heroMasculino = useMemo(() => {
+    const fechasJugadas = fechas.filter(f =>
+      partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado')
+    ).length;
+    const jugadoresTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
+
+    return {
+      badge: fechasJugadas > 0 ? 'Torneo Masculino - En Curso' : 'Torneo Masculino - Arranca Pronto',
+      subtitle: 'Categoria Masculina - Cordoba - 2026',
+      stats: [
+        { end: 6, label: 'Edicion' },
+        { end: equipos.length || 22, label: 'Equipos' },
+        { end: fechasJugadas, label: 'Fechas' },
+        { end: jugadoresTotal || 250, label: 'Jugadores', suffix: jugadoresTotal ? '' : '+' },
+      ],
+    };
+  }, [equipos, partidos, fechas]);
+
+  const data = mode === 'femenino' ? heroFemenino : heroMasculino;
 
   const rootRef = useRef(null);
   const canvasRef = useRef(null);

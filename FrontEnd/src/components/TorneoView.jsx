@@ -115,7 +115,11 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
 
   if (!localEq || !visitEq) return null;
 
-  const mvpJug = partido.mvp_jugadora_id ? jugadorasMap[partido.mvp_jugadora_id] : null;
+  // partidos_masculino guarda la columna como "mvp_jugador_id" (sin "a"),
+  // partidos_femenino como "mvp_jugadora_id" — sin este fallback el MVP
+  // nunca se mostraba en los partidos de masculino.
+  const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
+  const mvpJug = mvpJugId ? jugadorasMap[mvpJugId] : null;
 
   return (
     <div className="result-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>

@@ -469,6 +469,19 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
     if (!form.equipo_local_id || !form.equipo_visit_id) { flash('Seleccioná ambos equipos',false); return; }
     if (form.equipo_local_id === form.equipo_visit_id)   { flash('Los equipos no pueden ser iguales',false); return; }
 
+    // El básquet no admite empates — si se carga un partido "finalizado" con
+    // el mismo puntaje de los dos lados (típico error de tipeo), el código
+    // que calcula ganador/perdedor le da la victoria al visitante sin
+    // avisar nada. Se corta acá antes de guardar.
+    if (form.estado === 'finalizado') {
+      const totalLocal = Number(form.q1_local||0)+Number(form.q2_local||0)+Number(form.q3_local||0)+Number(form.q4_local||0)+Number(form.ot_local||0);
+      const totalVisit = Number(form.q1_visit||0)+Number(form.q2_visit||0)+Number(form.q3_visit||0)+Number(form.q4_visit||0)+Number(form.ot_visit||0);
+      if (totalLocal === totalVisit) {
+        flash('El marcador está empatado — revisá los puntos, un partido finalizado no puede quedar en empate', false);
+        return;
+      }
+    }
+
     if (!editId && form.fecha_id) {
       const { data: dupes, error: dupErr } = await supabase
         .from(tablas.partidos)

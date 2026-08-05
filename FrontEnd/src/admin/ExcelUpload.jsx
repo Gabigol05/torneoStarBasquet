@@ -48,6 +48,20 @@ function buildFuseJugadores(lista) {
   });
 }
 
+// Arma la entrada de indice fuzzy para un jugador masculino recien creado o
+// traido de la base, con el mismo formato en ambos lugares (fetch inicial
+// y alta al publicar) para no duplicar la logica.
+function formatJugadorMasc(j) {
+  const partes = (j.nombre ?? '').trim().split(/\s+/);
+  const equipoNombre = equiposMasculino.find(e => e.id === j.equipo_id)?.name ?? j.equipo_id;
+  return {
+    id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
+    equipoId: j.equipo_id, equipo: equipoNombre, equipoNorm: normStr(equipoNombre),
+    t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
+    t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
+  };
+}
+
 // ─── Resolver jugadora: aliases → fuzzy → (masculino) nuevo jugador ──────────
 const aliasesCache = { femenino: null, masculino: null };
 
@@ -298,16 +312,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     if (categoria !== 'masculino') return;
     (async () => {
       const { data } = await supabase.from(tablas.jugadores).select('*');
-      const equipoNombre = id => equiposMasculino.find(e => e.id === id)?.name ?? id;
-      setJugadoresMasc((data ?? []).map(j => {
-        const partes = (j.nombre ?? '').trim().split(/\s+/);
-        return {
-          id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
-          equipoId: j.equipo_id, equipo: equipoNombre(j.equipo_id), equipoNorm: normStr(equipoNombre(j.equipo_id)),
-          t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
-          t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
-        };
-      }));
+      setJugadoresMasc((data ?? []).map(formatJugadorMasc));
     })();
   }, [categoria]);
 
@@ -417,6 +422,9 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
       // Partido
       addLog('🏀 Insertando partido...');
       const m=parsed.marcador, p=parsed.pct;
+      if (m.local.total === m.visit.total) {
+        throw new Error(`El Excel da un empate ${m.local.total}-${m.visit.total} — el básquet no admite empates, revisá la planilla antes de publicar.`);
+      }
       const { data:pd, error:pErr } = await supabase
         .from(tablas.partidos)
         .insert({
@@ -441,8 +449,13 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
       const nuevos = jugadoras.filter(j => j.matchMethod === 'nuevo' && !j.jugadora);
       if (nuevos.length > 0) {
         addLog(`🆕 Creando ${nuevos.length} jugador(es) nuevo(s)...`);
+        const creadosParaIndice = [];
         for (const nj of nuevos) {
-          const idGenerado = `${nj.nuevoEquipoId}_${normStr(nj.nombreRaw).replace(/\s+/g,'_')}${nj.numero ? '_'+nj.numero : ''}`;
+          // OJO: el numero de camiseta NO va en el id — si un Excel lo trae
+          // y otro no (o cambia de una fecha a otra), un id que dependiera
+          // del numero generaba una fila NUEVA para la misma persona real,
+          // partiendo sus estadisticas en dos jugadores distintos.
+          const idGenerado = `${nj.nuevoEquipoId}_${normStr(nj.nombreRaw).replace(/\s+/g,'_')}`;
           const { data: creado, error: cErr } = await supabase
             .from(tablas.jugadores)
             .upsert({ id: idGenerado, equipo_id: nj.nuevoEquipoId, nombre: nj.nombreRaw, numero: nj.numero }, { onConflict:'id' })
@@ -451,8 +464,15 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           jugadorasResueltas = jugadorasResueltas.map(j =>
             j === nj ? { ...j, jugadora: { id: creado.id, nombre: creado.nombre, equipoId: creado.equipo_id } } : j
           );
+          creadosParaIndice.push(creado);
         }
         setJugadoras(jugadorasResueltas);
+        // Sumar los recien creados al indice fuzzy en memoria — si no, cargar
+        // dos partidos seguidos en la misma sesion (muy probable este fin de
+        // semana) no los reconoce en la segunda carga y crea un duplicado.
+        if (categoria === 'masculino' && creadosParaIndice.length > 0) {
+          setJugadoresMasc(prev => [...prev, ...creadosParaIndice.map(formatJugadorMasc)]);
+        }
       }
 
       // Stats

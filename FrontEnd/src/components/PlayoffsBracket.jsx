@@ -71,15 +71,34 @@ function TeamSeed({ team, seed }) {
 // posiciones actual — no resultados jugados de playoffs (todavía no hay
 // carga de partidos de postemporada), sino la proyección de semillas que se
 // va actualizando sola a medida que cambia la tabla de la fase regular.
+// Cuando el pool no entra justo en un cuadro de potencia de 2 (por ejemplo
+// Copa de Bronce con 12+11 equipos por zona: sobran 7, y bracketSizeFor
+// corta en 4), antes esos equipos de mas quedaban afuera del cuadro sin
+// ningun aviso — como si no existieran. Se listan aparte para que no
+// desaparezcan silenciosamente.
+function EquiposFueraDeCuadro({ teams, accentColor }) {
+  if (!teams.length) return null;
+  return (
+    <div style={{ marginTop: 16, fontFamily: "'Barlow Condensed'", fontSize: 12.5, color: 'var(--gray)' }}>
+      <span style={{ color: accentColor ?? 'var(--gold)', fontWeight: 700 }}>
+        También compiten por esta copa (a la espera de que se defina el cuadro):
+      </span>{' '}
+      {teams.map(t => t.name).join(' · ')}
+    </div>
+  );
+}
+
 function BracketProyectado({ pool, accentColor }) {
   const size = bracketSizeFor(pool.length);
   if (size === 0) return <BracketVacio accentColor={accentColor} />;
 
   const seeded = pool.slice(0, size);
+  const sobrantes = pool.slice(size);
 
   if (size === 8) {
     const pairs = [[0,7],[1,6],[2,5],[3,4]];
     return (
+      <>
       <div className="bracket-wrap">
         <div className="bracket">
           <div className="bracket-round">
@@ -124,12 +143,15 @@ function BracketProyectado({ pool, accentColor }) {
           </div>
         </div>
       </div>
+      <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
+      </>
     );
   }
 
   if (size === 4) {
     const pairs = [[0,3],[1,2]];
     return (
+      <>
       <div className="bracket-wrap">
         <div className="bracket">
           <div className="bracket-round">
@@ -163,11 +185,14 @@ function BracketProyectado({ pool, accentColor }) {
           </div>
         </div>
       </div>
+      <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
+      </>
     );
   }
 
   // size === 2 — solo alcanza para una final directa
   return (
+    <>
     <div className="bracket-wrap">
       <div className="bracket">
         <div className="bracket-round">
@@ -179,6 +204,8 @@ function BracketProyectado({ pool, accentColor }) {
         </div>
       </div>
     </div>
+    <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
+    </>
   );
 }
 

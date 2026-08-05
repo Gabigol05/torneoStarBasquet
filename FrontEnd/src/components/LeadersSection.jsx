@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 
-function calcLiders(equipos, statKey, promKey, n = 8) {
+function calcLiders(equipos, statKey, promKey, minAttempts, n = 8) {
   const all = [];
   for (const eq of equipos ?? []) {
     for (const j of eq.jugadoras ?? []) {
       const val = j[statKey] ?? 0;
-      if (val > 0) {
+      // Para porcentajes (ej: % Triples) un jugador con un solo tiro
+      // convertido de un solo intento arranca la temporada al 100%, por
+      // encima de cualquier tirador real de volumen — se pide un minimo de
+      // intentos antes de entrar al ranking de ese stat en particular.
+      const intentos = (j.tc_total ?? 0) + (j.tf_total ?? 0);
+      if (val > 0 && (!minAttempts || intentos >= minAttempts)) {
         all.push({
           nombre: j.nombre, equipo: eq.name, color: eq.color, val,
           pj: j.pj ?? 0,
@@ -22,8 +27,8 @@ function getInitials(nombre) {
   return (nombre ?? '?').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-function LeaderCard({ titulo, emoji, statKey, promKey, sub, equipos, color, mode }) {
-  const lideres = calcLiders(equipos, statKey, promKey);
+function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos, color, mode }) {
+  const lideres = calcLiders(equipos, statKey, promKey, minAttempts);
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
   const accent = color ?? 'var(--fem2)';
@@ -130,7 +135,7 @@ const LIDER_CATEGORIAS = [
   { titulo: 'Asistencias', emoji: '', statKey: 'ast_total', promKey: 'ast_prom', sub: 'acumulado en el torneo', color: '#22D07A' },
   { titulo: 'Robos',       emoji: '', statKey: 'rob_total', promKey: 'rob_prom', sub: 'acumulado en el torneo', color: '#F97316' },
   { titulo: 'Tapones',     emoji: '', statKey: 'tap_total', promKey: 'tap_prom', sub: 'acumulado en el torneo', color: '#A78BFA' },
-  { titulo: '% Triples',   emoji: '', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185' },
+  { titulo: '% Triples',   emoji: '', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
   { titulo: 'Valoracion',  emoji: '', statKey: 'val_total', promKey: 'val_prom', sub: 'acumulado en el torneo', color: '#FCD34D' },
 ];
 

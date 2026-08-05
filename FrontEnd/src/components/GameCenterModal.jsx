@@ -53,24 +53,39 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
 
     let ignore = false;
     setLoading(true);
-    Promise.all([
+    // El roster femenino esta hardcodeado en femeninoData.js (trae "jugadoras"
+    // adentro de cada equipo), pero el de masculino vive en la tabla
+    // jugadores_masculino — equiposMasculino NO tiene ese campo. Sin esto,
+    // el box score de masculino mostraba el ID interno del jugador en vez
+    // del nombre (y el MVP nunca se resolvia).
+    const queries = [
       supabase.from(tablaPartido).select('*').eq('id', partidoId).single(),
       supabase.from(tablaStats).select('*').eq('partido_id', partidoId),
-    ]).then(([{ data: partido }, { data: stats }]) => {
+    ];
+    if (esMasc) queries.push(supabase.from('jugadores_masculino').select('id,nombre'));
+
+    Promise.all(queries).then(([{ data: partido }, { data: stats }, jugadoresRes]) => {
       if (ignore) return;
       if (!partido) { setLoading(false); return; }
 
       const eqLocal = roster.find(e => e.id === partido.equipo_local_id);
       const eqVisit = roster.find(e => e.id === partido.equipo_visit_id);
 
+      const nombrePorId = esMasc
+        ? Object.fromEntries((jugadoresRes?.data ?? []).map(j => [j.id, j.nombre]))
+        : null;
+
+      const resolverNombre = (r) => {
+        if (esMasc) return nombrePorId[r[idField]] ?? r[idField];
+        const eq  = roster.find(e => e.id === r.equipo_id);
+        const jug = eq?.jugadoras?.find(j => j.id === r[idField]);
+        return jug?.nombre ?? r[idField];
+      };
+
       const enrich = (rows, eqId) =>
         (rows ?? [])
           .filter(r => r.equipo_id === eqId)
-          .map(r => {
-            const eq  = roster.find(e => e.id === r.equipo_id);
-            const jug = eq?.jugadoras?.find(j => j.id === r[idField]);
-            return { ...r, jugadora_id: r[idField], nombre: jug?.nombre ?? r[idField] };
-          })
+          .map(r => ({ ...r, jugadora_id: r[idField], nombre: resolverNombre(r) }))
           .sort((a, b) => b.pts - a.pts);
 
       const statsLocal = enrich(stats, partido.equipo_local_id);
@@ -82,10 +97,14 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
       const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
       if (mvpJugId) {
         mvpRow = (stats ?? []).find(r => r[idField] === mvpJugId) ?? null;
-        const mvpEq = eqLocal?.jugadoras?.find(j => j.id === mvpJugId)
-          ? eqLocal
-          : (eqVisit?.jugadoras?.find(j => j.id === mvpJugId) ? eqVisit : null);
-        mvpNombre = mvpEq?.jugadoras?.find(j => j.id === mvpJugId)?.nombre ?? null;
+        if (esMasc) {
+          mvpNombre = nombrePorId[mvpJugId] ?? null;
+        } else {
+          const mvpEq = eqLocal?.jugadoras?.find(j => j.id === mvpJugId)
+            ? eqLocal
+            : (eqVisit?.jugadoras?.find(j => j.id === mvpJugId) ? eqVisit : null);
+          mvpNombre = mvpEq?.jugadoras?.find(j => j.id === mvpJugId)?.nombre ?? null;
+        }
       }
 
       setData({ partido, eqLocal, eqVisit, statsLocal, statsVisit, mvpRow, mvpNombre });

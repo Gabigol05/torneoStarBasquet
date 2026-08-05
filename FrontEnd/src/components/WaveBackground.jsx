@@ -36,32 +36,32 @@ export function WaveBackground() {
         </defs>
         <g transform="translate(0,45) scale(1,0.55)">
           <g className="wv" style={{ animationDuration: '24s', animationDelay: '-2s' }}>
-            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.4" opacity="0.22" />
+            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.1" opacity="0.08" />
           </g>
         </g>
         <g transform="translate(0,80) scale(1,0.4)">
           <g className="wv" style={{ animationDuration: '19s', animationDelay: '-9s' }}>
-            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.4" opacity="0.3" />
+            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.1" opacity="0.12" />
           </g>
         </g>
         <g transform="translate(0,120) scale(1,0.65)">
           <g className="wv" style={{ animationDuration: '15s', animationDelay: '-4s' }}>
-            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.7" opacity="0.42" />
+            <use href="#wavebase" stroke="var(--color-primary, #1878E8)" strokeWidth="1.3" opacity="0.16" />
           </g>
         </g>
         <g transform="translate(0,160) scale(1,0.45)">
           <g className="wv" style={{ animationDuration: '12s', animationDelay: '-7s' }}>
-            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="1.9" opacity="0.55" />
+            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="1.4" opacity="0.2" />
           </g>
         </g>
         <g transform="translate(0,200) scale(1,0.55)">
           <g className="wv" style={{ animationDuration: '9s', animationDelay: '-1s' }}>
-            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="2.1" opacity="0.72" />
+            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="1.5" opacity="0.26" />
           </g>
         </g>
         <g transform="translate(0,235) scale(1,0.35)">
           <g className="wv" style={{ animationDuration: '6.5s', animationDelay: '-3s' }}>
-            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="2.3" opacity="0.85" />
+            <use href="#wavebase" stroke="var(--color-accent, #4FA3FF)" strokeWidth="1.6" opacity="0.32" />
           </g>
         </g>
       </svg>

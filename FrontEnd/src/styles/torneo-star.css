@@ -1068,6 +1068,10 @@ nav {
    STANDINGS TABLE
 ══════════════════════════════ */
 .table-wrap {
+  /* Antes no tenia fondo propio (solo el borde), asi que el fondo de olas
+     fijo se veia de lleno atravesando las filas de la tabla. Se le agrega
+     el mismo solido que ya usan leader-card/encuesta-card-v2. */
+  background: var(--dark3);
   overflow-x: auto;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -5353,6 +5357,7 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   position: absolute;
   inset: 0;
   background: var(--bg-main, transparent);
+  opacity: 0.5;
 }
 .wave-bg svg {
   position: absolute;

@@ -1,5 +1,22 @@
 import { useFavorito } from '../hooks/useFavorito';
 import { useStats } from '../context/StatsContext';
+import { equiposFemenino } from '../data/femeninoData';
+import { equiposMasculino } from '../data/masculinoData';
+
+// Antes esta tarjeta dependia 100% de encontrar el equipo en el "equipos"
+// en vivo (el que trae useMasculinoStats/useFemeninoStats) — si ese fetch
+// todavia no habia resuelto, tardaba, o fallaba por un instante (pasa mas
+// seguido de lo que parece: reconexion de Realtime, tab en segundo plano,
+// etc.), la tarjeta directamente desaparecia aunque el favorito siguiera
+// guardado. Ahora la identidad del equipo (nombre/logo/color) sale siempre
+// del roster estatico, que esta disponible al toque sin depender de ningun
+// fetch — asi la tarjeta nunca "parpadea" a desaparecida por una carga
+// lenta. Las estadisticas en vivo (posicion, PJ/PG/PP, proximo partido) se
+// suman encima apenas estan disponibles, pero no son requisito para mostrar
+// la tarjeta.
+const EQUIPOS_ESTATICOS = Object.fromEntries(
+  [...equiposFemenino, ...equiposMasculino].map(e => [e.id, e])
+);
 
 export function FavoritoCard({ onSelectTeam }) {
   const { favoritoId } = useFavorito();
@@ -7,14 +24,21 @@ export function FavoritoCard({ onSelectTeam }) {
 
   if (!favoritoId) return null;
 
-  const equipo = equipos.find(e => e.id === favoritoId);
-  if (!equipo) return null;
+  const base = EQUIPOS_ESTATICOS[favoritoId];
+  // Esto solo pasa si el equipo favorito ya no existe en el roster actual
+  // (por ejemplo, se renovaron los equipos de una temporada a otra).
+  if (!base) return null;
 
+  const equipoVivo = equipos.find(e => e.id === favoritoId);
+  const equipo = equipoVivo ?? base;
+
+  const tieneStats = (equipo.pj ?? 0) > 0;
   const proximo = equipo.proximos?.[0];
-  const pct = equipo.pj > 0 ? (equipo.pg / equipo.pj).toFixed(3) : '.000';
+  const pct = tieneStats ? (equipo.pg / equipo.pj).toFixed(3) : '.000';
 
-  const sortedTeams = [...equipos].sort((a, b) => b.pg - a.pg);
-  const pos = sortedTeams.findIndex(t => t.id === favoritoId) + 1;
+  const sortedTeams = [...equipos].sort((a, b) => (b.pg ?? 0) - (a.pg ?? 0));
+  const posIdx = equipoVivo ? sortedTeams.findIndex(t => t.id === favoritoId) : -1;
+  const pos = posIdx >= 0 ? posIdx + 1 : null;
 
   return (
     <div
@@ -30,12 +54,16 @@ export function FavoritoCard({ onSelectTeam }) {
         <div className="fav-info">
           <div className="fav-name" style={{ color: equipo.color }}>{equipo.name}</div>
           <div className="fav-stats-row">
+            {pos != null && (
+              <>
+                <span className="fav-stat">
+                  <strong style={{ color: equipo.color }}>#{pos}</strong> Posición
+                </span>
+                <span className="fav-stat-sep">·</span>
+              </>
+            )}
             <span className="fav-stat">
-              <strong style={{ color: equipo.color }}>#{pos}</strong> Posición
-            </span>
-            <span className="fav-stat-sep">·</span>
-            <span className="fav-stat">
-              <strong>{equipo.pg}G - {equipo.pp}P</strong>
+              <strong>{equipo.pg ?? 0}G - {equipo.pp ?? 0}P</strong>
             </span>
             <span className="fav-stat-sep">·</span>
             <span className="fav-stat">{pct}</span>

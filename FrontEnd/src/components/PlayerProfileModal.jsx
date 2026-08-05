@@ -1,6 +1,30 @@
-﻿import { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+﻿import { useMemo, useRef, useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
+
+// ⚠️ FIX: reemplaza a <ResponsiveContainer> de recharts. Esa librería mide el
+// contenedor con SU PROPIO ResizeObserver interno y, si el modal se cierra
+// justo cuando ese observer está por disparar, el callback llega tarde (via
+// un MessagePort, fuera del ciclo normal de React) e intenta leer el tamaño
+// de un contenedor que ya no existe — eso es lo que tiraba la app entera.
+// Con un ResizeObserver propio, controlado acá y desconectado en el cleanup
+// del useEffect, ese callback tardío directamente no puede dispararse más.
+function useContainerSize() {
+  const ref = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return [ref, size];
+}
 
 // ─── Share button ─────────────────────────────────────────────────────────────
 function ShareButton({ player, pts, reb, ast, addToast }) {
@@ -117,6 +141,8 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
     if (!historialGrafico.length) return null;
     return historialGrafico.reduce((b, r) => (r.pts > (b?.pts ?? -1) ? r : b), null);
   }, [historialGrafico]);
+
+  const [chartWrapRef, chartSize] = useContainerSize();
 
   if (!isOpen || !player) return null;
 
@@ -260,21 +286,26 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {chartData.length > 1 && (
                 <div style={{ marginBottom: 24 }}>
                   <div style={ST.sectionTitle}>📈 Puntos por fecha</div>
-                  {/* ⚠️ FIX: recharts tira un error asíncrono (vía su propio
-                      resize-observer interno) cuando el modal se cierra justo
-                      mientras el gráfico está recalculando tamaño — antes eso
-                      no se veía porque otro bug (hooks) crasheaba la app
-                      primero; al arreglar ese bug quedó expuesto este. Un
-                      ErrorBoundary local hace que, si vuelve a pasar, solo
-                      desaparezca el gráfico en vez de tumbar todo el sitio. */}
+                  {/* ⚠️ FIX: ya no se usa <ResponsiveContainer> de recharts —
+                      medía el contenedor con su propio ResizeObserver interno
+                      y, si el modal se cerraba justo cuando ese observer
+                      estaba por disparar, el callback llegaba tarde (fuera
+                      del ciclo de React) e intentaba leer un contenedor que
+                      ya no existía, tirando la app entera. Ahora el tamaño lo
+                      mide un ResizeObserver propio (useContainerSize, arriba)
+                      que se desconecta en el cleanup del useEffect, así ese
+                      callback tardío no puede volver a dispararse. El
+                      ErrorBoundary local queda igual, como red de contención
+                      adicional por si la librería falla por otro motivo. */}
                   <ErrorBoundary fallback={
                     <div style={{ padding: '20px', textAlign: 'center', color: '#6B7A99', fontSize: 13 }}>
                       No se pudo cargar el gráfico
                     </div>
                   }>
-                    <div style={{ width: '100%', height: 160 }}>
-                      <ResponsiveContainer width="100%" height="100%" debounce={100}>
-                        <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                    <div ref={chartWrapRef} style={{ width: '100%', height: 160 }}>
+                      {chartSize.width > 0 && chartSize.height > 0 && (
+                        <LineChart width={chartSize.width} height={chartSize.height} data={chartData}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                           <XAxis dataKey="match" stroke="#6b7280" tick={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}/>
                           <YAxis stroke="#6b7280" tick={{ fontFamily: 'Bebas Neue', fontSize: 15 }}/>
                           <Tooltip
@@ -285,7 +316,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
                             dot={{ r: 4, fill: '#FACC15', stroke: '#08101a', strokeWidth: 2 }}
                             activeDot={{ r: 6 }} name="PTS"/>
                         </LineChart>
-                      </ResponsiveContainer>
+                      )}
                     </div>
                   </ErrorBoundary>
                 </div>

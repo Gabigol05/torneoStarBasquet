@@ -2,6 +2,11 @@
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { GameCenterModal } from './GameCenterModal';
 
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
+// tarjetas de fixture/resultado/lider/bracket) — evita color-mix()/variables
+// CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 // Últimos N resultados de un equipo
 function getRacha(historial, n = 5) {
   if (!historial?.length) return [];
@@ -282,6 +287,8 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       const partidoFull = partidos?.find(p => p.id === h.partidoId);
                       const esLocal     = partidoFull?.equipo_local_id === team.id;
                       const fechaObj    = fechas?.find(f => f.id === h.fechaId);
+                      const rivalTeam   = allTeams?.find(t => t.name === h.rival);
+                      const cRival      = rivalTeam?.color ?? '#5A6B85';
 
                       // ⚠️ FIX: calcular pf/pc desde cuartos si son 0 y hay parciales
                       const pf = h.pf || (esLocal
@@ -294,8 +301,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       return (
                         <div key={idx}
                           className={`tp-match-card ${h.resultado === 'G' ? 'win' : 'loss'}`}
-                          style={{ '--team-color': team.color, cursor: h.partidoId ? 'pointer' : 'default' }}
+                          style={{ background: `linear-gradient(115deg, ${hexA(team.color, '55')}, #1C2535 45%, ${hexA(cRival, '55')})`, cursor: h.partidoId ? 'pointer' : 'default' }}
                           onClick={() => h.partidoId && setSelectedMatch(h.partidoId)}>
+                          <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
                           <div className="tp-match-header">
                             <span className="tp-match-date">
                               {fechaObj ? `Fecha ${fechaObj.numero}` : ''}
@@ -337,6 +345,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                               )}
                             </div>
                           )}
+                          </div>
                         </div>
                       );
                     })}
@@ -357,27 +366,34 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   </div>
                 ) : (
                   <div className="tp-matches-list">
-                    {team.proximos.map((p, idx) => (
-                      <div key={idx} className="tp-match-card upcoming" style={{ '--team-color': team.color }}>
-                        <div className="tp-match-header">
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span className="tp-match-date">
-                              {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
-                            </span>
-                            {p.hora && (
-                              <span style={{ fontSize: 12, color: '#F0B429', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: .5 }}>
-                                🕐 {p.hora}
+                    {team.proximos.map((p, idx) => {
+                      const rivalTeam = allTeams?.find(t => t.name === p.rival);
+                      const cRival    = rivalTeam?.color ?? '#5A6B85';
+                      return (
+                        <div key={idx} className="tp-match-card upcoming"
+                          style={{ background: `linear-gradient(115deg, ${hexA(team.color, '55')}, #1C2535 45%, ${hexA(cRival, '55')})` }}>
+                          <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
+                          <div className="tp-match-header">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span className="tp-match-date">
+                                {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
                               </span>
-                            )}
+                              {p.hora && (
+                                <span style={{ fontSize: 12, color: '#F0B429', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: .5 }}>
+                                  🕐 {p.hora}
+                                </span>
+                              )}
+                            </div>
+                            <span className="tp-match-result upcoming">PRÓXIMO</span>
                           </div>
-                          <span className="tp-match-result upcoming">PRÓXIMO</span>
+                          <div className="tp-match-info">
+                            <span className="tp-match-teams">vs {p.rival}</span>
+                            {p.lugar && <span className="tp-match-lugar">📍 {p.lugar}</span>}
+                          </div>
+                          </div>
                         </div>
-                        <div className="tp-match-info">
-                          <span className="tp-match-teams">vs {p.rival}</span>
-                          {p.lugar && <span className="tp-match-lugar">📍 {p.lugar}</span>}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -8,6 +8,11 @@ const CUPS = [
   { key: 'bronce', label: 'Copa de Bronce', color: '#CD7F32' },
 ];
 
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
+// tarjetas de fixture/resultado/lider/votaciones) — evita color-mix()/
+// variables CSS con alpha dinamico, que no anda bien en navegadores viejos.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 // Mismo criterio de orden que la tabla de posiciones (TorneoView): PTS -> DIF -> PF.
 function sortByStandings(equipos) {
   return [...(equipos ?? [])].sort((a, b) => {
@@ -55,14 +60,31 @@ function TeamSeed({ team, seed }) {
   if (!team) return <div className="bracket-team tbd">Por definir</div>;
   return (
     <div className="bracket-team">
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
         <img src={team.logo} alt="" decoding="async"
-          style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+          style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
+            border: `1.5px solid ${team.color}`, boxShadow: `0 0 6px ${hexA(team.color, '59')}` }}
           onError={e => { e.target.style.display = 'none'; }}/>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {seed}. {team.name}
         </span>
       </span>
+    </div>
+  );
+}
+
+// Wrapper de un cruce con equipos reales: degradado con los colores de ambos
+// equipos (mismo lenguaje que fixture/resultado/votaciones). Los cruces que
+// todavia son "TBD" en ambos lados siguen usando el .bracket-match plano.
+function BracketMatch({ teamA, teamB, seedA, seedB }) {
+  const cA = teamA?.color ?? '#5A6B85';
+  const cB = teamB?.color ?? '#5A6B85';
+  return (
+    <div className="bracket-match" style={{ background: `linear-gradient(115deg, ${hexA(cA, '55')}, #1C2535 45%, ${hexA(cB, '55')})` }}>
+      <div className="bracket-match-inner" style={{ background: `linear-gradient(135deg, ${hexA(cA, '14')}, #0B111C 45%, ${hexA(cB, '14')})` }}>
+        <TeamSeed team={teamA} seed={seedA}/>
+        <TeamSeed team={teamB} seed={seedB}/>
+      </div>
     </div>
   );
 }
@@ -104,10 +126,7 @@ function BracketProyectado({ pool, accentColor }) {
           <div className="bracket-round">
             <div className="bracket-round-label">Cuartos</div>
             {pairs.map(([a, b]) => (
-              <div key={a} className="bracket-match">
-                <TeamSeed team={seeded[a]} seed={a + 1}/>
-                <TeamSeed team={seeded[b]} seed={b + 1}/>
-              </div>
+              <BracketMatch key={a} teamA={seeded[a]} teamB={seeded[b]} seedA={a + 1} seedB={b + 1}/>
             ))}
           </div>
           <div className="bracket-round">
@@ -157,10 +176,7 @@ function BracketProyectado({ pool, accentColor }) {
           <div className="bracket-round">
             <div className="bracket-round-label">Semifinal</div>
             {pairs.map(([a, b]) => (
-              <div key={a} className="bracket-match">
-                <TeamSeed team={seeded[a]} seed={a + 1}/>
-                <TeamSeed team={seeded[b]} seed={b + 1}/>
-              </div>
+              <BracketMatch key={a} teamA={seeded[a]} teamB={seeded[b]} seedA={a + 1} seedB={b + 1}/>
             ))}
           </div>
           <div className="bracket-round">
@@ -197,10 +213,7 @@ function BracketProyectado({ pool, accentColor }) {
       <div className="bracket">
         <div className="bracket-round">
           <div className="bracket-round-label">Final</div>
-          <div className="bracket-match">
-            <TeamSeed team={seeded[0]} seed={1}/>
-            <TeamSeed team={seeded[1]} seed={2}/>
-          </div>
+          <BracketMatch teamA={seeded[0]} teamB={seeded[1]} seedA={1} seedB={2}/>
         </div>
       </div>
     </div>

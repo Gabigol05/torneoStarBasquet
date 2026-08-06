@@ -885,20 +885,22 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       {esFavorito(team.id) ? '*' : 'o'}
                     </button>
                     <div className="flip-card-inner">
-                      <div className="flip-card-front">
-                        <div className="fc-logo-wrap" style={{ borderColor: team.color }}>
-                          <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
-                            onError={e => { e.target.style.background = 'var(--dark4)'; }}/>
-                        </div>
-                        <h3 className="fc-name">{team.name}</h3>
-                        <div className="fc-subtitle">{team.jugadoras.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}</div>
-                        {team.pj > 0 && (
-                          <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
-                            {team.pg}G - {team.pp}P
+                      <div className="flip-card-front" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '70')}, #1C2535 65%)` }}>
+                        <div className="fc-front-inner" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '14')}, #0B111C 60%)` }}>
+                          <div className="fc-logo-wrap" style={{ borderColor: team.color, boxShadow: `0 0 16px ${hexA(team.color, '59')}` }}>
+                            <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
+                              onError={e => { e.target.style.background = 'var(--dark4)'; }}/>
                           </div>
-                        )}
+                          <h3 className="fc-name">{team.name}</h3>
+                          <div className="fc-subtitle" style={{ color: team.color }}>{team.jugadoras.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}</div>
+                          {team.pj > 0 && (
+                            <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
+                              {team.pg}G - {team.pp}P
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flip-card-back">
+                      <div className="flip-card-back" style={{ borderColor: team.color }}>
                         <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
                         <div className="fc-record-label">RECORD ACTUAL</div>
                         <div className="fc-record-val" style={{ color: team.color }}>{team.pg} - {team.pp}</div>

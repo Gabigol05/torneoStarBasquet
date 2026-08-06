@@ -1,6 +1,11 @@
 ﻿import { useMemo } from 'react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
+// resto de las tarjetas con color de equipo) — evita color-mix()/variables
+// CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 // ⚠️ FIX: se reemplazó recharts (LineChart/ResponsiveContainer) por este
 // mini gráfico SVG propio. Ni sacando ResponsiveContainer se pudo evitar el
 // crash — recharts sigue teniendo internamente un manejo de resize/estado
@@ -93,12 +98,16 @@ function PctBar({ value, color = '#F0B429' }) {
 }
 
 // ─── Card de stat ─────────────────────────────────────────────────────────────
-function StatCard({ val, lbl, color = '#EEF2F8', sub }) {
+function StatCard({ val, lbl, color = '#EEF2F8', sub, teamColor }) {
   return (
-    <div style={{ flex: 1, background: '#141C2A', border: '1px solid #1C2535', borderRadius: 8, padding: '10px 8px', textAlign: 'center', minWidth: 60 }}>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color, lineHeight: 1 }}>{val}</div>
-      <div style={{ color: '#6B7A99', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{lbl}</div>
-      {sub && <div style={{ color: '#4A566E', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+    <div style={{ flex: 1, minWidth: 60, borderRadius: 9, padding: 1,
+      background: teamColor ? `linear-gradient(160deg, ${hexA(teamColor, '50')}, #1C2535 65%)` : '#1C2535' }}>
+      <div style={{ borderRadius: 8, padding: '10px 8px', textAlign: 'center',
+        background: teamColor ? `linear-gradient(160deg, ${hexA(teamColor, '12')}, #0B111C 60%)` : '#141C2A' }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color, lineHeight: 1 }}>{val}</div>
+        <div style={{ color: '#6B7A99', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{lbl}</div>
+        {sub && <div style={{ color: '#4A566E', fontSize: 9, marginTop: 1 }}>{sub}</div>}
+      </div>
     </div>
   );
 }
@@ -215,14 +224,14 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
       <div className="pp-modal" onClick={e => e.stopPropagation()}>
 
         {/* ── Card superior ── */}
-        <div className="pp-card">
+        <div className="pp-card" style={{ background: `linear-gradient(160deg, ${hexA(player.color ?? '#FF4FA3', '40')}, #1C2535 70%)` }}>
           <div className="pp-card-actions">
             <ShareButton player={player} pts={pts} reb={reb} ast={ast} addToast={addToast}/>
             <button className="gc-close-btn" onClick={onClose}>&times;</button>
           </div>
 
           {/* Avatar */}
-          <div className="pp-avatar-container">
+          <div className="pp-avatar-container" style={{ borderColor: player.color ?? 'var(--fem2)', boxShadow: `0 0 22px ${hexA(player.color ?? '#FF4FA3', '70')}` }}>
             <div className="pp-avatar-initials"
               style={{ borderColor: player.color ?? 'var(--fem2)', color: player.color ?? 'var(--fem2)' }}>
               {(player.name ?? '').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
@@ -261,15 +270,19 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
             <>
               {/* Resumen general */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-                <StatCard val={pj}       lbl="Partidos"       color="#EEF2F8"/>
-                <StatCard val={mejorPts} lbl="Mejor partido"  color="#F0B429" sub={mejorPartido ? `vs ${mejorPartido.match}` : 'PTS'}/>
-                <StatCard val={valTotal} lbl="VAL total" color={valTotal >= 0 ? '#22D07A' : '#F04060'} sub={`${val} prom.`}/>
+                <StatCard val={pj}       lbl="Partidos"       color="#EEF2F8" teamColor={player.color}/>
+                <StatCard val={mejorPts} lbl="Mejor partido"  color="#F0B429" sub={mejorPartido ? `vs ${mejorPartido.match}` : 'PTS'} teamColor={player.color}/>
+                <StatCard val={valTotal} lbl="VAL total" color={valTotal >= 0 ? '#22D07A' : '#F04060'} sub={`${val} prom.`} teamColor={player.color}/>
               </div>
 
               {/* ── DESGLOSE DE TIROS ── */}
               <div style={{ marginBottom: 24 }}>
                 <div style={ST.sectionTitle}>🏀 Desglose de tiros</div>
-                <div style={{ background: '#0E1420', border: '1px solid #1C2535', borderRadius: 12, padding: '16px' }}>
+                <div style={{ padding: 1, borderRadius: 13,
+                  background: player.color ? `linear-gradient(160deg, ${hexA(player.color, '45')}, #1C2535 65%)` : '#1C2535' }}>
+                <div style={{
+                  background: player.color ? `linear-gradient(160deg, ${hexA(player.color, '0e')}, #0B111C 60%)` : '#0E1420',
+                  borderRadius: 12, padding: '16px' }}>
                   <TiroRow
                     label="Tiros Libres (TL)"
                     conv={scTotal} fall={sfTotal} pct={pctSimp}
@@ -301,6 +314,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
                       </div>
                     ))}
                   </div>
+                </div>
                 </div>
               </div>
 

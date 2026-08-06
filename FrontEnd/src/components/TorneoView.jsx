@@ -99,6 +99,15 @@ function EmptyState({ icon, title, sub, showIG = true }) {
   );
 }
 
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+function formatDiaLargo(fechaISO) {
+  if (!fechaISO) return '';
+  const d = new Date(fechaISO + 'T00:00:00');
+  const dia = DIAS_SEMANA[d.getDay()];
+  const corta = fechaISO.split('-').reverse().slice(0, 2).join('/');
+  return `${dia} ${corta}`;
+}
+
 function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
   const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
@@ -226,39 +235,47 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
   );
 }
 
+// Alpha en hex de 2 digitos, concatenado directo al color del equipo (ej:
+// "#D4A017" + "59" = ~35% opacidad). Evita color-mix()/variables CSS con
+// alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 function FixtureCard({ partido, equiposFem, fechas }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
   const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
   const fecha   = fechas.find(f => f.id === partido.fecha_id);
   if (!localEq || !visitEq) return null;
+  const diaCal = partido.fecha_partido ?? fecha?.fecha_dia;
+  const cL = localEq.color ?? '#8899BB', cV = visitEq.color ?? '#8899BB';
   return (
-    <div className="fixture-card">
-      <div className="fc2-header">
-        <span className="fc2-fecha">
-          {fecha ? `Fecha ${fecha.numero}` : 'Proximo'}
-          {(partido.fecha_partido ?? fecha?.fecha_dia) &&
-            ` - ${(partido.fecha_partido ?? fecha.fecha_dia).split('-').reverse().slice(0,2).join('/')}`}
-        </span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {partido.hora_inicio && (
-            <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, color: '#F0B429', letterSpacing: .5 }}>
-              {String(partido.hora_inicio).slice(0, 5)}
-            </span>
-          )}
-          {partido.lugar && <span className="fc2-lugar">{partido.lugar}</span>}
+    <div className="fixture-card-v2" style={{
+      background: `linear-gradient(115deg, ${hexA(cL,'55')}, #1C2535 40%, ${hexA(cV,'55')})`,
+    }}>
+      <div className="fc2v-inner" style={{
+        background: `linear-gradient(135deg, ${hexA(cL,'1a')}, #0B111C 45%, ${hexA(cV,'1a')})`,
+      }}>
+        <div className="fc2v-header">
+          <span className="fc2v-badge">
+            {fecha ? `Fecha ${fecha.numero}` : 'Proximo'}
+            {diaCal && ` · ${diaCal.split('-').reverse().slice(0,2).join('/')}`}
+            {partido.hora_inicio && ` · ${String(partido.hora_inicio).slice(0, 5)}`}
+          </span>
+          {partido.lugar && <span className="fc2v-lugar">📍 {partido.lugar}</span>}
         </div>
-      </div>
-      <div className="fc2-body">
-        <div className="fc2-equipo">
-          <img src={localEq.logo} alt={localEq.name} className="fc2-logo" loading="lazy"
-            onError={e => { e.target.style.display = 'none'; }}/>
-          <span className="fc2-nombre" style={{ color: localEq.color }}>{localEq.name}</span>
-        </div>
-        <div className="fc2-vs">VS</div>
-        <div className="fc2-equipo fc2-equipo-right">
-          <span className="fc2-nombre" style={{ color: visitEq.color }}>{visitEq.name}</span>
-          <img src={visitEq.logo} alt={visitEq.name} className="fc2-logo" loading="lazy"
-            onError={e => { e.target.style.display = 'none'; }}/>
+        <div className="fc2v-body">
+          <div className="fc2v-team">
+            <img src={localEq.logo} alt={localEq.name} className="fc2v-logo" loading="lazy"
+              style={{ borderColor: cL, boxShadow: `0 0 14px ${hexA(cL,'59')}` }}
+              onError={e => { e.target.style.display = 'none'; }}/>
+            <span className="fc2v-name">{localEq.name}</span>
+          </div>
+          <div className="fc2v-vs">VS</div>
+          <div className="fc2v-team">
+            <img src={visitEq.logo} alt={visitEq.name} className="fc2v-logo" loading="lazy"
+              style={{ borderColor: cV, boxShadow: `0 0 14px ${hexA(cV,'59')}` }}
+              onError={e => { e.target.style.display = 'none'; }}/>
+            <span className="fc2v-name">{visitEq.name}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -353,23 +370,40 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     );
   }, [equiposFemenino, searchJugadoras, filterEquipoId]);
 
+  // Una jornada ("Fecha 1") puede jugarse en mas de un dia calendario (ej: 8
+  // partidos el sabado, 3 el domingo) — antes esto solo ordenaba por
+  // fecha_id + hora_inicio, entonces un partido de las 10:00 del domingo
+  // aparecia ANTES que uno de las 20:00 del sabado, mezclando los dias.
+  // Ahora se ordena tambien por la fecha calendario real de cada partido.
+  const fechaDiaPorId = useMemo(() =>
+    Object.fromEntries(fechas.map(f => [f.id, f.fecha_dia])),
+    [fechas]);
+  const fechaCalendario = p => p.fecha_partido ?? fechaDiaPorId[p.fecha_id] ?? '';
+
   const partidosFinalizados = useMemo(() =>
     partidos
       .filter(p => p.estado === 'finalizado')
       .filter(p => !fechaSelId || p.fecha_id === fechaSelId)
-      .sort((a, b) => (b.fecha_id ?? 0) - (a.fecha_id ?? 0)),
-    [partidos, fechaSelId]);
+      .sort((a, b) => {
+        const df = (b.fecha_id ?? 0) - (a.fecha_id ?? 0);
+        if (df !== 0) return df;
+        const dd = fechaCalendario(b).localeCompare(fechaCalendario(a));
+        if (dd !== 0) return dd;
+        return (b.hora_inicio ?? '').localeCompare(a.hora_inicio ?? '');
+      }),
+    [partidos, fechaSelId, fechaDiaPorId]);
 
   const partidosPendientes = useMemo(() =>
     partidos
-      
       .filter(p => !fechaSelId || p.fecha_id === fechaSelId)
       .sort((a, b) => {
         const df = (a.fecha_id ?? 0) - (b.fecha_id ?? 0);
         if (df !== 0) return df;
+        const dd = fechaCalendario(a).localeCompare(fechaCalendario(b));
+        if (dd !== 0) return dd;
         return (a.hora_inicio ?? '99:99').localeCompare(b.hora_inicio ?? '99:99');
       }),
-    [partidos, fechaSelId]);
+    [partidos, fechaSelId, fechaDiaPorId]);
 
   const equiposOrdenados = useMemo(() =>
     [...equiposFemenino].sort((a, b) => {
@@ -713,18 +747,31 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       sub="Todavia no hay partidos cargados para esta fecha."/>
                   ) : (
                     <div className="fixture-grid">
-                      {partidosPendientes.map(p => (
-                        p.estado === 'finalizado' ? (
-                          <MatchResultCard key={p.id} partido={p}
-                            equiposFem={equiposFemenino}
-                            jugadorasMap={jugadorasMap}
-                            fechas={fechas}
-                            onClick={() => setSelectedMatch(p.id)}/>
-                        ) : (
-                          <FixtureCard key={p.id} partido={p}
-                            equiposFem={equiposFemenino} fechas={fechas}/>
-                        )
-                      ))}
+                      {(() => {
+                        let lastDia = null;
+                        return partidosPendientes.map(p => {
+                          const diaCal = fechaCalendario(p);
+                          const mostrarDivisor = diaCal && diaCal !== lastDia;
+                          lastDia = diaCal;
+                          return (
+                            <div key={p.id} style={{ display: 'contents' }}>
+                              {mostrarDivisor && (
+                                <div className="fixture-date-divider">{formatDiaLargo(diaCal)}</div>
+                              )}
+                              {p.estado === 'finalizado' ? (
+                                <MatchResultCard partido={p}
+                                  equiposFem={equiposFemenino}
+                                  jugadorasMap={jugadorasMap}
+                                  fechas={fechas}
+                                  onClick={() => setSelectedMatch(p.id)}/>
+                              ) : (
+                                <FixtureCard partido={p}
+                                  equiposFem={equiposFemenino} fechas={fechas}/>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   )
                 )}

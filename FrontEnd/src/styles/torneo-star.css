@@ -4861,26 +4861,83 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   flex-direction: column;
   gap: 12px;
 }
-.fixture-card {
-  background: #0E1420;
-  border: 1px solid #1C2535;
-  border-radius: 14px;
-  padding: 16px;
+.fixture-date-divider {
+  color: #8899BB;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 2px 2px;
+  border-bottom: 1px solid #1C2535;
+  margin-top: 4px;
 }
-.fc2-header {
+.fixture-date-divider:first-child { margin-top: 0; }
+
+/* Tarjeta de fixture con degradado sutil de los colores de cada equipo,
+   logos con aro/glow del color del equipo y fecha/hora como pildora —
+   reemplaza la version plana anterior (fondo negro liso, texto suelto). */
+.fixture-card-v2 {
+  border-radius: 16px;
+  padding: 1px;
+}
+.fc2v-inner {
+  border-radius: 15px;
+  padding: 16px 18px;
+}
+.fc2v-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-.fc2-fecha { color: #F0B429; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-family: 'Bebas Neue', sans-serif; }
-.fc2-lugar { color: #6B7A99; font-size: 12px; }
-.fc2-body  { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.fc2-equipo { display: flex; align-items: center; gap: 10px; flex: 1; }
-.fc2-equipo-right { flex-direction: row-reverse; justify-content: flex-start; }
-.fc2-logo  { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-.fc2-nombre { font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: .5px; }
-.fc2-vs    { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: #4A566E; letter-spacing: 2px; padding: 0 8px; flex-shrink: 0; }
+.fc2v-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(240,180,41,.12);
+  border: 1px solid rgba(240,180,41,.3);
+  color: #F0B429;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.fc2v-lugar { color: #6B7A99; font-size: 12px; }
+.fc2v-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fc2v-team { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.fc2v-logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: #0E1420; border: 2.5px solid; }
+.fc2v-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  color: #EEF2F8;
+  letter-spacing: .5px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.fc2v-vs {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #141C2A;
+  border: 1px solid #2C3A52;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  color: #F0B429;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .fc2v-logo { width: 46px; height: 46px; }
+  .fc2v-name { font-size: 15px; }
+}
 
 /* ══ PLAYER ITEM STATS (mini stats en card de jugadora) ═══════ */
 .player-item-stats {

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 
-async function recalcularTodos(onLog, tablas) {
+export async function recalcularTodos(onLog, tablas) {
   onLog('📋 Obteniendo lista de jugadoras con stats...');
 
   const idField = tablas.jugadorIdField;

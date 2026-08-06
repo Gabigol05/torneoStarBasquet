@@ -9,6 +9,8 @@ import StatsEditor from './StatsEditor';
 import UploadHistory from './UploadHistory';
 import RecalcularStats from './RecalcularStats';
 import EncuestasManager from './EncuestasManager';
+import AliasesManager from './AliasesManager';
+import MergeJugadores from './MergeJugadores';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
 const NAV = [
@@ -17,6 +19,8 @@ const NAV = [
   { id:'partidos',   icon:'📅', label:'Partidos',          desc:'Fixture y resultados'     },
   { id:'stats',      icon:'✏️',  label:'Editar Stats',     desc:'Corrección manual'        },
   { id:'recalcular', icon:'🔄', label:'Recalcular',        desc:'Reprocessar promedios'    },
+  { id:'alias',      icon:'🔗', label:'Alias',             desc:'Ver/borrar nombres vinculados' },
+  { id:'fusionar',   icon:'🧬', label:'Fusionar jugadores', desc:'Unir duplicados del roster' },
   { id:'encuestas',  icon:'🗳️', label:'Encuestas',         desc:'Votaciones publicas'      },
 ];
 
@@ -161,7 +165,7 @@ function Sidebar({ sec, setSec, logout, realtimeStatus, onClose }) {
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────────
-const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular'];
+const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar'];
 
 export default function AdminPanel() {
   const { logout }      = useAuth();
@@ -229,6 +233,8 @@ export default function AdminPanel() {
           {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'stats'      && <StatsEditor categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'recalcular' && <RecalcularStats categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'alias'      && <AliasesManager categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'fusionar'   && <MergeJugadores categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'encuestas'  && <EncuestasManager />}
         </div>
       </main>

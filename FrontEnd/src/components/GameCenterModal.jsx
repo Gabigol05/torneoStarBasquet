@@ -3,6 +3,11 @@ import { supabase, isConfigured } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
+// resto de las tarjetas con color de equipo) — evita color-mix()/variables
+// CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 function Skeleton({ w = '100%', h = 16, radius = 4, style = {} }) {
   return (
     <div style={{
@@ -146,7 +151,9 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
 
         {!loading && data && (
           <>
-            <div className="gc-header">
+            <div className="gc-header" style={{
+              background: `linear-gradient(120deg, ${hexA(data.eqLocal?.color ?? '#8899BB', '40')}, #1C2535 45%, ${hexA(data.eqVisit?.color ?? '#8899BB', '40')})`,
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{
                   fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 11, letterSpacing: 1.5,
@@ -163,7 +170,8 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
               <div className="gc-score-board">
                 <div className="gc-team">
                   <img src={data.eqLocal?.logo} alt={data.eqLocal?.name}
-                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8 }}
+                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8,
+                      border: `2px solid ${data.eqLocal?.color ?? '#8899BB'}`, boxShadow: `0 0 14px ${hexA(data.eqLocal?.color ?? '#8899BB', '59')}` }}
                     onError={e => { e.target.style.display='none'; }}/>
                   <div className="gc-team-name" style={{ color: data.eqLocal?.color }}>
                     {data.eqLocal?.name}
@@ -176,7 +184,8 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 </div>
                 <div className="gc-team">
                   <img src={data.eqVisit?.logo} alt={data.eqVisit?.name}
-                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8 }}
+                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8,
+                      border: `2px solid ${data.eqVisit?.color ?? '#8899BB'}`, boxShadow: `0 0 14px ${hexA(data.eqVisit?.color ?? '#8899BB', '59')}` }}
                     onError={e => { e.target.style.display='none'; }}/>
                   <div className="gc-team-name" style={{ color: data.eqVisit?.color }}>
                     {data.eqVisit?.name}
@@ -222,11 +231,15 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
             )}
 
             <div style={{ display:'flex', gap:6, marginBottom:20, borderBottom: '1px solid rgba(255,255,255,.08)', paddingBottom: 2 }}>
-              {[['resumen','Resumen'],['local', data.eqLocal?.name ?? 'Local'],['visit', data.eqVisit?.name ?? 'Visit']].map(([k,l]) => (
+              {[
+                ['resumen', 'Resumen', '#F0B429'],
+                ['local', data.eqLocal?.name ?? 'Local', data.eqLocal?.color ?? '#F0B429'],
+                ['visit', data.eqVisit?.name ?? 'Visit', data.eqVisit?.color ?? '#F0B429'],
+              ].map(([k,l,c]) => (
                 <button key={k} onClick={() => setTab(k)}
                   style={{ flex:1, padding:'9px 4px', background:'transparent',
-                    border:'none', borderBottom: tab===k ? '2px solid #F0B429' : '2px solid transparent',
-                    color:tab===k?'#EEF2F8':'#6b7a99', cursor:'pointer', fontSize:12.5, fontWeight: 700,
+                    border:'none', borderBottom: tab===k ? `2px solid ${c}` : '2px solid transparent',
+                    color:tab===k?c:'#6b7a99', cursor:'pointer', fontSize:12.5, fontWeight: 700,
                     fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform: 'uppercase' }}>
                   {l}
                 </button>
@@ -234,7 +247,10 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
             </div>
 
             {tab === 'resumen' && (
-              <div>
+              <div style={{ padding: 1, borderRadius: 13,
+                background: `linear-gradient(160deg, ${hexA(data.eqLocal?.color ?? '#8899BB', '35')}, #1C2535 40%, ${hexA(data.eqVisit?.color ?? '#8899BB', '35')})` }}>
+                <div style={{ borderRadius: 12, padding: '14px 16px',
+                  background: `linear-gradient(160deg, ${hexA(data.eqLocal?.color ?? '#8899BB', '0d')}, #0B111C 45%, ${hexA(data.eqVisit?.color ?? '#8899BB', '0d')})` }}>
                 <StatBar label="% TL"     a={data.partido.pct_simples_local} b={data.partido.pct_simples_visit} colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                 <StatBar label="% 2P"     a={data.partido.pct_dobles_local}  b={data.partido.pct_dobles_visit}  colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
                 <StatBar label="% 3P"     a={data.partido.pct_triples_local} b={data.partido.pct_triples_visit} colorA={data.eqLocal?.color} colorB={data.eqVisit?.color}/>
@@ -253,24 +269,29 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                     </>
                   );
                 })()}
+                </div>
               </div>
             )}
 
-            {(tab === 'local' || tab === 'visit') && (
-              <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            {(tab === 'local' || tab === 'visit') && (() => {
+              const eqActivo = tab === 'local' ? data.eqLocal : data.eqVisit;
+              const cAct = eqActivo?.color ?? '#8899BB';
+              return (
+              <div style={{ overflowX:'auto', padding: 1, borderRadius: 10,
+                background: `linear-gradient(160deg, ${hexA(cAct, '35')}, #1C2535 60%)` }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, borderRadius: 9, overflow: 'hidden' }}>
                   <thead>
                     <tr>
                       {['#', esMasc ? 'Jugador' : 'Jugadora', 'PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
-                        <th key={h} style={{ background:'#141C2A', color:'#6B7A99', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
+                        <th key={h} style={{ background: hexA(cAct, '1f'), color:'#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(tab === 'local' ? data.statsLocal : data.statsVisit).map((r, i) => {
-                      const eq = tab === 'local' ? data.eqLocal : data.eqVisit;
+                      const eq = eqActivo;
                       return (
-                        <tr key={r.jugadora_id} style={{ background: i%2===0 ? '#0E1420':'#141C2A' }}>
+                        <tr key={r.jugadora_id} style={{ background: `linear-gradient(90deg, ${hexA(cAct, i%2===0 ? '14' : '0a')}, #0B111C 60%)` }}>
                           <td style={{ padding:'6px 8px', textAlign:'center', color:'#6B7A99' }}>{r.numero ?? '-'}</td>
                           <td style={{ padding:'6px 8px', textAlign:'left', color: eq?.color, fontWeight:600, minWidth:120, whiteSpace:'nowrap' }}>
                             {r.nombre.split(' ').slice(0,2).join(' ')}
@@ -293,7 +314,8 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
           </>
         )}
 

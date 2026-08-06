@@ -181,7 +181,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   {filteredJugadoras.map((j, idx) => (
                     <div key={j.id}
                       className={`tp-player-card reveal-on-scroll delay-${Math.min((idx % 5) + 1, 5)}`}
-                      style={{ '--team-color': team.color }}
+                      style={{ '--team-color': team.color, background: `linear-gradient(160deg, ${hexA(team.color, '60')}, #1C2535 60%)` }}
                       onClick={() => handleSelectPlayer({
                         id:          j.id,
                         name:        j.nombre,
@@ -219,9 +219,10 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                         sc_prom:  j.sc_prom  ?? 0, dc_prom: j.dc_prom ?? 0,
                         tc_prom:  j.tc_prom  ?? 0,
                       })}>
+                      <div className="tp-player-card-inner" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '12')}, #0B111C 55%)` }}>
 
                       {/* Avatar con iniciales en lugar de SVG genérico */}
-                      <div className="tp-player-avatar" style={{ borderColor: team.color, color: team.color, background: `${team.color}15` }}>
+                      <div className="tp-player-avatar" style={{ borderColor: team.color, color: team.color, background: `${team.color}15`, boxShadow: `0 0 12px ${hexA(team.color, '59')}` }}>
                         <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: '13px', fontWeight: 700 }}>
                           {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
                         </span>
@@ -256,6 +257,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                             <span className="tp-stat-mini-lbl">{lbl}</span>
                           </div>
                         ))}
+                      </div>
                       </div>
                     </div>
                   ))}
@@ -462,13 +464,15 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                     { lbl: 'Efectividad',      val: pct },
                     { lbl: esFem ? 'Jugadoras' : 'Jugadores', val: team.jugadoras.length },
                   ].map((s, i) => (
-                    <div key={i} className="tp-team-stat-box">
-                      <div className="tp-team-stat-val" style={{ color: team.color }}>
-                        {isLoadingStats && typeof s.val === 'number' && s.val === 0
-                          ? <StatSkeleton/>
-                          : s.val}
+                    <div key={i} className="tp-team-stat-box" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '60')}, #1C2535 60%)` }}>
+                      <div className="tp-team-stat-box-inner" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '12')}, #0B111C 55%)` }}>
+                        <div className="tp-team-stat-val" style={{ color: team.color }}>
+                          {isLoadingStats && typeof s.val === 'number' && s.val === 0
+                            ? <StatSkeleton/>
+                            : s.val}
+                        </div>
+                        <div className="tp-team-stat-lbl">{s.lbl}</div>
                       </div>
-                      <div className="tp-team-stat-lbl">{s.lbl}</div>
                     </div>
                   ))}
                 </div>

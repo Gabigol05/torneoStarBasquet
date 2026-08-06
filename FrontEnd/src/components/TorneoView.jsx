@@ -565,7 +565,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           }
                           rows.push(
                             <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
-                              style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
+                              style={{ background: `linear-gradient(90deg, ${hexA(t.color ?? band.color, '26')}, transparent 55%), ${band.tint}`, boxShadow: `inset 3px 0 0 ${band.color}` }}>
                               <td className="team-cell">
                                 <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
                                 <img src={t.logo} alt={t.name} decoding="async"
@@ -658,7 +658,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                               }
                               rows.push(
                                 <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
-                                  style={{ background: band.tint, boxShadow: `inset 3px 0 0 ${band.color}` }}>
+                                  style={{ background: `linear-gradient(90deg, ${hexA(t.color ?? band.color, '26')}, transparent 55%), ${band.tint}`, boxShadow: `inset 3px 0 0 ${band.color}` }}>
                                   <td className="team-cell">
                                     <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
                                     <img src={t.logo} alt={t.name} decoding="async"
@@ -813,10 +813,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   {isLoadingStats ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <div key={i} className="player-item">
-                        <Skel w={44} h={44} radius={22} mb={0} style={{ flexShrink: 0 }}/>
-                        <div style={{ flex: 1 }}>
-                          <Skel w="70%" h={14} mb={6}/>
-                          <Skel w="50%" h={11} mb={0}/>
+                        <div className="player-item-inner">
+                          <Skel w={44} h={44} radius={22} mb={0} style={{ flexShrink: 0 }}/>
+                          <div style={{ flex: 1 }}>
+                            <Skel w="70%" h={14} mb={6}/>
+                            <Skel w="50%" h={11} mb={0}/>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -829,6 +831,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   ) : (
                     jugadorasFiltradas.map(j => (
                       <div className="player-item" key={j.id}
+                        style={{ background: `linear-gradient(160deg, ${hexA(j.equipoColor, '60')}, #1C2535 60%)` }}
                         onClick={() => handleSelectPlayer({
                           ...j,
                           id: j.id, name: j.nombre, team: j.equipo,
@@ -840,8 +843,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           sc_prom:  j.sc_prom  ?? 0, dc_prom: j.dc_prom ?? 0,
                           tc_prom:  j.tc_prom  ?? 0,
                         })}>
+                        <div className="player-item-inner" style={{ background: `linear-gradient(160deg, ${hexA(j.equipoColor, '12')}, #0B111C 55%)` }}>
                         <div className="player-item-avatar"
-                          style={{ background: `${j.equipoColor}22`, border: `1.5px solid ${j.equipoColor}55` }}>
+                          style={{ background: `${j.equipoColor}22`, border: `1.5px solid ${j.equipoColor}`, boxShadow: `0 0 10px ${hexA(j.equipoColor, '59')}` }}>
                           <span style={{ fontFamily: "'Barlow Condensed'", fontSize: '14px', fontWeight: '700', color: j.equipoColor }}>
                             {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
                           </span>
@@ -858,6 +862,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                               <span>{j.ast_prom} AST</span>
                             </div>
                           )}
+                        </div>
                         </div>
                       </div>
                     ))

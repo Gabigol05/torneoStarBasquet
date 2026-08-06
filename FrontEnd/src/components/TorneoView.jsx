@@ -775,7 +775,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     <div style={{ gridColumn: '1/-1' }}>
                       <EmptyState icon="?"
                         title={searchJugadoras ? `Sin resultados para "${searchJugadoras}"` : (mode === 'femenino' ? 'Sin jugadoras' : 'Sin jugadores')}
-                        sub={mode === 'femenino' ? 'Proba con otro nombre o equipo' : 'Los planteles se van a ir cargando desde el panel'} showIG={false}/>
+                        sub={mode === 'femenino' ? 'Proba con otro nombre o equipo' : 'Van a aparecer apenas se juegue la primera fecha'} showIG={false}/>
                     </div>
                   ) : (
                     jugadorasFiltradas.map(j => (

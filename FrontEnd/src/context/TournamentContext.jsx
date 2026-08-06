@@ -1,4 +1,5 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useRef } from 'react';
+import { trackEvent } from '../lib/analytics.js';
 
 const TournamentContext = createContext();
 const STORAGE_KEY = 'star_basquet_mode';
@@ -18,6 +19,7 @@ export function TournamentProvider({ children }) {
   // hay un deploy nuevo) te mandaba de vuelta al inicio del lado masculino.
   // Ahora se guarda el ultimo modo elegido y se restaura al cargar.
   const [mode, setMode] = useState(readStoredMode); // 'masculino' | 'femenino'
+  const isFirstRender = useRef(true);
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'masculino' ? 'femenino' : 'masculino'));
@@ -28,6 +30,15 @@ export function TournamentProvider({ children }) {
     document.body.classList.remove('theme-masculino', 'theme-femenino');
     document.body.classList.add(`theme-${mode}`);
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
+
+    // No contar la restauracion inicial (leida de localStorage) como un
+    // "cambio" de torneo — solo eventos de cambio real, para saber que
+    // categoria mira mas la gente.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    } else {
+      trackEvent('switch_tournament_mode', { mode });
+    }
   }, [mode]);
 
   return (

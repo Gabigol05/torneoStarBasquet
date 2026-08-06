@@ -1,8 +1,24 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { PageHome } from './components/PageHome.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { AuthProvider, useAuth } from './admin/AuthContext.jsx';
+import { initAnalytics, trackPageview } from './lib/analytics.js';
+
+// Google Analytics: inicializa el script una vez y manda una "pageview"
+// manual en cada cambio de ruta (necesario en una SPA, sino GA4 solo ve
+// la carga inicial). No hace nada si no hay VITE_GA_MEASUREMENT_ID seteado.
+function AnalyticsTracker() {
+  const location = useLocation();
+
+  useEffect(() => { initAnalytics(); }, []);
+
+  useEffect(() => {
+    trackPageview(location.pathname + location.search);
+  }, [location]);
+
+  return null;
+}
 
 // El panel admin (con el parser de Excel, xlsx incluido, ~500KB+) antes se
 // importaba de forma estática y quedaba metido en el bundle principal, así
@@ -43,6 +59,7 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
+          <AnalyticsTracker />
           <Routes>
             <Route path="/"       element={<PageHome />} />
             <Route path="/admin"  element={<AdminRoute />} />

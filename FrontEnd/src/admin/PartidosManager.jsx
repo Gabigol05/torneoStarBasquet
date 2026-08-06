@@ -12,7 +12,7 @@ const EMPTY_PARTIDO = {
   puntos_local:'',    puntos_visit:'',
   q1_local:'', q2_local:'', q3_local:'', q4_local:'', ot_local:'',
   q1_visit:'', q2_visit:'', q3_visit:'', q4_visit:'', ot_visit:'',
-  fecha_id:'', hora_inicio:'', lugar:'', estado:'pendiente',
+  fecha_id:'', hora_inicio:'', lugar:'', estado:'pendiente', fecha_partido:'',
 };
 
 function LogoEq({ id, equipos, size=28 }) {
@@ -155,7 +155,16 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
           <label style={F.label}>LUGAR (opcional)</label>
           {inp('lugar', 'Club, cancha...')}
         </div>
+        <div style={F.group}>
+          <label style={F.label}>FECHA DE ESTE PARTIDO (opcional)</label>
+          <input type="date" value={form.fecha_partido ?? ''}
+            onChange={e => setForm(f => ({...f, fecha_partido:e.target.value}))}
+            style={F.input}/>
+        </div>
       </div>
+      {/* Solo hace falta completar esto si la jornada se juega en mas de un
+          dia (ej: algunos partidos el sabado, otros el domingo) — si no, con
+          la fecha de la jornada alcanza y este campo se puede dejar vacio. */}
 
       {/* Sugerir encuesta */}
       {!editId && form.estado !== 'finalizado' && (
@@ -183,14 +192,14 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
   const [partidos,     setPartidos]     = useState([
-    { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' },
+    { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'' },
   ]);
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
   const [crearEncuestas, setCrearEncuestas] = useState(true);
   const { confirm: confirmDup, ConfirmDialog: ConfirmDialogFixture } = useConfirm();
 
-  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'' }]);
+  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
   const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => j===i?{...r,[field]:val}:r));
 
@@ -206,13 +215,19 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
     setLoading(true);
     try {
       // 1. Crear/obtener fecha
+      // Si ya existe una fecha con este numero (ej: se esta cargando un
+      // segundo lote de partidos de la misma jornada, en otro dia) y no se
+      // puso una FECHA CALENDARIO nueva, no se toca el fecha_dia existente —
+      // antes esto se pisaba siempre, y una jornada jugada en dos dias
+      // terminaba con todos los partidos mostrando el ultimo dia cargado.
+      const fechaPayload = {
+        numero:      Number(jornada),
+        descripcion: descripcion || `Fecha ${jornada}`,
+      };
+      if (fechaDia) fechaPayload.fecha_dia = fechaDia;
       const { data:fd, error:fErr } = await supabase
         .from(tablas.fechas)
-        .upsert({
-          numero:      Number(jornada),
-          fecha_dia:   fechaDia || null,
-          descripcion: descripcion || `Fecha ${jornada}`,
-        }, { onConflict:'numero' })
+        .upsert(fechaPayload, { onConflict:'numero' })
         .select('id').single();
       if (fErr) throw fErr;
 
@@ -241,6 +256,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
         equipo_visit_id: p.equipo_visit_id,
         lugar:           p.lugar || null,
         hora_inicio:     p.hora_inicio || null,
+        fecha_partido:   p.fecha_partido || null,
         estado:          'pendiente',
       }));
       const { data: inserted, error:pErr } = await supabase
@@ -371,10 +387,20 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
                   onChange={e => updatePartido(i,'lugar',e.target.value)}
                   style={F.input}/>
               </div>
+              <div style={{ flex:'0 0 150px', minWidth:130 }}>
+                <input type="date"
+                  value={p.fecha_partido ?? ''}
+                  onChange={e => updatePartido(i,'fecha_partido',e.target.value)}
+                  style={F.input}
+                  title="Solo si este partido se juega otro día que el resto de la fecha"/>
+              </div>
             </div>
           </div>
         ))}
       </div>
+      <p style={{ color:'#4A566E', fontSize:11, margin:'-8px 0 16px' }}>
+        La fecha calendario de arriba aplica a toda la jornada. Si algún partido puntual se juega otro día (ej: la jornada arranca el sábado y termina el domingo), completale su propia fecha en el campo de la derecha de esa fila.
+      </p>
 
       {/* Agregar partido */}
       {partidos.length < 10 && (
@@ -502,6 +528,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         fecha_id:        form.fecha_id || null,
         lugar:           form.lugar    || null,
         hora_inicio:     form.hora_inicio || null,
+        fecha_partido:   form.fecha_partido || null,
         estado:          form.estado,
         q1_local: Number(form.q1_local||0), q2_local: Number(form.q2_local||0),
         q3_local: Number(form.q3_local||0), q4_local: Number(form.q4_local||0), ot_local: Number(form.ot_local||0),
@@ -543,6 +570,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
     setForm({
       equipo_local_id: p.equipo_local_id??'', equipo_visit_id: p.equipo_visit_id??'',
       fecha_id: p.fecha_id??'', hora_inicio: p.hora_inicio??'', lugar: p.lugar??'', estado: p.estado??'pendiente',
+      fecha_partido: p.fecha_partido??'',
       q1_local:p.q1_local??'', q2_local:p.q2_local??'', q3_local:p.q3_local??'', q4_local:p.q4_local??'', ot_local:p.ot_local??'',
       q1_visit:p.q1_visit??'', q2_visit:p.q2_visit??'', q3_visit:p.q3_visit??'', q4_visit:p.q4_visit??'', ot_visit:p.ot_visit??'',
     });
@@ -747,6 +775,11 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                           </div>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                             <EstadoBadge estado={p.estado}/>
+                            {p.fecha_partido && (
+                              <span style={{ fontSize:11, color:'#4FA3FF', background:'rgba(79,163,255,.1)', border:'1px solid rgba(79,163,255,.25)', borderRadius:4, padding:'1px 6px' }}>
+                                📅 {new Date(p.fecha_partido + 'T00:00:00').toLocaleDateString('es-AR')}
+                              </span>
+                            )}
                             {p.hora_inicio && <span style={{ fontSize:11, color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:14 }}>🕐 {p.hora_inicio.slice(0,5)}</span>}
                     {p.lugar && <span style={{ fontSize:11, color:'#4A566E' }}>📍 {p.lugar}</span>}
                             {/* Parciales */}

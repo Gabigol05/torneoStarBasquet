@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS partidos_femenino (
   creado_en        TIMESTAMPTZ DEFAULT now(),
   actualizado_en   TIMESTAMPTZ DEFAULT now()
 );
+-- Fecha calendario propia del partido, independiente de fechas_femenino.fecha_dia.
+-- Una "fecha"/jornada puede jugarse en mas de un dia (ej: 8 partidos el sabado,
+-- 3 el domingo) — sin esto, la unica fecha disponible es la de la jornada
+-- entera, compartida por todos sus partidos.
+ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS fecha_partido DATE;
 
 -- Columnas que pueden faltar si la tabla ya existía
 ALTER TABLE partidos_femenino ADD COLUMN IF NOT EXISTS fecha_id          INT REFERENCES fechas_femenino(id);

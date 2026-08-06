@@ -127,7 +127,11 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span className="rc-fecha">
             {fecha ? `Fecha ${fecha.numero}` : 'Partido'}
-            {fecha?.fecha_dia && ` - ${fecha.fecha_dia.split('-').reverse().slice(0,2).join('/')}`}
+            {/* Un partido puede tener su propia fecha calendario distinta a
+                la de la jornada (ej: jornada jugada en dos dias) — se prioriza
+                esa sobre la fecha general de la jornada. */}
+            {(partido.fecha_partido ?? fecha?.fecha_dia) &&
+              ` - ${(partido.fecha_partido ?? fecha.fecha_dia).split('-').reverse().slice(0,2).join('/')}`}
           </span>
           {partido.hora_inicio && (
             <span style={{ fontSize: 11, color: '#4A566E', fontFamily: "'Barlow Condensed',sans-serif" }}>
@@ -232,7 +236,8 @@ function FixtureCard({ partido, equiposFem, fechas }) {
       <div className="fc2-header">
         <span className="fc2-fecha">
           {fecha ? `Fecha ${fecha.numero}` : 'Proximo'}
-          {fecha?.fecha_dia && ` - ${fecha.fecha_dia.split('-').reverse().slice(0,2).join('/')}`}
+          {(partido.fecha_partido ?? fecha?.fecha_dia) &&
+            ` - ${(partido.fecha_partido ?? fecha.fecha_dia).split('-').reverse().slice(0,2).join('/')}`}
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {partido.hora_inicio && (

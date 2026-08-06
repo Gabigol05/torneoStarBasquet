@@ -58,6 +58,11 @@ CREATE TABLE IF NOT EXISTS partidos_masculino (
   creado_en        TIMESTAMPTZ DEFAULT now(),
   actualizado_en   TIMESTAMPTZ DEFAULT now()
 );
+-- Fecha calendario propia del partido, independiente de fechas_masculino.fecha_dia.
+-- Una "fecha"/jornada puede jugarse en mas de un dia (ej: 8 partidos el sabado,
+-- 3 el domingo) — sin esto, la unica fecha disponible es la de la jornada
+-- entera, compartida por todos sus partidos.
+ALTER TABLE partidos_masculino ADD COLUMN IF NOT EXISTS fecha_partido DATE;
 
 -- Reutiliza la misma función trigger que partidos_femenino (es genérica,
 -- solo referencia columnas NEW.*, no nombres de tabla — ver create_tables.sql)

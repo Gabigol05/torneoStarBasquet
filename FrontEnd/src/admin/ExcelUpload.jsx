@@ -327,6 +327,11 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const [fileName,  setFileName]  = useState('');
   const [jornada,   setJornada]   = useState('');
   const [lugar,     setLugar]     = useState('');
+  // Fecha calendario de ESTE partido puntual — una jornada puede jugarse en
+  // mas de un dia (ej: 8 partidos el sabado y 3 el domingo, todos "Fecha 1"),
+  // asi que no alcanza con la fecha de la jornada. Opcional: si se deja vacio
+  // el partido sigue mostrando la fecha de la jornada como antes.
+  const [fechaPartido, setFechaPartido] = useState('');
   const [log,       setLog]       = useState([]);
   const [duplicate, setDuplicate] = useState(null);
   const fileRef = useRef();
@@ -435,7 +440,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           q4_visit:m.visit.q4, ot_visit:m.visit.ot,
           pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
           pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
-          lugar:lugar||null, estado:'finalizado',
+          lugar:lugar||null, fecha_partido:fechaPartido||null, estado:'finalizado',
         })
         .select('id').single();
       if (pErr) throw new Error(`Partido: ${pErr.message}`);
@@ -595,7 +600,15 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
               <input type="text" value={lugar}
                 onChange={e=>setLugar(e.target.value)} style={s.input} placeholder="Club, cancha..."/>
             </div>
+            <div style={s.metaGroup}>
+              <label style={s.label}>FECHA DE ESTE PARTIDO (opcional)</label>
+              <input type="date" value={fechaPartido}
+                onChange={e=>setFechaPartido(e.target.value)} style={s.input}/>
+            </div>
           </div>
+          <p style={{ color:'#4A566E', fontSize:11, margin:'-8px 0 12px' }}>
+            Completala solo si esta fecha se juega en mas de un dia (ej: algunos partidos el sabado y otros el domingo). Si la dejás vacía, se usa la fecha general de la jornada.
+          </p>
           <div style={s.dropZone} onClick={()=>fileRef.current.click()}
             onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e);}}>
             <div style={{fontSize:52,marginBottom:10}}>📁</div>

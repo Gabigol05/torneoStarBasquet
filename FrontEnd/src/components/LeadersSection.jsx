@@ -23,6 +23,11 @@ function calcLiders(equipos, statKey, promKey, minAttempts, n = 8) {
   return all.sort((a, b) => b.val - a.val).slice(0, n);
 }
 
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
+// tarjetas de fixture/resultado/votaciones) — evita color-mix()/variables
+// CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 function getInitials(nombre) {
   return (nombre ?? '?').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
@@ -31,9 +36,19 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
   const lideres = calcLiders(equipos, statKey, promKey, minAttempts);
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
-  const accent = color ?? 'var(--fem2)';
+  // Antes la card se coloreaba segun la CATEGORIA de stat (dorado para
+  // Puntos, azul para Rebotes, etc.), sin relacion con quien lidera. Ahora
+  // usa el color del EQUIPO del lider — mismo lenguaje visual que fixture,
+  // resultado y votaciones.
+  const accent = top?.color ?? color ?? 'var(--fem2)';
   const [flipped, setFlipped] = useState(false);
   const modeClass = mode === 'masculino' ? 'masc' : 'fem';
+  const cardBg = hayDatos ? {
+    background: `linear-gradient(160deg, ${hexA(accent,'70')}, #1C2535 65%)`,
+  } : undefined;
+  const innerBg = hayDatos ? {
+    background: `linear-gradient(160deg, ${hexA(accent,'14')}, #0B111C 60%)`,
+  } : undefined;
 
   if (!hayDatos) {
     return (
@@ -58,70 +73,76 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
     >
       <div className={`leader-flip-inner${flipped ? ' is-flipped' : ''}`}>
 
-        <div className={`leader-flip-face front leader-card ${modeClass}`}>
-          <div className="lc-stat-label">{emoji} {titulo}</div>
-          <div className="lc-top">
-            <div className="lc-avatar"
-              style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}55` }}>
-              {getInitials(top.nombre)}
-            </div>
-            <div>
-              <div className="lc-player-name">{(top.nombre ?? '').split(' ').slice(0, 2).join(' ')}</div>
-              <div className="lc-team-name">{top.equipo}</div>
-            </div>
-          </div>
-          <div className="lc-big-num" style={{ color: accent }}>{top.val}</div>
-          <div className="lc-sub">{sub}</div>
-          {top.prom !== null && (
-            <div className="lc-context">
-              {top.pj} PJ · {top.prom} prom/partido
-            </div>
-          )}
-          <div className="lc-strength-track">
-            <div className="lc-strength-fill" style={{ width: '100%', background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
-          </div>
-          <div className="lc-list">
-            {lideres.slice(1, 3).map((l, i) => (
-              <div className="lc-row" key={i}>
-                <span className="lc-row-rank">{i + 2}</span>
-                <span style={{ flex: 1 }}>
-                  {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
-                  <div className="lc-row-strength">
-                    <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: accent }} />
-                  </div>
-                </span>
-                <span className="lc-row-val">
-                  {l.val}
-                  {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
-                </span>
+        <div className={`leader-flip-face front leader-card has-color ${modeClass}`} style={cardBg}>
+          <div className="lc-inner" style={innerBg}>
+            <div className="lc-stat-label">{emoji} {titulo}</div>
+            <div className="lc-top">
+              <div className="lc-avatar"
+                style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}`, boxShadow: `0 0 14px ${hexA(top.color,'59')}` }}>
+                {getInitials(top.nombre)}
               </div>
-            ))}
+              <div>
+                <div className="lc-player-name">{(top.nombre ?? '').split(' ').slice(0, 2).join(' ')}</div>
+                <div className="lc-team-name">{top.equipo}</div>
+              </div>
+            </div>
+            <div className="lc-big-num" style={{ color: accent }}>{top.val}</div>
+            <div className="lc-sub">{sub}</div>
+            {top.prom !== null && (
+              <div className="lc-context">
+                {top.pj} PJ · {top.prom} prom/partido
+              </div>
+            )}
+            <div className="lc-strength-track">
+              <div className="lc-strength-fill" style={{ width: '100%', background: `linear-gradient(90deg, ${hexA(accent,'99')}, ${accent})` }} />
+            </div>
+            <div className="lc-list">
+              {lideres.slice(1, 3).map((l, i) => (
+                <div className="lc-row" key={i}>
+                  <span className="lc-row-rank">{i + 2}</span>
+                  <span className="lc-row-dot" style={{ background: l.color }} />
+                  <span style={{ flex: 1 }}>
+                    {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
+                    <div className="lc-row-strength">
+                      <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: l.color }} />
+                    </div>
+                  </span>
+                  <span className="lc-row-val">
+                    {l.val}
+                    {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {lideres.length > 3 && (
+              <div className="lc-flip-hint">Ver top {lideres.length} ↻</div>
+            )}
           </div>
-          {lideres.length > 3 && (
-            <div className="lc-flip-hint">Ver top {lideres.length} ↻</div>
-          )}
         </div>
 
-        <div className={`leader-flip-face back leader-card ${modeClass}`}>
-          <div className="lc-stat-label">{emoji} {titulo} · Ranking completo</div>
-          <div className="lc-list lc-list-full">
-            {lideres.map((l, i) => (
-              <div className="lc-row" key={i}>
-                <span className="lc-row-rank" style={i === 0 ? { color: accent } : undefined}>{i + 1}</span>
-                <span style={{ flex: 1 }}>
-                  {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
-                  <div className="lc-row-strength">
-                    <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: accent }} />
-                  </div>
-                </span>
-                <span className="lc-row-val">
-                  {l.val}
-                  {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
-                </span>
-              </div>
-            ))}
+        <div className={`leader-flip-face back leader-card has-color ${modeClass}`} style={cardBg}>
+          <div className="lc-inner" style={innerBg}>
+            <div className="lc-stat-label">{emoji} {titulo} · Ranking completo</div>
+            <div className="lc-list lc-list-full">
+              {lideres.map((l, i) => (
+                <div className="lc-row" key={i}>
+                  <span className="lc-row-rank" style={i === 0 ? { color: accent } : undefined}>{i + 1}</span>
+                  <span className="lc-row-dot" style={{ background: l.color }} />
+                  <span style={{ flex: 1 }}>
+                    {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
+                    <div className="lc-row-strength">
+                      <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: l.color }} />
+                    </div>
+                  </span>
+                  <span className="lc-row-val">
+                    {l.val}
+                    {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="lc-flip-hint">Volver ↻</div>
           </div>
-          <div className="lc-flip-hint">Volver ↻</div>
         </div>
 
       </div>

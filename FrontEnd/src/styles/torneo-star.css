@@ -1437,6 +1437,26 @@ tbody td {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Card con el color del EQUIPO del lider (degradado + aro/glow en el
+   avatar) — mismo lenguaje que fixture/resultado/votaciones. */
+.leader-card.has-color {
+  border: none;
+  padding: 1px;
+}
+.leader-card.has-color::before { display: none; }
+.lc-inner {
+  border-radius: 9px;
+  padding: clamp(16px, 2.5vw, 20px);
+  height: 100%;
+}
+.lc-row-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
 .lc-stat-label {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: clamp(11px, 1.3vw, 13px);

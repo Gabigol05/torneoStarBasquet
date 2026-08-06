@@ -10,12 +10,18 @@ const EQUIPOS_MAP = Object.fromEntries(
 const CATEGORIA_LABEL = { femenino: 'FEMENINO', masculino: 'MASCULINO', general: 'GENERAL' };
 const CATEGORIA_CLASS = { femenino: 'tag-fem', masculino: 'tag-masc', general: 'tag-gen' };
 
-function OpcionLogo({ equipoId, size = 22 }) {
+// Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
+// tarjetas de fixture/resultado) — evita color-mix()/variables CSS con alpha
+// dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
+function OpcionLogo({ equipoId, size = 22, ring }) {
   const eq = EQUIPOS_MAP[equipoId];
   if (!eq?.logo) return null;
+  const color = ring ?? `${eq.color}40`;
   return (
     <img src={eq.logo} alt="" width={size} height={size}
-      style={{ borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${eq.color}40`, flexShrink: 0 }}
+      style={{ borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${color}`, flexShrink: 0 }}
       onError={e => { e.currentTarget.style.display = 'none'; }} />
   );
 }
@@ -26,56 +32,76 @@ function EncuestaCard({ encuesta, opciones, votoElegido, onVotar }) {
   const catClass = CATEGORIA_CLASS[encuesta.categoria] ?? 'tag-gen';
   const maxVotos = Math.max(0, ...opciones.map(o => Number(o.votos || 0)));
 
+  // Si la encuesta es "¿Quién gana?" entre dos equipos (el caso mas comun,
+  // creado automaticamente por partido), la card usa el mismo degradado con
+  // los colores de ambos equipos que ya tienen las tarjetas de fixture y
+  // resultado — si no, se mantiene el estilo neutro con la barra de arriba.
+  const equipoIds = opciones.map(o => o.equipo_id).filter(Boolean);
+  const esDuelo = equipoIds.length === 2 && opciones.length === 2;
+  const cA = esDuelo ? (EQUIPOS_MAP[equipoIds[0]]?.color ?? '#8899BB') : null;
+  const cB = esDuelo ? (EQUIPOS_MAP[equipoIds[1]]?.color ?? '#8899BB') : null;
+
   return (
-    <div className={`encuesta-card-v2 reveal-on-scroll ${catClass}`}>
-      <div className="ev-header">
-        <span className={`encuesta-tag ${catClass}`}>
-          {CATEGORIA_LABEL[encuesta.categoria] ?? 'GENERAL'}
-        </span>
-        {encuesta.subtitulo && <span className="ev-subtitulo">{encuesta.subtitulo}</span>}
-      </div>
-
-      <div className="ev-question">{encuesta.pregunta}</div>
-
-      {!yaVoto ? (
-        <div className="ev-opciones">
-          {opciones.map(o => (
-            <button key={o.opcion_id} className="ev-opcion-btn"
-              onClick={() => onVotar(encuesta.id, o.opcion_id)}>
-              <span className="ev-opcion-radio" />
-              <OpcionLogo equipoId={o.equipo_id} />
-              <span className="ev-opcion-txt">{o.texto}</span>
-              <span className="ev-opcion-arrow">→</span>
-            </button>
-          ))}
+    <div className={`encuesta-card-v2 reveal-on-scroll ${catClass}${esDuelo ? ' es-duelo' : ''}`}
+      style={esDuelo ? { background: `linear-gradient(115deg, ${hexA(cA,'55')}, #1C2535 40%, ${hexA(cB,'55')})` } : undefined}>
+      <div className="ev-card-inner" style={esDuelo ? { background: `linear-gradient(135deg, ${hexA(cA,'14')}, #0B111C 45%, ${hexA(cB,'14')})` } : undefined}>
+        <div className="ev-header">
+          <span className={`encuesta-tag ${catClass}`}>
+            {CATEGORIA_LABEL[encuesta.categoria] ?? 'GENERAL'}
+          </span>
+          {encuesta.subtitulo && <span className="ev-subtitulo">{encuesta.subtitulo}</span>}
         </div>
-      ) : (
-        <div className="ev-resultados fade-refresh">
-          {opciones.map(o => {
-            const votos = Number(o.votos || 0);
-            const pct = totalVotos > 0 ? Math.round((votos / totalVotos) * 100) : 0;
-            const elegida = o.opcion_id === votoElegido;
-            const liderando = votos === maxVotos && maxVotos > 0;
-            return (
-              <div key={o.opcion_id} className={`ev-result-row${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`}>
-                <div className="ev-result-top">
-                  <div className="ev-result-label">
-                    <OpcionLogo equipoId={o.equipo_id} size={20} />
-                    <span>{o.texto}</span>
-                    {liderando && <span className="ev-crown" title="Liderando">♛</span>}
-                    {elegida && <span className="ev-your-vote">TU VOTO</span>}
+
+        <div className="ev-question">{encuesta.pregunta}</div>
+
+        {!yaVoto ? (
+          <div className="ev-opciones">
+            {opciones.map((o, i) => {
+              const color = esDuelo ? (i === 0 ? cA : cB) : null;
+              return (
+                <button key={o.opcion_id} className="ev-opcion-btn"
+                  style={color ? { borderColor: hexA(color,'55') } : undefined}
+                  onClick={() => onVotar(encuesta.id, o.opcion_id)}>
+                  <span className="ev-opcion-radio" style={color ? { borderColor: color } : undefined} />
+                  <OpcionLogo equipoId={o.equipo_id} ring={color} />
+                  <span className="ev-opcion-txt">{o.texto}</span>
+                  <span className="ev-opcion-arrow">→</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="ev-resultados fade-refresh">
+            {opciones.map((o, i) => {
+              const votos = Number(o.votos || 0);
+              const pct = totalVotos > 0 ? Math.round((votos / totalVotos) * 100) : 0;
+              const elegida = o.opcion_id === votoElegido;
+              const liderando = votos === maxVotos && maxVotos > 0;
+              const color = esDuelo ? (i === 0 ? cA : cB) : null;
+              return (
+                <div key={o.opcion_id} className={`ev-result-row${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`}>
+                  <div className="ev-result-top">
+                    <div className="ev-result-label">
+                      <OpcionLogo equipoId={o.equipo_id} size={20} ring={color} />
+                      <span>{o.texto}</span>
+                      {liderando && <span className="ev-crown" title="Liderando">♛</span>}
+                      {elegida && <span className="ev-your-vote">TU VOTO</span>}
+                    </div>
+                    <div className="ev-pct-big" style={color && liderando ? { color } : undefined}>
+                      {pct}<span className="ev-pct-sign">%</span>
+                    </div>
                   </div>
-                  <div className="ev-pct-big">{pct}<span className="ev-pct-sign">%</span></div>
+                  <div className="ev-bar-track">
+                    <div className={`ev-bar-fill${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`}
+                      style={{ width: `${pct}%`, ...(color ? { background: `linear-gradient(90deg, ${hexA(color,'99')}, ${color})` } : {}) }} />
+                  </div>
                 </div>
-                <div className="ev-bar-track">
-                  <div className={`ev-bar-fill${elegida ? ' mine' : ''}${liderando ? ' leading' : ''}`} style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-          <div className="ev-total">{totalVotos} voto{totalVotos === 1 ? '' : 's'} totales</div>
-        </div>
-      )}
+              );
+            })}
+            <div className="ev-total">{totalVotos} voto{totalVotos === 1 ? '' : 's'} totales</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

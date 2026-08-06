@@ -99,6 +99,11 @@ function EmptyState({ icon, title, sub, showIG = true }) {
   );
 }
 
+// Alpha en hex de 2 digitos, concatenado directo al color del equipo (ej:
+// "#D4A017" + "59" = ~35% opacidad). Evita color-mix()/variables CSS con
+// alpha dinamico, que no anda bien en navegadores viejos de celulares.
+const hexA = (hex, alpha) => `${hex}${alpha}`;
+
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
 function formatDiaLargo(fechaISO) {
   if (!fechaISO) return '';
@@ -129,51 +134,47 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
   // nunca se mostraba en los partidos de masculino.
   const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
   const mvpJug = mvpJugId ? jugadorasMap[mvpJugId] : null;
+  const diaCal = partido.fecha_partido ?? fecha?.fecha_dia;
+  const cL = localEq.color ?? '#8899BB', cV = visitEq.color ?? '#8899BB';
 
   return (
-    <div className="result-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <div className="rc-header">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span className="rc-fecha">
+    <div className="result-card-v2" onClick={onClick} style={{
+      cursor: onClick ? 'pointer' : 'default',
+      background: `linear-gradient(115deg, ${hexA(cL,'55')}, #1C2535 40%, ${hexA(cV,'55')})`,
+    }}>
+      <div className="rc2-inner" style={{
+        background: `linear-gradient(135deg, ${hexA(cL,'1a')}, #0B111C 45%, ${hexA(cV,'1a')})`,
+      }}>
+        <div className="rc2-header">
+          <span className="fc2v-badge">
             {fecha ? `Fecha ${fecha.numero}` : 'Partido'}
-            {/* Un partido puede tener su propia fecha calendario distinta a
-                la de la jornada (ej: jornada jugada en dos dias) — se prioriza
-                esa sobre la fecha general de la jornada. */}
-            {(partido.fecha_partido ?? fecha?.fecha_dia) &&
-              ` - ${(partido.fecha_partido ?? fecha.fecha_dia).split('-').reverse().slice(0,2).join('/')}`}
+            {diaCal && ` · ${diaCal.split('-').reverse().slice(0,2).join('/')}`}
+            {partido.hora_inicio && ` · ${String(partido.hora_inicio).slice(0, 5)}`}
           </span>
-          {partido.hora_inicio && (
-            <span style={{ fontSize: 11, color: '#4A566E', fontFamily: "'Barlow Condensed',sans-serif" }}>
-              {String(partido.hora_inicio).slice(0, 5)}
-            </span>
-          )}
+          <span className={`rc-estado ${enVivo ? 'en-vivo' : 'finalizado'}`}>
+            {enVivo ? 'EN VIVO' : 'FINAL'}
+          </span>
         </div>
-        <span className={`rc-estado ${enVivo ? 'en-vivo' : 'finalizado'}`}>
-          {enVivo ? 'EN VIVO' : 'FINAL'}
-        </span>
-      </div>
 
-      <div className="rc-body">
-        <div className={`rc-equipo ${ganLocal ? 'ganador' : ''}`}>
-          <img src={localEq.logo} alt={localEq.name} className="rc-logo" loading="lazy"
-            onError={e => { e.target.style.display = 'none'; }}/>
-          <span className="rc-nombre">{localEq.name}</span>
-          <span className="rc-pts" style={{ color: ganLocal ? localEq.color : '#6B7A99' }}>
-            {ptsLocal}
-          </span>
+        <div className="rc2-body">
+          <div className="fc2v-team">
+            <img src={localEq.logo} alt={localEq.name} className="fc2v-logo" loading="lazy"
+              style={{ borderColor: cL, boxShadow: `0 0 14px ${hexA(cL,'59')}`, opacity: ganLocal ? 1 : .55 }}
+              onError={e => { e.target.style.display = 'none'; }}/>
+            <span className="fc2v-name" style={{ color: ganLocal ? '#EEF2F8' : '#6B7A99' }}>{localEq.name}</span>
+            <span className="rc2-pts" style={{ color: ganLocal ? cL : '#6B7A99' }}>{ptsLocal}</span>
+          </div>
+          <div className="fc2v-vs">-</div>
+          <div className="fc2v-team">
+            <img src={visitEq.logo} alt={visitEq.name} className="fc2v-logo" loading="lazy"
+              style={{ borderColor: cV, boxShadow: `0 0 14px ${hexA(cV,'59')}`, opacity: !ganLocal ? 1 : .55 }}
+              onError={e => { e.target.style.display = 'none'; }}/>
+            <span className="fc2v-name" style={{ color: !ganLocal ? '#EEF2F8' : '#6B7A99' }}>{visitEq.name}</span>
+            <span className="rc2-pts" style={{ color: !ganLocal ? cV : '#6B7A99' }}>{ptsVisit}</span>
+          </div>
         </div>
-        <div className="rc-sep">-</div>
-        <div className={`rc-equipo rc-equipo-visit ${!ganLocal ? 'ganador' : ''}`}>
-          <span className="rc-pts" style={{ color: !ganLocal ? visitEq.color : '#6B7A99' }}>
-            {ptsVisit}
-          </span>
-          <span className="rc-nombre">{visitEq.name}</span>
-          <img src={visitEq.logo} alt={visitEq.name} className="rc-logo" loading="lazy"
-            onError={e => { e.target.style.display = 'none'; }}/>
-        </div>
-      </div>
 
-      {partido.q1_local != null && (
+        {partido.q1_local != null && (
         <div className="rc-parciales">
           {['q1', 'q2', 'q3', 'q4'].map(q => (
             <div key={q} className="rc-parcial">
@@ -231,14 +232,10 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
           </span>
         </div>
       )}
+      </div>
     </div>
   );
 }
-
-// Alpha en hex de 2 digitos, concatenado directo al color del equipo (ej:
-// "#D4A017" + "59" = ~35% opacidad). Evita color-mix()/variables CSS con
-// alpha dinamico, que no anda bien en navegadores viejos de celulares.
-const hexA = (hex, alpha) => `${hex}${alpha}`;
 
 function FixtureCard({ partido, equiposFem, fechas }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);

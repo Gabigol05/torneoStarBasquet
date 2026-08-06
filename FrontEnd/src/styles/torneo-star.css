@@ -4763,49 +4763,39 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   flex-direction: column;
   gap: 14px;
 }
-.result-card {
-  background: #0E1420;
-  border: 1px solid #1C2535;
-  border-radius: 14px;
-  padding: 16px;
-  transition: border-color 0.2s, transform 0.15s;
+/* Tarjeta de resultado — mismo lenguaje visual que la de fixture (degradado
+   del color de cada equipo, logos con aro/glow), pero con el marcador. */
+.result-card-v2 {
+  border-radius: 16px;
+  padding: 1px;
+  transition: transform 0.15s;
 }
-.result-card:hover {
-  border-color: #2C3A52;
-  transform: translateY(-1px);
+.result-card-v2:hover { transform: translateY(-1px); }
+.rc2-inner {
+  border-radius: 15px;
+  padding: 16px 18px;
 }
-.rc-header {
+.rc2-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-.rc-fecha { color: #6B7A99; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
 .rc-estado { font-size: 11px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; }
 .rc-estado.finalizado { background: rgba(34,208,122,0.1); color: #22D07A; }
 .rc-estado.en-vivo    { background: rgba(240,64,96,0.15); color: #F04060; animation: pulse-vivo 1.5s ease-in-out infinite; }
 @keyframes pulse-vivo { 0%,100%{opacity:1} 50%{opacity:.6} }
 
-.rc-body {
+.rc2-body {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
-.rc-equipo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  text-align: center;
-}
-.rc-equipo-visit { flex-direction: column; }
-.rc-equipo.ganador .rc-nombre { color: #EEF2F8; }
-.rc-logo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-.rc-nombre { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; color: #6B7A99; letter-spacing: .5px; }
-.rc-pts { font-family: 'Bebas Neue', sans-serif; font-size: 42px; line-height: 1; }
-.rc-sep { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: #4A566E; }
+.rc2-pts { font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; }
 
 .rc-parciales {
   display: flex;
@@ -4815,7 +4805,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   flex-wrap: wrap;
 }
 .rc-parcial {
-  background: #141C2A;
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.06);
   border-radius: 6px;
   padding: 4px 10px;
   display: flex;
@@ -4967,9 +4958,7 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 
 /* ══ MOBILE ══════════════════════════════════════════════════ */
 @media (max-width: 640px) {
-  .rc-logo { width: 36px; height: 36px; }
-  .rc-pts  { font-size: 34px; }
-  .rc-nombre { font-size: 12px; }
+  .rc2-pts  { font-size: 30px; }
   .rc-parciales { gap: 4px; }
   .rc-parcial { padding: 3px 7px; min-width: 36px; }
 }
@@ -5203,6 +5192,18 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .votaciones-band {
   position: relative;
 }
+/* Textura rayada diagonal — la misma idea que tenia el sitio entero antes de
+   pasar al fondo de olas, pero ahora acotada solo a esta seccion. */
+.votaciones-band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(135deg,
+    rgba(255,255,255,.05) 0px, rgba(255,255,255,.05) 1px,
+    transparent 1px, transparent 14px);
+  pointer-events: none;
+  z-index: 0;
+}
 
 .encuesta-card-v2 {
   background: var(--dark3);
@@ -5227,6 +5228,18 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .encuesta-card-v2:hover {
   transform: translateY(-3px);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Encuesta "¿Quién gana?" entre dos equipos — degradado con el color de cada
+   uno, mismo lenguaje visual que las tarjetas de fixture y resultado. */
+.encuesta-card-v2.es-duelo {
+  border: none;
+  padding: 1px;
+}
+.encuesta-card-v2.es-duelo::before { display: none; }
+.encuesta-card-v2.es-duelo .ev-card-inner {
+  border-radius: 13px;
+  padding: clamp(16px, 2.5vw, 20px);
 }
 
 .ev-header {

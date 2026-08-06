@@ -4181,19 +4181,11 @@ table tbody tr:hover {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* ── Contenedor con degradado que insinua que hay mas chips a la derecha ── */
+/* ── Contenedor de los chips (el degradado de "hay mas chips a la derecha"
+   se saco: usaba un color fijo que no coincidia con el fondo bordo del
+   tema femenino y se veia como una mancha negra pegada al borde). ── */
 .chips-fade-wrap {
   position: relative;
-}
-.chips-fade-wrap::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 34px;
-  background: linear-gradient(90deg, transparent, var(--dark, #080C12) 85%);
-  pointer-events: none;
 }
 
 /* ── FILTER CHIPS ── */

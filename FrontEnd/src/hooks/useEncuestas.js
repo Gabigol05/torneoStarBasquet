@@ -13,26 +13,46 @@ function groupResultados(rows) {
   return map;
 }
 
-async function fetchTodo(voterToken) {
+async function fetchTodo(voterToken, ipHash) {
   if (!isConfigured) return null;
+
+  // ⚠️ FIX: ademas de buscar los votos por voter_token (se pierde si se borra
+  // el localStorage, se usa modo incognito, o el navegador purga datos del
+  // sitio), tambien se buscan por ip_hash — asi si alguien vota de nuevo
+  // desde la misma red pero con un token "nuevo", igual lo reconocemos como
+  // "ya votaste" en vez de dejarlo votar otra vez. El ip_hash ya se guardaba
+  // en cada voto (para bloquear duplicados), pero antes solo se usaba para
+  // ESE chequeo — nunca para reconocer al votante en una visita posterior.
+  const queries = [
+    supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending: false }),
+    supabase.from('v_encuesta_resultados').select('*'),
+    supabase.from('encuesta_votos').select('encuesta_id,opcion_id').eq('voter_token', voterToken),
+  ];
+  if (ipHash) {
+    queries.push(supabase.from('encuesta_votos').select('encuesta_id,opcion_id').eq('ip_hash', ipHash));
+  }
 
   const [
     { data: encuestasRows, error: e1 },
     { data: resultadosRows, error: e2 },
     { data: misVotosRows, error: e3 },
-  ] = await Promise.all([
-    supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending: false }),
-    supabase.from('v_encuesta_resultados').select('*'),
-    supabase.from('encuesta_votos').select('encuesta_id,opcion_id').eq('voter_token', voterToken),
-  ]);
+    ipRes,
+  ] = await Promise.all(queries);
 
   if (e1) console.warn('[useEncuestas] encuestas:', e1.message);
   if (e2) console.warn('[useEncuestas] resultados:', e2.message);
   if (e3) console.warn('[useEncuestas] mis_votos:', e3.message);
+  if (ipRes?.error) console.warn('[useEncuestas] mis_votos_ip:', ipRes.error.message);
 
-  const encuestas   = encuestasRows  ?? [];
-  const resultados  = groupResultados(resultadosRows ?? []);
-  const misVotosMap = Object.fromEntries((misVotosRows ?? []).map(v => [v.encuesta_id, v.opcion_id]));
+  const encuestas  = encuestasRows  ?? [];
+  const resultados = groupResultados(resultadosRows ?? []);
+  // Los que coinciden por ip_hash se cargan primero, y los que coinciden por
+  // voter_token pisan encima — el token identifica el dispositivo con mas
+  // precision, asi que gana si por algun motivo difirieran.
+  const misVotosMap = {
+    ...Object.fromEntries((ipRes?.data ?? []).map(v => [v.encuesta_id, v.opcion_id])),
+    ...Object.fromEntries((misVotosRows ?? []).map(v => [v.encuesta_id, v.opcion_id])),
+  };
 
   return { encuestas, resultados, misVotosMap };
 }
@@ -52,7 +72,8 @@ export function useEncuestas() {
     try {
       setIsLoading(true);
       const token = getVoterToken();
-      const data = await fetchTodo(token);
+      const ipHash = await getVoterIpHash();
+      const data = await fetchTodo(token, ipHash);
       if (!data) return;
       setEncuestas(data.encuestas);
       setResultados(data.resultados);

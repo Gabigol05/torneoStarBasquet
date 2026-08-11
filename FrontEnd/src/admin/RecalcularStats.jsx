@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 
-export async function recalcularTodos(onLog, tablas) {
-  onLog('📋 Obteniendo lista de jugadoras con stats...');
+export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
+  const jug = categoria === 'masculino' ? 'jugadores' : 'jugadoras';
+  onLog(`📋 Obteniendo lista de ${jug} con stats...`);
 
   const idField = tablas.jugadorIdField;
 
@@ -25,7 +26,7 @@ export async function recalcularTodos(onLog, tablas) {
   }
 
   const ids = [...new Set(statsRows.map(r => r[idField]))];
-  onLog(`🔢 ${ids.length} jugadoras con partidos cargados`);
+  onLog(`🔢 ${ids.length} ${jug} con partidos cargados`);
 
   let ok = 0;
   let fallidas = [];
@@ -85,9 +86,9 @@ export async function recalcularTodos(onLog, tablas) {
     ok++;
   }
 
-  onLog(`✅ ${ok} jugadoras recalculadas`);
+  onLog(`✅ ${ok} ${jug} recalculad${categoria === 'masculino' ? 'os' : 'as'}`);
   if (fallidas.length > 0) {
-    onLog(`⚠️ ${fallidas.length} jugadoras fallaron: ${fallidas.join(', ')}`);
+    onLog(`⚠️ ${fallidas.length} ${jug} fallaron: ${fallidas.join(', ')}`);
     onLog('Volvé a correr el recálculo — si vuelven a fallar las mismas, avisá al desarrollador.');
   } else {
     onLog('🎉 ¡Listo! El sitio ya refleja los promedios y acumulados actualizados.');
@@ -113,7 +114,7 @@ export default function RecalcularStats({ categoria: categoriaProp, setCategoria
     setLog([]);
     setDone(false);
     try {
-      await recalcularTodos(addLog, tablas);
+      await recalcularTodos(addLog, tablas, categoria);
       setDone(true);
     } catch (err) {
       addLog(`❌ Error: ${err.message}`);
@@ -127,7 +128,7 @@ export default function RecalcularStats({ categoria: categoriaProp, setCategoria
       {ConfirmDialog}
       <h2 style={S.title}>🔄 Recalcular todos los promedios y acumulados</h2>
       <p style={S.hint}>
-        Recorre todas las jugadoras con partidos cargados y recalcula sus promedios
+        Recorre {categoria === 'masculino' ? 'todos los jugadores' : 'todas las jugadoras'} con partidos cargados y recalcula sus promedios
         y totales acumulados desde cero usando los datos de <code>{tablas.stats}</code>.
         Usá esto si hubo una corrección manual en Supabase o si sospechás que
         los promedios quedaron desactualizados.

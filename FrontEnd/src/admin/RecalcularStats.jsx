@@ -62,6 +62,9 @@ export async function recalcularTodos(onLog, tablas) {
       pct_simples:  tsc + tsf > 0 ? +((tsc / (tsc + tsf)) * 100).toFixed(1) : 0,
       pct_dobles:   tdc + tdf > 0 ? +((tdc / (tdc + tdf)) * 100).toFixed(1) : 0,
       pct_triples:  ttc + ttf > 0 ? +((ttc / (ttc + ttf)) * 100).toFixed(1) : 0,
+      // ⚠️ FIX: faltaba guardar el detalle convertidos/intentados (solo se
+      // guardaba el %), por eso el modal de jugador mostraba 0/0 en TL y 2P.
+      sc_total: tsc, sf_total: tsf, dc_total: tdc, df_total: tdf, tc_total: ttc, tf_total: ttf,
       pts_total:    sum('pts'),
       reb_total:    sum('rd') + sum('ro'),
       ast_total:    sum('as_'),

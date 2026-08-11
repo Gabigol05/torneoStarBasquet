@@ -319,6 +319,10 @@ async function recalcularPromedios(jugadorIds, tablas) {
       pct_simples: tsc+tsf>0?+((tsc/(tsc+tsf))*100).toFixed(1):0,
       pct_dobles:  tdc+tdf>0?+((tdc/(tdc+tdf))*100).toFixed(1):0,
       pct_triples: ttc+ttf>0?+((ttc/(ttc+ttf))*100).toFixed(1):0,
+      // ⚠️ FIX: antes solo se guardaba el %, nunca el detalle "convertidos/
+      // intentados" — el modal de jugador mostraba 0/0 aunque el % diera
+      // bien, porque leía estos campos y nunca se habían guardado.
+      sc_total:tsc, sf_total:tsf, dc_total:tdc, df_total:tdf, tc_total:ttc, tf_total:ttf,
       pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
       rob_total:sum('rb'), tap_total:sum('tp'), val_total:sum('val'), per_total:sum('pe'),
       mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),

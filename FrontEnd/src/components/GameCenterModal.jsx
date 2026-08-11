@@ -7,6 +7,9 @@ import { equiposMasculino } from '../data/masculinoData';
 // resto de las tarjetas con color de equipo) — evita color-mix()/variables
 // CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
 const hexA = (hex, alpha) => `${hex}${alpha}`;
+// Ancho fijo de la columna "#" — necesario para calcular el offset `left`
+// de la columna de nombre, que queda pegada justo al lado.
+const STICKY_NUM_W = 32;
 
 function Skeleton({ w = '100%', h = 16, radius = 4, style = {} }) {
   return (
@@ -282,7 +285,12 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, borderRadius: 9, overflow: 'hidden' }}>
                   <thead>
                     <tr>
-                      {['#', esMasc ? 'Jugador' : 'Jugadora', 'PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
+                      {/* '#' y nombre quedan fijos (sticky) al scrollear horizontal — en
+                          una tabla de 14 columnas, sin esto se pierde de vista quién es
+                          quién apenas se desliza para ver el resto de las stats. */}
+                      <th style={{ position:'sticky', left:0, zIndex:2, background:'#141C2A', color:'#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap', width:STICKY_NUM_W }}>#</th>
+                      <th style={{ position:'sticky', left:STICKY_NUM_W, zIndex:2, background:'#141C2A', color:'#8899AA', padding:'6px 8px', textAlign:'left', fontSize:10, whiteSpace:'nowrap', boxShadow:'2px 0 4px rgba(0,0,0,.25)' }}>{esMasc ? 'Jugador' : 'Jugadora'}</th>
+                      {['PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
                         <th key={h} style={{ background: hexA(cAct, '1f'), color:'#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -290,10 +298,11 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   <tbody>
                     {(tab === 'local' ? data.statsLocal : data.statsVisit).map((r, i) => {
                       const eq = eqActivo;
+                      const rowBg = i%2===0 ? '#141C2A' : '#0E1420';
                       return (
                         <tr key={r.jugadora_id} style={{ background: `linear-gradient(90deg, ${hexA(cAct, i%2===0 ? '14' : '0a')}, #0B111C 60%)` }}>
-                          <td style={{ padding:'6px 8px', textAlign:'center', color:'#6B7A99' }}>{r.numero ?? '-'}</td>
-                          <td style={{ padding:'6px 8px', textAlign:'left', color: eq?.color, fontWeight:600, minWidth:120, whiteSpace:'nowrap' }}>
+                          <td style={{ position:'sticky', left:0, zIndex:1, background:rowBg, padding:'6px 8px', textAlign:'center', color:'#6B7A99', width:STICKY_NUM_W }}>{r.numero ?? '-'}</td>
+                          <td style={{ position:'sticky', left:STICKY_NUM_W, zIndex:1, background:rowBg, boxShadow:'2px 0 4px rgba(0,0,0,.25)', padding:'6px 8px', textAlign:'left', color: eq?.color, fontWeight:600, minWidth:120, whiteSpace:'nowrap' }}>
                             {r.nombre.split(' ').slice(0,2).join(' ')}
                           </td>
                           <td style={{ padding:'6px 8px', textAlign:'center', color:'#F0B429', fontWeight:700, fontFamily:"'Bebas Neue',sans-serif", fontSize:16 }}>{r.pts}</td>

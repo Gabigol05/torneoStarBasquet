@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useStats } from '../context/StatsContext';
 
 export function MobileHeader({ onRefresh } = {}) {
-  const { equipos = [] } = useStats();
+  const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -27,6 +27,9 @@ export function MobileHeader({ onRefresh } = {}) {
         isOpen={!!selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
         player={selectedPlayer}
+        statsPorPartido={statsPorPartido}
+        partidos={partidos}
+        fechas={fechas}
       />
       <header className="mobile-header">
         <div className="mh-brand">

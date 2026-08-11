@@ -11,7 +11,7 @@ function dispatchTabChange(tabKey) {
 }
 
 export function Navbar() {
-  const { equipos = [] } = useStats();
+  const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
   const { mode } = useTournament();
   const activeSection = useActiveSection();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -47,6 +47,9 @@ export function Navbar() {
         isOpen={!!selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
         player={selectedPlayer}
+        statsPorPartido={statsPorPartido}
+        partidos={partidos}
+        fechas={fechas}
       />
 
       <nav className="navbar-sticky">

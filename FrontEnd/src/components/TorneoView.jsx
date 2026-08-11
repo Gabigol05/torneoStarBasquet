@@ -300,6 +300,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const [selectedTeamId,  setSelectedTeamId]  = useState(null);
   const [searchJugadoras, setSearchJugadoras] = useState('');
   const [filterEquipoId,  setFilterEquipoId]  = useState(null);
+  // Renderizar los ~230 jugadores de una sola vez es pesado en celulares
+  // gama media (cada card tiene degradado + sombra inline) — se muestra de a
+  // tandas y se resetea cada vez que cambia la búsqueda o el filtro de equipo.
+  const PLAYERS_PAGE_SIZE = 24;
+  const [playersVisible, setPlayersVisible] = useState(PLAYERS_PAGE_SIZE);
   const [tappedCard,      setTappedCard]      = useState(null);
   const [fechaSelId,      setFechaSelId]      = useState(null);
 
@@ -366,6 +371,14 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         .map(j => ({ ...j, equipo: team.name, equipoColor: team.color, equipoId: team.id, equipoLogo: team.logo }))
     );
   }, [equiposFemenino, searchJugadoras, filterEquipoId]);
+
+  // Volver a la primera tanda cada vez que cambia la búsqueda o el filtro
+  useEffect(() => { setPlayersVisible(PLAYERS_PAGE_SIZE); }, [searchJugadoras, filterEquipoId]);
+
+  const jugadorasVisibles = useMemo(
+    () => jugadorasFiltradas.slice(0, playersVisible),
+    [jugadorasFiltradas, playersVisible]
+  );
 
   // Una jornada ("Fecha 1") puede jugarse en mas de un dia calendario (ej: 8
   // partidos el sabado, 3 el domingo) — antes esto solo ordenaba por
@@ -829,7 +842,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         sub={mode === 'femenino' ? 'Proba con otro nombre o equipo' : 'Van a aparecer apenas se juegue la primera fecha'} showIG={false}/>
                     </div>
                   ) : (
-                    jugadorasFiltradas.map(j => (
+                    jugadorasVisibles.map(j => (
                       <div className="player-item" key={j.id}
                         style={{ background: `linear-gradient(160deg, ${hexA(j.equipoColor, '60')}, #1C2535 60%)` }}
                         onClick={() => handleSelectPlayer({
@@ -868,6 +881,14 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     ))
                   )}
                 </div>
+                {playersVisible < jugadorasFiltradas.length && (
+                  <button
+                    className="load-more-btn"
+                    onClick={() => setPlayersVisible(v => v + PLAYERS_PAGE_SIZE)}
+                    style={{ borderColor: modeColor, color: modeColor }}>
+                    Cargar más ({jugadorasFiltradas.length - playersVisible} restantes)
+                  </button>
+                )}
               </div>
             )}
 

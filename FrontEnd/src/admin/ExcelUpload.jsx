@@ -225,7 +225,12 @@ function parsearExcel(wb) {
     if (r[C.equipo] && typeof r[C.equipo]==='string' && r[C.equipo].trim()) {
       const eq = r[C.equipo].trim();
       if (eq==='Equipo') break;
-      if (eq===res.equipoLocal||eq===res.equipoVisit) equipoActual=eq;
+      // Comparación tolerante (antes era === estricto): un espacio extra, una
+      // tilde, o mayúscula distinta entre el bloque del marcador y el bloque
+      // de stats hacía que nunca detecte el cambio de equipo visitante, y
+      // todas sus jugadoras quedaban etiquetadas con el equipo local —
+      // buscando (y a veces matcheando mal) contra el roster equivocado.
+      if (normStr(eq)===normStr(res.equipoLocal)||normStr(eq)===normStr(res.equipoVisit)) equipoActual=eq;
     }
     const nombre = r[C.nombre];
     const numero = r[C.numero];

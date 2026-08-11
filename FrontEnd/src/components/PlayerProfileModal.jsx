@@ -147,6 +147,19 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
   // (este componente queda montado de forma persistente y solo cambia isOpen).
   const historialGrafico = useMemo(() => {
     if (!player || !statsPorPartido || !partidos || !fechas) return [];
+    // 🔍 DEBUG TEMPORAL — sacar apenas se encuentre la causa
+    if (player.id) {
+      const propios = partidos.filter(p => p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId);
+      console.debug('[historialGrafico DEBUG]', {
+        playerId: player.id, equipoId: player.equipoId,
+        totalPartidos: partidos.length,
+        partidosDelEquipo: propios.length,
+        finalizadosDelEquipo: propios.filter(p => p.estado === 'finalizado').length,
+        statsKeysCount: Object.keys(statsPorPartido).length,
+        ejemploStatsKey: Object.keys(statsPorPartido)[0],
+        tieneStatsParaAlgunPartido: propios.map(p => ({ partidoId: p.id, tieneFila: !!statsPorPartido?.[p.id]?.[player.id] })),
+      });
+    }
     return partidos
       .filter(p =>
         p.estado === 'finalizado' &&

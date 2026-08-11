@@ -139,6 +139,13 @@ async function fetchTodo() {
           ...j,
           ...DEFAULT_STATS,
           ...st,
+          // ⚠️ FIX: estadisticas_femenino tiene su propia columna "id"
+          // (autoincremental, PK de esa tabla) distinta de jugadora_id — el
+          // spread de arriba la pisaba, así que el resto del sitio terminaba
+          // usando ese id numérico en vez del id real de la jugadora
+          // (ej. "f_tl_13"), rompiendo cualquier búsqueda posterior que
+          // dependiera de él (como el historial de stats por fecha).
+          id: j.id,
           // aliases cortos
           pts: st.pts_prom  ?? 0,
           reb: st.reb_prom  ?? 0,

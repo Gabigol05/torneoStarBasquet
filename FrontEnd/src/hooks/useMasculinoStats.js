@@ -158,6 +158,10 @@ async function fetchTodo() {
           fechaNac: j.fecha_nac,
           ...DEFAULT_STATS,
           ...st,
+          // ⚠️ FIX preventivo (mismo bug que en femenino): si estadisticas_masculino
+          // tiene su propia columna "id", el spread de arriba pisaría el id real
+          // del jugador — se re-afirma acá para que nunca gane el de la tabla de stats.
+          id: j.id,
           pts: st.pts_prom ?? 0,
           reb: st.reb_prom ?? 0,
           ast: st.ast_prom ?? 0,

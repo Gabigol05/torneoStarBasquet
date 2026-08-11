@@ -13,6 +13,30 @@ const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,
 const fuseEqFem  = new Fuse(equiposFemenino,  { keys: [{ name:'name', weight:1 }], threshold: 0.4 });
 const fuseEqMasc = new Fuse(equiposMasculino, { keys: [{ name:'name', weight:1 }], threshold: 0.4 });
 
+// ─── Alias de nombres de equipo ────────────────────────────────────────────────
+// Algunos excels escriben el nombre del equipo distinto entre el bloque del
+// marcador y el de stats (o distinto al nombre oficial), y como no son
+// variaciones de tipeo (tilde/mayúscula/espacio) sino palabras totalmente
+// distintas, el fuzzy matching no alcanza a asociarlos. "Ene Ene" en vez de
+// "NN" es el caso conocido — se resuelve por equivalencia manual antes de
+// intentar el fuzzy match.
+const ALIAS_EQUIPOS_TEXTO = {
+  'ene ene': 'nn',
+};
+const canonEquipo = texto => {
+  const n = normStr(texto);
+  return ALIAS_EQUIPOS_TEXTO[n] ?? n;
+};
+// Busca un equipo por texto: primero por igualdad exacta (tolerando el alias
+// de arriba), y si no hay hit, recién ahí cae al fuzzy matching normal.
+function buscarEquipo(texto, fuseEq, lista) {
+  if (!texto) return null;
+  const canon = canonEquipo(texto);
+  const exacto = lista.find(e => normStr(e.name) === canon);
+  if (exacto) return exacto;
+  return fuseEq.search(texto)[0]?.item ?? null;
+}
+
 // ─── Índice fuzzy de JUGADORAS/ES — femenino es estático (roster fijo) ────────
 const TODAS_JUGADORAS_FEM = equiposFemenino.flatMap(eq =>
   eq.jugadoras.filter(j => j && j.nombre).map(j => {
@@ -77,7 +101,7 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
   if (!nombreRaw) return { jugadora: null, method: 'empty', score: 1 };
   const clean    = normStr(String(nombreRaw));
   const aliases  = await cargarAliases(categoria, tablas);
-  const eqMatch  = equipoHint ? fuseEq.search(equipoHint)[0]?.item : null;
+  const eqMatch  = equipoHint ? buscarEquipo(equipoHint, fuseEq, ctx.equipos) : null;
   const equipoId = eqMatch?.id;
 
   // 1️⃣ Lookup exacto en tabla de aliases (prioridad máxima)
@@ -226,11 +250,12 @@ function parsearExcel(wb) {
       const eq = r[C.equipo].trim();
       if (eq==='Equipo') break;
       // Comparación tolerante (antes era === estricto): un espacio extra, una
-      // tilde, o mayúscula distinta entre el bloque del marcador y el bloque
-      // de stats hacía que nunca detecte el cambio de equipo visitante, y
-      // todas sus jugadoras quedaban etiquetadas con el equipo local —
-      // buscando (y a veces matcheando mal) contra el roster equivocado.
-      if (normStr(eq)===normStr(res.equipoLocal)||normStr(eq)===normStr(res.equipoVisit)) equipoActual=eq;
+      // tilde, mayúscula distinta, o un alias tipo "Ene Ene"/"NN" entre el
+      // bloque del marcador y el bloque de stats hacía que nunca detecte el
+      // cambio de equipo visitante, y todas sus jugadoras quedaban
+      // etiquetadas con el equipo local — buscando (y a veces matcheando
+      // mal) contra el roster equivocado.
+      if (canonEquipo(eq)===canonEquipo(res.equipoLocal)||canonEquipo(eq)===canonEquipo(res.equipoVisit)) equipoActual=eq;
     }
     const nombre = r[C.nombre];
     const numero = r[C.numero];
@@ -323,7 +348,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
   const todasJugadoras  = categoria === 'masculino' ? jugadoresMasc : TODAS_JUGADORAS_FEM;
   const fuseJugadoras   = useMemo(() => categoria === 'masculino' ? buildFuseJugadores(jugadoresMasc) : fuseJugadorasFem, [categoria, jugadoresMasc]);
-  const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras };
+  const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras, equipos: roster };
 
   const [step,      setStep]      = useState('archivo');
   const [parsed,    setParsed]    = useState(null);    // datos del parser (sin resolver)
@@ -398,13 +423,13 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     setStep('publicando');
     setLog([]);
     try {
-      // Resolver equipos
-      const mL = fuseEq.search(parsed.equipoLocal);
-      const mV = fuseEq.search(parsed.equipoVisit);
-      if (!mL.length) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
-      if (!mV.length) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
-      const eqLId = mL[0].item.id, eqVId = mV[0].item.id;
-      addLog(`✅ ${mL[0].item.name} vs ${mV[0].item.name}`);
+      // Resolver equipos (con alias tipo "Ene Ene" -> "NN" antes del fuzzy)
+      const eqLocalItem = buscarEquipo(parsed.equipoLocal, fuseEq, roster);
+      const eqVisitItem = buscarEquipo(parsed.equipoVisit, fuseEq, roster);
+      if (!eqLocalItem) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
+      if (!eqVisitItem) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
+      const eqLId = eqLocalItem.id, eqVId = eqVisitItem.id;
+      addLog(`✅ ${eqLocalItem.name} vs ${eqVisitItem.name}`);
 
       // Check duplicado
       if (!forceOverwrite) {
@@ -704,7 +729,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             {jugNoCount>0 && (
               <div style={s.resumenItem}>
                 <span style={s.resumenDot('#F04060')}/>
-                <span style={{color:'#F04060'}}>{jugNoCount} no resueltas (se ignoran)</span>
+                <span style={{color:'#F04060'}}>{jugNoCount} no resuelt{categoria==='masculino'?'os':'as'} (se ignoran)</span>
               </div>
             )}
           </div>

@@ -43,7 +43,7 @@ export const equiposMasculino = [
   { id: 'm_incas',          name: 'Incas',             logo: logoIncas,          color: '#dc2626' },
   { id: 'm_changos',        name: 'Los Changos',       logo: logoChangos,        color: '#7c3aed' },
   { id: 'm_random',         name: 'Random Team',       logo: logoRandom,         color: '#dc2626' },
-  { id: 'm_docta_bandidos', name: 'Docta Bandidos',    logo: logoDoctaBandidos,  color: '#0f1f3d' },
+  { id: 'm_docta_bandidos', name: 'Docta Bandidos',    logo: logoDoctaBandidos,  color: '#3B5BDB' },
   { id: 'm_linaje',         name: 'Linaje',            logo: logoLinaje,         color: '#b91c1c' },
   { id: 'm_oro_negro',      name: 'Oro Negro',         logo: logoOroNegro,       color: '#1e3a5f' },
   { id: 'm_real_norte',     name: 'Real Norte',        logo: logoRealNorte,      color: '#16a34a' },

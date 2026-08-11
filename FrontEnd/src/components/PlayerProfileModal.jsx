@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
@@ -17,39 +17,98 @@ const hexA = (hex, alpha) => `${hex}${alpha}`;
 // El viewBox fijo + preserveAspectRatio hace que escale solo con CSS, sin
 // necesitar medir el contenedor con JS (por eso tampoco hace falta ningún
 // ResizeObserver acá).
-function MiniLineChart({ data, color = '#FACC15' }) {
+// ⚠️ Reemplaza al MiniLineChart anterior (línea seca sin relleno) — sigue sin
+// depender de ninguna librería externa (mismo motivo que antes: evitar el
+// crash de recharts), pero ahora con área degradada, puntos con glow
+// tappeables y selector de métrica (PTS/REB/AST/VAL) en vez de mostrar
+// siempre puntos.
+const CHART_METRICS = [
+  { key: 'pts', label: 'PTS' },
+  { key: 'reb', label: 'REB' },
+  { key: 'ast', label: 'AST' },
+  { key: 'val', label: 'VAL' },
+];
+
+function StatsLineChart({ data, color = '#F0B429' }) {
+  const [metric, setMetric] = useState('pts');
+  const [activeIdx, setActiveIdx] = useState(null);
   if (!data || data.length < 2) return null;
-  const W = 100, H = 40, padY = 4;
-  const values = data.map(d => d.pts ?? 0);
+
+  const W = 320, H = 150, padY = 16, padX = 10;
+  const values = data.map(d => d[metric] ?? 0);
   const max = Math.max(...values, 1);
-  const min = Math.min(0, ...values);
-  const range = (max - min) || 1;
-  const stepX = W / (data.length - 1);
-  const points = data.map((d, i) => ({
-    x: i * stepX,
-    y: H - padY - (((d.pts ?? 0) - min) / range) * (H - padY * 2),
+  const range = max || 1;
+  const stepX = (W - padX * 2) / (data.length - 1);
+  const pts = data.map((d, i) => ({
+    x: padX + i * stepX,
+    y: H - padY - ((d[metric] ?? 0) / range) * (H - padY * 2),
     ...d,
   }));
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ');
+  const idx = activeIdx ?? pts.length - 1;
+  const active = pts[idx];
+  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const area = `${line} L ${pts[pts.length - 1].x.toFixed(1)} ${H - padY} L ${pts[0].x.toFixed(1)} ${H - padY} Z`;
+  const gradId = `pp-area-${color.replace('#', '')}`;
 
   return (
-    <div style={{ width: '100%' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block', overflow: 'visible' }}>
-        <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke"
-          strokeLinecap="round" strokeLinejoin="round"/>
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2.4} fill={color} stroke="#08101a" strokeWidth={1}
-            vectorEffect="non-scaling-stroke">
-            <title>{p.match}: {p.pts} pts</title>
-          </circle>
-        ))}
-      </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, gap: 4 }}>
-        {data.map((d, i) => (
-          <span key={i} style={{ fontSize: 10, color: '#6b7280', fontFamily: "'Barlow Condensed',sans-serif", whiteSpace: 'nowrap' }}>
-            {d.match}
-          </span>
-        ))}
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {CHART_METRICS.map(m => {
+          const on = metric === m.key;
+          return (
+            <button key={m.key} onClick={() => { setMetric(m.key); setActiveIdx(null); }}
+              style={{
+                flex: 1, padding: '7px 0', borderRadius: 8,
+                border: `1.5px solid ${on ? color : 'transparent'}`,
+                background: on ? hexA(color, '18') : '#141C2A',
+                color: on ? color : '#6B7A99',
+                fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700,
+                letterSpacing: 1, cursor: 'pointer', transition: 'all .15s',
+              }}>
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ background: `linear-gradient(160deg, ${hexA(color, '22')}, #1C2535 55%)`, borderRadius: 14, padding: 1 }}>
+        <div style={{ background: '#0E1420', borderRadius: 13, padding: '16px 12px 8px' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 170, overflow: 'visible', display: 'block' }}>
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity="0.35"/>
+                <stop offset="100%" stopColor={color} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            {[0.25, 0.5, 0.75].map(f => {
+              const y = padY + f * (H - padY * 2);
+              return <line key={f} x1={padX} x2={W - padX} y1={y} y2={y} stroke="#FFFFFF0d" strokeWidth="1"/>;
+            })}
+            <path d={area} fill={`url(#${gradId})`} stroke="none"/>
+            <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            {pts.map((p, i) => (
+              <g key={i} style={{ cursor: 'pointer' }}
+                onClick={() => setActiveIdx(i)} onMouseEnter={() => setActiveIdx(i)}>
+                <circle cx={p.x} cy={p.y} r={8} fill={color} opacity={i === idx ? 0.25 : 0.15}/>
+                <circle cx={p.x} cy={p.y} r={i === idx ? 5 : 4} fill={color} stroke="#0E1420" strokeWidth={2}/>
+              </g>
+            ))}
+          </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, padding: '0 2px' }}>
+            {data.map((d, i) => (
+              <span key={i} style={{ fontSize: 10, color: i === idx ? color : '#4A566E', fontWeight: i === idx ? 700 : 400, fontFamily: "'Barlow Condensed',sans-serif" }}>
+                {d.match}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: 12, background: '#141C2A', border: `1px solid ${hexA(color, '44')}`, borderRadius: 10, padding: '10px 14px' }}>
+        <div style={{ color, fontSize: 12, fontWeight: 700, letterSpacing: 1, marginBottom: 2 }}>
+          {active.match} · {CHART_METRICS.find(m => m.key === metric).label}
+        </div>
+        <div style={{ color: '#EEF2F8', fontSize: 22, fontWeight: 700, fontFamily: "'Bebas Neue',sans-serif" }}>
+          {active[metric]}
+        </div>
       </div>
     </div>
   );
@@ -321,7 +380,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {/* Gráfico de puntos por fecha */}
               {chartData.length > 1 && (
                 <div style={{ marginBottom: 24 }}>
-                  <div style={ST.sectionTitle}>📈 Puntos por fecha</div>
+                  <div style={ST.sectionTitle}>📈 Rendimiento por fecha</div>
                   {/* El ErrorBoundary local queda como red de contención
                       adicional, aunque ya no dependa de recharts. */}
                   <ErrorBoundary fallback={
@@ -329,7 +388,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
                       No se pudo cargar el gráfico
                     </div>
                   }>
-                    <MiniLineChart data={chartData} color="#FACC15"/>
+                    <StatsLineChart data={chartData} color={player.color || '#F0B429'}/>
                   </ErrorBoundary>
                 </div>
               )}

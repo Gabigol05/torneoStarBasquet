@@ -21,6 +21,7 @@ import logoOroNegro       from '../assets/logo_masc_oro_negro.png';
 import logoRealNorte      from '../assets/logo_masc_real_norte.png';
 import logoElRejunte      from '../assets/logo_masc_el_rejunte.png';
 import logoSanFrancisco   from '../assets/logo_masc_san_francisco.png';
+import logoVillaAzalais   from '../assets/logo_masc_villa_azalais.png';
 
 export const equiposMasculino = [
   // San Francisco arriba de Independencia a pedido (temporal, hasta que
@@ -48,4 +49,5 @@ export const equiposMasculino = [
   { id: 'm_oro_negro',      name: 'Oro Negro',         logo: logoOroNegro,       color: '#F0B429' },
   { id: 'm_real_norte',     name: 'Real Norte',        logo: logoRealNorte,      color: '#16a34a' },
   { id: 'm_el_rejunte',     name: 'El Rejunte',        logo: logoElRejunte,      color: '#d97706' },
+  { id: 'm_villa_azalais',  name: 'Villa Azalais',     logo: logoVillaAzalais,   color: '#E63946' },
 ];

@@ -54,7 +54,9 @@ export function Navbar() {
 
       <nav className="navbar-sticky">
         <a href="#inicio" className="nav-brand" onClick={closeMobile}>
-          <img src={logo} alt="logo" className="logo-img" width="60" style={{ borderRadius: '50%' }} />
+          <div className="nav-logo-ring">
+            <img src={logo} alt="logo" className="logo-img" width="60" />
+          </div>
         </a>
 
         <ul className={`nav-links ${isMobileOpen ? 'mobile-open' : ''}`}>

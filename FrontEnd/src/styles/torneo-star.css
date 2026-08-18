@@ -195,6 +195,18 @@ nav {
   flex-shrink: 0;
 }
 
+.nav-logo-ring {
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 16px rgba(240, 180, 41, 0.4);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  transition: box-shadow 0.2s;
+}
+.nav-logo-ring:hover { box-shadow: 0 0 22px rgba(240, 180, 41, 0.6); }
+.nav-logo-ring .logo-img { display: block; border-radius: 50%; }
+
 .nav-star-logo {
   width: clamp(32px, 5vw, 42px);
   height: clamp(32px, 5vw, 42px);

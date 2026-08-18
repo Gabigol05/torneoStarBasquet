@@ -161,7 +161,7 @@ function StatCard({ val, lbl, color = '#EEF2F8', sub, teamColor }) {
   return (
     <div style={{ flex: 1, minWidth: 60, borderRadius: 9, padding: 1,
       background: teamColor ? `linear-gradient(160deg, ${hexA(teamColor, '50')}, #1C2535 65%)` : '#1C2535' }}>
-      <div style={{ borderRadius: 8, padding: '10px 8px', textAlign: 'center',
+      <div style={{ borderRadius: 8, padding: '10px 8px', textAlign: 'center', height: '100%',
         background: teamColor ? `linear-gradient(160deg, ${hexA(teamColor, '12')}, #0B111C 60%)` : '#141C2A' }}>
         <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color, lineHeight: 1 }}>{val}</div>
         <div style={{ color: '#6B7A99', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{lbl}</div>

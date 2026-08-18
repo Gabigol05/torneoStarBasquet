@@ -2067,6 +2067,7 @@ footer::after {
 @media (min-width: 768px) {
   .nav-links {
     display: flex;
+    align-items: center;
   }
 
   .nav-ig {

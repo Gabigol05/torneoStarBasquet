@@ -2099,9 +2099,10 @@ footer::after {
 
   /* La tabla de estadisticas del partido tiene 14 columnas — a 600px fijo
      obliga a scrollear incluso en monitores grandes que tienen lugar de
-     sobra. A partir de tablet/desktop dejamos que crezca con la pantalla. */
+     sobra. A partir de tablet/desktop dejamos que crezca con la pantalla
+     (1000px seguia quedando corto para que entre la tabla entera). */
   .gc-modal {
-    max-width: min(1000px, 94vw);
+    max-width: min(1150px, 90vw);
   }
 }
 
@@ -2109,6 +2110,10 @@ footer::after {
 @media (min-width: 1440px) {
   :root {
     font-size: 18px;
+  }
+
+  .gc-modal {
+    max-width: min(1300px, 82vw);
   }
 
 body.theme-masculino {

@@ -1,14 +1,43 @@
 import { useEffect, useRef } from 'react';
 import { useGlobalSearch } from '../hooks/useGlobalSearch';
+import { useTournament } from '../context/TournamentContext';
+
+const normQ = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+// Resalta en dorado la parte del nombre que coincide con lo tipeado.
+function highlightMatch(nombre, q) {
+  if (!q) return nombre;
+  const nn = normQ(nombre);
+  const nq = normQ(q);
+  const i = nn.indexOf(nq);
+  if (i < 0) return nombre;
+  return (
+    <>
+      {nombre.slice(0, i)}
+      <mark className="gs-mark">{nombre.slice(i, i + q.length)}</mark>
+      {nombre.slice(i + q.length)}
+    </>
+  );
+}
+
+const FILTROS = [
+  { key: 'todos',   label: 'Todos' },
+  { key: 'jugador', label: 'Jugadores' },
+  { key: 'equipo',  label: 'Equipos' },
+];
 
 export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
+  const { mode } = useTournament();
   // equipos viene de PageHome (ya tiene stats) — sin doble fetch
   const {
-    query, setQuery, results, hasResults, isEmpty,
+    query, setQuery, results, hasResults, isEmpty, isTyping,
     isOpen, open, close, cursor, setCursor, handleKey,
+    filtro, setFiltro, recientes, addRecent, clearRecientes, masBuscados,
   } = useGlobalSearch(equipos);
 
   const inputRef = useRef(null);
+  const jugadorLbl  = mode === 'femenino' ? 'Jugadora'  : 'Jugador';
+  const jugadoraPl  = mode === 'femenino' ? 'jugadoras' : 'jugadores';
 
   // Ctrl+K / Cmd+K
   useEffect(() => {
@@ -25,6 +54,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
   }, [isOpen]);
 
   const handleSelect = ({ type, data }) => {
+    addRecent(type === 'equipo' ? (data.name ?? data.nombre) : data.nombre);
     if (type === 'equipo') {
       onSelectTeam?.(data);
     } else {
@@ -48,11 +78,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
     close();
   };
 
-  // Índice global para cursor
-  const allItems = [
-    ...results.equipos.map(e => ({ type:'equipo', data:e })),
-    ...results.jugadoras.map(j => ({ type:'jugadora', data:j })),
-  ];
+  const rankClass = i => (i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '');
 
   return (
     <>
@@ -78,7 +104,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                 ref={inputRef}
                 className="gs-input"
                 type="text"
-                placeholder="Jugadora, equipo..."
+                placeholder={`${jugadorLbl}, equipo...`}
                 value={query}
                 onChange={e => { setQuery(e.target.value); setCursor(-1); }}
                 onKeyDown={e => handleKey(e, handleSelect)}
@@ -89,16 +115,77 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
               }
             </div>
 
+            {/* Filtros por tipo */}
+            <div className="gs-chips">
+              {FILTROS.map(f => (
+                <button key={f.key}
+                  className={`gs-chip ${filtro === f.key ? 'active' : ''}`}
+                  onClick={() => setFiltro(f.key)}>
+                  {f.key === 'jugador' ? (mode === 'femenino' ? 'Jugadoras' : 'Jugadores') : f.label}
+                </button>
+              ))}
+            </div>
+
             {/* Resultados */}
             <div className="gs-results">
-              {!query && (
-                <div className="gs-hint">
-                  <div style={{ fontSize:32, marginBottom:8 }}>🏀</div>
-                  <div>Buscá jugadoras o equipos del torneo</div>
-                  <div style={{ marginTop:6, fontSize:11, color:'#4A566E' }}>
-                    ↑↓ para navegar · ↵ para seleccionar · Esc para cerrar
-                  </div>
-                </div>
+              {/* Estado inicial: recientes + mas buscados, en vez del hint muerto de antes */}
+              {!isTyping && (
+                <>
+                  {recientes.length > 0 && (
+                    <div className="gs-section">
+                      <div className="gs-section-lbl">
+                        Búsquedas recientes
+                        <button className="gs-section-clear" onClick={clearRecientes}>Borrar</button>
+                      </div>
+                      <div className="gs-recent-chips">
+                        {recientes.map((r, i) => (
+                          <span key={i} className="gs-recent-chip" onClick={() => setQuery(r)}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+                            </svg>
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {masBuscados.length > 0 && filtro !== 'equipo' && (
+                    <div className="gs-group">
+                      <div className="gs-group-label">Más buscados</div>
+                      {masBuscados.map((j, i) => {
+                        const active = cursor === i;
+                        const initials = j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+                        return (
+                          <div key={j.id}
+                            className={`gs-item ${active ? 'gs-item-active' : ''}`}
+                            onMouseEnter={() => setCursor(i)}
+                            onClick={() => handleSelect({ type: 'jugadora', data: j })}>
+                            <span className={`gs-rank ${rankClass(i)}`}>{i + 1}</span>
+                            <div className="gs-item-avatar"
+                              style={{ background:`${j.equipoColor}20`, color:j.equipoColor, border:`1.5px solid ${j.equipoColor}40` }}>
+                              {initials}
+                            </div>
+                            <div className="gs-item-info">
+                              <div className="gs-item-name">{j.nombre}</div>
+                              <div className="gs-item-sub">
+                                {j.equipo} <span className="gs-stat-pill">· {j.pts} PTS</span>
+                              </div>
+                            </div>
+                            <span className="gs-item-arrow">→</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {recientes.length === 0 && masBuscados.length === 0 && (
+                    <div className="gs-hint">
+                      <div style={{ fontSize:32, marginBottom:8 }}>🏀</div>
+                      <div>Buscá {jugadoraPl} o equipos del torneo</div>
+                    </div>
+                  )}
+                </>
               )}
 
               {isEmpty && (
@@ -129,9 +216,9 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                             onError={e => { e.target.style.display='none'; }}/>
                         </div>
                         <div className="gs-item-info">
-                          <div className="gs-item-name">{eq.name}</div>
+                          <div className="gs-item-name">{highlightMatch(eq.name, query)}</div>
                           <div className="gs-item-sub">
-                            {eq.jugadoras.length} jugadoras
+                            {eq.jugadoras.length} {jugadoraPl}
                             {eq.pj > 0 && ` · ${eq.pg}G ${eq.pp}P`}
                           </div>
                         </div>
@@ -145,7 +232,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
               {/* Jugadoras */}
               {results.jugadoras.length > 0 && (
                 <div className="gs-group">
-                  <div className="gs-group-label">Jugadoras</div>
+                  <div className="gs-group-label">{mode === 'femenino' ? 'Jugadoras' : 'Jugadores'}</div>
                   {results.jugadoras.map((j, i) => {
                     const idx = results.equipos.length + i;
                     const active = cursor === idx;
@@ -161,11 +248,11 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                           {initials}
                         </div>
                         <div className="gs-item-info">
-                          <div className="gs-item-name">{j.nombre}</div>
+                          <div className="gs-item-name">{highlightMatch(j.nombre, query)}</div>
                           <div className="gs-item-sub">
                             {j.equipo}
                             {hayStats && (
-                              <span style={{ marginLeft:6, color:'#F0B429' }}>
+                              <span className="gs-stat-pill" style={{ marginLeft:6 }}>
                                 · {j.pts} PTS {j.reb} REB {j.ast} AST
                               </span>
                             )}

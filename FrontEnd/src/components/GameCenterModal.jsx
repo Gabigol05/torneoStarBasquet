@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
@@ -46,6 +46,11 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab,     setTab]     = useState('resumen');
+  // Orden de la tabla de estadisticas por partido: null = orden original
+  // (que ya viene por PTS descendente desde `enrich`). Se resetea cada vez
+  // que se abre un partido nuevo, mas abajo.
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState(1);
 
   const esMasc       = mode === 'masculino';
   const roster       = esMasc ? equiposMasculino : equiposFemenino;
@@ -57,6 +62,8 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
     if (!isOpen) return;
     setTab('resumen');
     setData(null);
+    setSortKey(null);
+    setSortDir(1);
     if (!isConfigured || !partidoId) return;
 
     let ignore = false;
@@ -121,6 +128,39 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
 
     return () => { ignore = true; };
   }, [isOpen, partidoId, mode]);
+
+  // Columnas ordenables de la tabla de estadisticas — 'sc'/'dc'/'tc' son los
+  // convertidos de TL/2P/3P (lo que se ve en pantalla es "convertidos/intentados",
+  // pero para ordenar tiene mas sentido comparar por lo que realmente metio).
+  const statCols = [
+    { key: 'pts', lbl: 'PTS' }, { key: 'val', lbl: 'VAL' },
+    { key: 'sc',  lbl: 'TL'  }, { key: 'dc',  lbl: '2P'  }, { key: 'tc', lbl: '3P' },
+    { key: 'rd',  lbl: 'RD'  }, { key: 'ro',  lbl: 'RO'  }, { key: 'as_', lbl: 'AS' },
+    { key: 'rb',  lbl: 'ROB' }, { key: 'tp',  lbl: 'TAP' }, { key: 'pe', lbl: 'PER' },
+    { key: 'fp',  lbl: 'FP'  },
+  ];
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(d => -d);
+    } else {
+      setSortKey(key);
+      setSortDir(1);
+    }
+  };
+
+  const rowsActivas = tab === 'local' ? data?.statsLocal : data?.statsVisit;
+  const sortedRows = useMemo(() => {
+    if (!rowsActivas) return [];
+    if (!sortKey) return rowsActivas;
+    const copy = [...rowsActivas];
+    copy.sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv ?? '');
+      return sortDir * ((bv ?? 0) - (av ?? 0));
+    });
+    return copy;
+  }, [rowsActivas, sortKey, sortDir]);
 
   if (!isOpen) return null;
 
@@ -279,7 +319,32 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
             {(tab === 'local' || tab === 'visit') && (() => {
               const eqActivo = tab === 'local' ? data.eqLocal : data.eqVisit;
               const cAct = eqActivo?.color ?? '#8899BB';
+              const SortArrow = ({ col }) => {
+                const active = sortKey === col;
+                return (
+                  <span style={{ marginLeft: 3, fontSize: 8, display:'inline-block',
+                    opacity: active ? 1 : 0.35, color: active ? '#F0B429' : 'inherit', transition: 'opacity .15s' }}>
+                    {active && sortDir === -1 ? '▲' : '▼'}
+                  </span>
+                );
+              };
               return (
+              <>
+              {sortKey && (
+                <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:6 }}>
+                  <button onClick={() => { setSortKey(null); setSortDir(1); }} style={{
+                    display:'flex', alignItems:'center', gap:6,
+                    background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)',
+                    color:'#8899BB', fontFamily:"'Barlow Condensed',sans-serif", fontSize:11.5, fontWeight:700,
+                    letterSpacing:.5, padding:'5px 10px', borderRadius:6, cursor:'pointer',
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/>
+                    </svg>
+                    Orden original
+                  </button>
+                </div>
+              )}
               <div style={{ overflowX:'auto', padding: 1, borderRadius: 10,
                 background: `linear-gradient(160deg, ${hexA(cAct, '35')}, #1C2535 60%)` }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, borderRadius: 9, overflow: 'hidden' }}>
@@ -289,14 +354,18 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                           una tabla de 14 columnas, sin esto se pierde de vista quién es
                           quién apenas se desliza para ver el resto de las stats. */}
                       <th style={{ position:'sticky', left:0, zIndex:2, background:'#141C2A', color:'#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap', width:STICKY_NUM_W }}>#</th>
-                      <th style={{ position:'sticky', left:STICKY_NUM_W, zIndex:2, background:'#141C2A', color:'#8899AA', padding:'6px 8px', textAlign:'left', fontSize:10, whiteSpace:'nowrap', boxShadow:'2px 0 4px rgba(0,0,0,.25)' }}>{esMasc ? 'Jugador' : 'Jugadora'}</th>
-                      {['PTS','VAL','TL','2P','3P','RD','RO','AS','ROB','TAP','PER','FP'].map(h => (
-                        <th key={h} style={{ background: hexA(cAct, '1f'), color:'#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap' }}>{h}</th>
+                      <th onClick={() => handleSort('nombre')} style={{ position:'sticky', left:STICKY_NUM_W, zIndex:2, background:'#141C2A', color: sortKey==='nombre' ? '#F0B429' : '#8899AA', padding:'6px 8px', textAlign:'left', fontSize:10, whiteSpace:'nowrap', boxShadow:'2px 0 4px rgba(0,0,0,.25)', cursor:'pointer' }}>
+                        {esMasc ? 'Jugador' : 'Jugadora'}<SortArrow col="nombre"/>
+                      </th>
+                      {statCols.map(c => (
+                        <th key={c.key} onClick={() => handleSort(c.key)} style={{ background: hexA(cAct, '1f'), color: sortKey===c.key ? '#F0B429' : '#8899AA', padding:'6px 8px', textAlign:'center', fontSize:10, whiteSpace:'nowrap', cursor:'pointer' }}>
+                          {c.lbl}<SortArrow col={c.key}/>
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {(tab === 'local' ? data.statsLocal : data.statsVisit).map((r, i) => {
+                    {sortedRows.map((r, i) => {
                       const eq = eqActivo;
                       const rowBg = i%2===0 ? '#141C2A' : '#0E1420';
                       return (
@@ -323,6 +392,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   </tbody>
                 </table>
               </div>
+              </>
               );
             })()}
           </>

@@ -1403,6 +1403,7 @@ tbody td {
   grid-template-columns: repeat(auto-fill, minmax(clamp(240px, 35vw, 280px), 1fr));
   gap: clamp(12px, 2vw, 16px);
   margin-bottom: var(--spacing-2xl);
+  align-items: stretch;
 }
 
 .leader-card {
@@ -1448,6 +1449,8 @@ tbody td {
   border-radius: 9px;
   padding: clamp(16px, 2.5vw, 20px);
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .lc-row-dot {
   width: 7px;
@@ -2092,6 +2095,13 @@ footer::after {
   .footer-top {
     grid-template-columns: 1fr 1fr 1fr;
   }
+
+  /* La tabla de estadisticas del partido tiene 14 columnas — a 600px fijo
+     obliga a scrollear incluso en monitores grandes que tienen lugar de
+     sobra. A partir de tablet/desktop dejamos que crezca con la pantalla. */
+  .gc-modal {
+    max-width: min(1000px, 94vw);
+  }
 }
 
 /* Large Desktop / 4K */
@@ -2652,16 +2662,19 @@ body.theme-femenino {
 .players-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
 
 .player-item {
   background: var(--dark3); border-radius: 9px; padding: 1px;
   cursor: pointer; transition: transform 0.2s;
+  height: 100%;
 }
 .player-item:hover { transform: translateY(-2px); }
 .player-item-inner {
   border-radius: 8px; padding: 11px;
   display: flex; align-items: center; gap: 12px;
+  height: 100%;
 }
 .player-item-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--dark5); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .player-item-info { flex: 1; }
@@ -5253,13 +5266,14 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .leader-flip {
   perspective: 1600px;
   cursor: pointer;
-  min-height: 260px;
+  min-height: 380px;
+  height: 100%;
 }
 .leader-flip-inner {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 260px;
+  min-height: 380px;
   transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
   transform-style: preserve-3d;
 }
@@ -5308,12 +5322,11 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 }
 
 .lc-list-full {
-  max-height: 200px;
-  overflow-y: auto;
+  max-height: none;
 }
 
 .lc-flip-hint {
-  margin-top: clamp(8px, 1.2vw, 10px);
+  margin-top: auto;
   padding-top: clamp(8px, 1.2vw, 10px);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   text-align: center;

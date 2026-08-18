@@ -73,6 +73,13 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
         ast_total: data.ast_total ?? 0, rob_total: data.rob_total ?? 0,
         tap_total: data.tap_total ?? 0, val_total: data.val_total ?? 0,
         per_total: data.per_total ?? 0,
+        // ⚠️ FIX: faltaban los tiros reales (convertidos/fallados) — sin esto
+        // el desglose de tiros mostraba "0/0" con el porcentaje viejo pegado
+        // al lado, para cualquier jugador abierto desde el buscador global.
+        sc_total: data.sc_total ?? 0, sf_total: data.sf_total ?? 0,
+        dc_total: data.dc_total ?? 0, df_total: data.df_total ?? 0,
+        tc_total: data.tc_total ?? 0, tf_total: data.tf_total ?? 0,
+        sc_prom: data.sc_prom ?? 0, dc_prom: data.dc_prom ?? 0, tc_prom: data.tc_prom ?? 0,
       });
     }
     close();

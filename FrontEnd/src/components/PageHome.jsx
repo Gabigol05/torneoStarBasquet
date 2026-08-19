@@ -8,8 +8,10 @@ import { LeadersSection }   from './LeadersSection.jsx';
 import { EncuestasSection } from './EncuestasSection.jsx';
 import { PlayoffsBracket }  from './PlayoffsBracket.jsx';
 import { PlayerProfileModal } from './PlayerProfileModal.jsx';
+import { GameCenterModal }  from './GameCenterModal.jsx';
 import { Footer }           from './Footer.jsx';
 import { BottomNav }        from './BottomNav.jsx';
+import { InstallBanner }    from './InstallBanner.jsx';
 import { ToastContainer, useToast, useResultadosToast } from './ToastSystem.jsx';
 import { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx';
 import { useScrollReveal }  from '../hooks/useScrollReveal';
@@ -65,7 +67,8 @@ export function PageHome() {
   useScrollReveal();
   const [activeTab, setActiveTab] = useState('inicio');
   const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
-  const { mode } = useTournament();
+  const [deepLinkPartido, setDeepLinkPartido] = useState(null);
+  const { mode, setMode } = useTournament();
   // Antes los dos hooks pedían datos y abrían su canal de Realtime siempre,
   // aunque solo se ve un modo a la vez — cada visitante hacía el doble de
   // queries/websockets de lo necesario. Ahora solo el hook del modo activo
@@ -149,12 +152,38 @@ export function PageHome() {
     window.history.replaceState({}, '', url.pathname + url.search);
   };
 
+  // Detecta ?partido=<id>&modo=<masculino|femenino> en la URL (link de un
+  // partido compartido) y abre el GameCenterModal correspondiente. A
+  // diferencia del deep link de jugadora, GameCenterModal trae sus propios
+  // datos por partidoId — no depende de que "equipos" ya haya cargado.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const partidoParam = params.get('partido');
+    if (!partidoParam) return;
+
+    const modoParam = params.get('modo');
+    if ((modoParam === 'masculino' || modoParam === 'femenino') && modoParam !== mode) {
+      setMode(modoParam);
+    }
+    setDeepLinkPartido(partidoParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeDeepLinkPartido = () => {
+    setDeepLinkPartido(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('partido');
+    url.searchParams.delete('modo');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
   return (
     <FavoritoProvider>
     <StatsContext.Provider value={{ equipos, partidos, fechas, statsPorPartido, isLoading }}>
       <WaveBackground />
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} />
+      <InstallBanner />
       <PlayerProfileModal
         isOpen={!!deepLinkPlayer}
         onClose={closeDeepLinkPlayer}
@@ -163,6 +192,12 @@ export function PageHome() {
         partidos={partidos}
         fechas={fechas}
         addToast={addToast}
+      />
+      <GameCenterModal
+        isOpen={!!deepLinkPartido}
+        onClose={closeDeepLinkPartido}
+        partidoId={deepLinkPartido}
+        mode={mode}
       />
       {/* Desktop */}
       <div className="desktop-only">

@@ -42,6 +42,55 @@ function StatBar({ label, a, b, colorA, colorB }) {
   );
 }
 
+// ─── Share button ─────────────────────────────────────────────────────────────
+// Autocontenido (no depende de addToast) porque GameCenterModal se abre desde
+// varios lugares (TorneoView, TeamPageFem) que no siempre pasan el sistema de
+// toasts — el feedback de "copiado" vive en el propio botón.
+function ShareMatchButton({ data, partidoId, mode }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    const { partido, eqLocal, eqVisit } = data;
+    const url = `${window.location.origin}${window.location.pathname}?partido=${partidoId}&modo=${mode}`;
+    const text = `🏀 ${eqLocal?.name} ${partido.puntos_local} - ${partido.puntos_visit} ${eqVisit?.name}\nTorneo Star Básquet 2026`;
+    if (navigator.share) {
+      try { await navigator.share({ title: `${eqLocal?.name} vs ${eqVisit?.name} — Star Básquet`, text, url }); }
+      catch (_) {}
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {}
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`, '_blank', 'noopener');
+  };
+
+  return (
+    <button onClick={handleShare} title="Compartir partido" style={{
+      position: 'absolute', top: 16, right: 16, zIndex: 10,
+      display: 'flex', alignItems: 'center', gap: 6,
+      height: 36, padding: copied ? '0 12px' : 0, width: copied ? 'auto' : 36,
+      borderRadius: 18,
+      background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
+      justifyContent: 'center',
+      color: copied ? '#7fe0a3' : '#EEF2F8', cursor: 'pointer',
+      fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700,
+      transition: 'width .2s, color .2s',
+    }}>
+      {copied ? '✓ Copiado' : (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
@@ -181,6 +230,8 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
         </button>
+
+        {!loading && data && <ShareMatchButton data={data} partidoId={partidoId} mode={mode} />}
 
         {loading && (
           <div style={{ padding: '2rem' }}>

@@ -4,37 +4,22 @@ import { trackEvent } from '../lib/analytics.js';
 import { useInstallPrompt } from '../hooks/useInstallPrompt.js';
 import { IosInstallSteps } from './IosInstallSteps.jsx';
 
-const DISMISS_KEY = 'star_basquet_install_dismissed';
-const DISMISS_DAYS = 14;
 const SHOW_DELAY_MS = 5000;
-
-function wasDismissedRecently() {
-  try {
-    const raw = localStorage.getItem(DISMISS_KEY);
-    if (!raw) return false;
-    const days = (Date.now() - Number(raw)) / (1000 * 60 * 60 * 24);
-    return days < DISMISS_DAYS;
-  } catch {
-    return false;
-  }
-}
-
-function markDismissed() {
-  try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {}
-}
 
 // Aviso de "agregar a inicio" — la PWA (vite-plugin-pwa) ya está armada e
 // instalable hace rato, pero no había ningún aviso que lo mostrara: nadie
-// sabía que existía. Aparece una sola vez (con cooldown de 14 días si lo
-// cierran); el botón fijo del footer queda como respaldo permanente para
-// quien lo cerró o entra en un navegador donde este aviso no se muestra.
+// sabía que existía. Antes, cerrarlo con la cruz lo apagaba 14 días (vía
+// localStorage); ahora cerrarlo solo lo oculta en esa visita — vuelve a
+// aparecer la próxima vez que entren, y así hasta que "standalone" detecte
+// que ya lo instalaron. El botón fijo del footer sigue como acceso rápido
+// para quien lo cierra pero quiere instalarlo al toque después.
 export function InstallBanner() {
   const { ios, standalone, canPromptNative, promptInstall } = useInstallPrompt();
   const [visible, setVisible] = useState(false);
   const [showIosSteps, setShowIosSteps] = useState(false);
 
   useEffect(() => {
-    if (standalone || wasDismissedRecently()) return;
+    if (standalone) return;
     // Espera unos segundos antes de mostrarlo para no interrumpir la
     // primera carga. Si a los 5s todavía no hay ni evento nativo ni es iOS
     // (el "canPromptNative" del render de abajo lo filtra), no pasa nada:
@@ -47,7 +32,6 @@ export function InstallBanner() {
   const dismiss = useCallback(() => {
     setVisible(false);
     setShowIosSteps(false);
-    markDismissed();
   }, []);
 
   const handleInstall = useCallback(async () => {
@@ -57,7 +41,10 @@ export function InstallBanner() {
       return;
     }
     const outcome = await promptInstall('banner');
-    if (outcome) { setVisible(false); markDismissed(); }
+    if (outcome === 'accepted') setVisible(false);
+    // Si eligió "cancelar" en el prompt nativo, se deja visible — puede
+    // haber sido sin querer, y de última vuelve a aparecer solo en la
+    // próxima visita de todos modos.
   }, [ios, promptInstall]);
 
   // Si a esta altura no hay ni evento nativo ni es iOS, no hay nada que

@@ -1,4 +1,5 @@
 import logoTorneo from '../assets/logo_torneo.jpg';
+import { FooterInstallButton } from './FooterInstallButton.jsx';
 
 export function Footer() {
   return (
@@ -42,6 +43,7 @@ export function Footer() {
                   </span>
                   @torneostar.basquet
                 </a>
+                <FooterInstallButton />
               </div>
               <div style={{ fontFamily: "'Barlow Condensed'", fontSize: '13px', color: 'var(--gray)', marginTop: '10px' }}>Inscripciones y consultas por Instagram</div>
             </div>

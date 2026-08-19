@@ -56,6 +56,7 @@ import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
 import { useWheelHorizontal } from '../hooks/useWheelHorizontal';
+import { labelFecha }       from '../lib/fechaLabel';
 
 const TABS = [
   { key: 'tabla',      label: 'Tabla'     },
@@ -147,7 +148,7 @@ function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick })
       }}>
         <div className="rc2-header">
           <span className="fc2v-badge">
-            {fecha ? `Fecha ${fecha.numero}` : 'Partido'}
+            {fecha ? labelFecha(fecha) : 'Partido'}
             {diaCal && ` · ${diaCal.split('-').reverse().slice(0,2).join('/')}`}
             {partido.hora_inicio && ` · ${String(partido.hora_inicio).slice(0, 5)}`}
           </span>
@@ -253,7 +254,7 @@ function FixtureCard({ partido, equiposFem, fechas }) {
       }}>
         <div className="fc2v-header">
           <span className="fc2v-badge">
-            {fecha ? `Fecha ${fecha.numero}` : 'Proximo'}
+            {fecha ? labelFecha(fecha) : 'Proximo'}
             {diaCal && ` · ${diaCal.split('-').reverse().slice(0,2).join('/')}`}
             {partido.hora_inicio && ` · ${String(partido.hora_inicio).slice(0, 5)}`}
           </span>

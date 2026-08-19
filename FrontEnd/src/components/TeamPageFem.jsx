@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { GameCenterModal } from './GameCenterModal';
+import { labelFecha } from '../lib/fechaLabel';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
 // tarjetas de fixture/resultado/lider/bracket) — evita color-mix()/variables
@@ -308,7 +309,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                           <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
                           <div className="tp-match-header">
                             <span className="tp-match-date">
-                              {fechaObj ? `Fecha ${fechaObj.numero}` : ''}
+                              {fechaObj ? labelFecha(fechaObj) : ''}
                             </span>
                             <span className={`tp-match-result ${h.resultado === 'G' ? 'win' : 'loss'}`}>
                               {h.resultado === 'G' ? 'GANÓ' : 'PERDIÓ'}
@@ -378,7 +379,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                           <div className="tp-match-header">
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                               <span className="tp-match-date">
-                                {p.fechaDesc ?? (p.fechaNum ? `Fecha ${p.fechaNum}` : 'Próximo')}
+                                {(p.fechaNum || p.fechaDesc)
+                                  ? labelFecha({ numero: p.fechaNum, descripcion: p.fechaDesc })
+                                  : 'Próximo'}
                               </span>
                               {p.hora && (
                                 <span style={{ fontSize: 12, color: '#F0B429', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: .5 }}>

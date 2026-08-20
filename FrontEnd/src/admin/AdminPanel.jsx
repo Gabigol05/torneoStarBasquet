@@ -160,13 +160,13 @@ function ToolsDropdown({ sec, setSec }) {
 function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, showToggle, onClose }) {
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(5,8,14,.72)', backdropFilter:'blur(2px)', zIndex:299 }}/>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(5,8,14,.78)', zIndex:299, animation:'drawerFade .15s ease' }}/>
       <aside style={{
         position:'fixed', top:0, left:0, bottom:0, width:'min(300px, 84vw)', maxWidth:300,
         height:'100dvh', maxHeight:'100vh', zIndex:300, boxSizing:'border-box',
-        background:'linear-gradient(180deg,#0C1220 0%,#080C12 100%)', borderRight:'1px solid #1C2535',
-        boxShadow:'8px 0 32px rgba(0,0,0,.45)', animation:'slideIn .22s ease',
-        display:'grid', gridTemplateRows:'auto 1fr auto', overflow:'hidden',
+        background:'#0B111C', borderRight:'1px solid #1C2535',
+        boxShadow:'8px 0 32px rgba(0,0,0,.45)', animation:'drawerFade .15s ease',
+        display:'grid', gridTemplateRows:'auto 1fr auto', overflow:'hidden', isolation:'isolate',
       }}>
         {/* Header fijo: marca + saludo + acciones rapidas */}
         <div style={{ padding:'1.1rem 1rem .9rem', borderBottom:'1px solid #1C2535' }}>
@@ -280,7 +280,7 @@ export default function AdminPanel() {
     <div style={S.shell}>
       <style>{`
         @keyframes pulse-rt { 0%,100%{opacity:1}50%{opacity:.4} }
-        @keyframes slideIn  { from{transform:translateX(-100%)}to{transform:translateX(0)} }
+        @keyframes drawerFade { from{opacity:0} to{opacity:1} }
         @media(max-width:820px){
           [data-admin-topbar]{display:none!important}
           [data-admin-mobilebar]{display:flex!important}

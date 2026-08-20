@@ -37,6 +37,18 @@ const GOLD_TEXT = {
   background: 'linear-gradient(100deg, #F0B429 0%, #FF6B2B 52%, #FFD166 100%)',
   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
 };
+// El sitio público tiene una regla global `nav { position:sticky; height:clamp(56px,8vh,68px); ... }`
+// pensada para SU navbar. Como acá usamos <nav> sin clase para agrupar los
+// botones del drawer, esa regla se filtraba y le clavaba un techo de ~68px
+// a la lista completa (4 botones ≈ 216px), haciendo que los botones de más
+// se superpongan visualmente con lo que viene después. Este reset anula
+// todo lo que esa regla global toca.
+const NAV_RESET = {
+  display:'flex', flexDirection:'column', gap:2, marginBottom:16,
+  height:'auto', minHeight:0, maxHeight:'none', position:'static', top:'auto', zIndex:'auto',
+  background:'transparent', backdropFilter:'none', WebkitBackdropFilter:'none', borderBottom:'none',
+  boxSizing:'border-box',
+};
 const NAV_TODO = [CARGAR, ...TABS, ...TOOLS];
 const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar'];
 
@@ -210,14 +222,14 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
         {/* Nav scrollable: unica zona con overflow, no puede pisar al header ni al footer */}
         <div style={{ overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'.9rem 1rem', minHeight:0 }}>
           <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>NAVEGACIÓN</div>
-          <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:16 }}>
+          <nav style={NAV_RESET}>
             {TABS.map(item => (
               <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
             ))}
           </nav>
 
           <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>HERRAMIENTAS</div>
-          <nav style={{ display:'flex', flexDirection:'column', gap:2 }}>
+          <nav style={{ ...NAV_RESET, marginBottom:0 }}>
             {TOOLS.map(item => (
               <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
             ))}
@@ -389,7 +401,12 @@ const S = {
   shell:       { minHeight:'100vh', background:'#080C12', fontFamily:"'Barlow Condensed',sans-serif", color:'#EEF2F8' },
   topbar:      { position:'relative', zIndex:50, background:'linear-gradient(180deg,#0C1220 0%,#0A0F19 100%)', borderBottom:'1px solid #1C2535' },
   topbarRow:   { display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, padding:'12px 24px', flexWrap:'wrap' },
-  navRow:      { display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, padding:'8px 20px 12px', flexWrap:'wrap', borderTop:'1px solid #131B29' },
+  // height/position/background/backdropFilter/borderBottom explícitos porque el
+  // sitio público tiene `nav { position:sticky; height:clamp(56px,8vh,68px); ... }`
+  // global que si no se pisa, le clava un techo de altura a este <nav> también.
+  navRow:      { display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, padding:'8px 20px 12px', flexWrap:'wrap',
+                 borderTop:'1px solid #131B29', borderBottom:'none', height:'auto', minHeight:0, maxHeight:'none',
+                 position:'static', top:'auto', zIndex:'auto', background:'transparent', backdropFilter:'none', WebkitBackdropFilter:'none' },
   logoutBtnSmall: { display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:'rgba(240,64,96,.08)', border:'1px solid rgba(240,64,96,.2)', borderRadius:8, color:'#F04060', cursor:'pointer', fontSize:12, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5 },
   cargarBtn:   { padding:'9px 16px', borderRadius:9, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', color:'#0B0E14', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:13, letterSpacing:.5, whiteSpace:'nowrap' },
   mobileBar:   { display:'none', position:'fixed', top:0, left:0, right:0, zIndex:200, background:'#0C1220', borderBottom:'1px solid #1C2535', padding:'12px 16px', alignItems:'center', gap:12 },

@@ -1,16 +1,13 @@
 // Convierte una "fecha"/jornada (fila de fechas_femenino/fechas_masculino) en
-// la etiqueta que se muestra en las cards de partido. Por default es
-// "Fecha N" (temporada regular), pero si el admin cargó la jornada con una
-// descripcion que menciona "playoff" (ej: "Playoffs Femenino - Semifinal",
-// puesto a mano en el panel al armar el fixture de esa ronda), se muestra
-// "Playoffs · Semifinal" en su lugar — sin esto, un partido de playoff
-// aparecia igual que cualquier otro ("Fecha 10") y no se distinguia.
+// la etiqueta que se muestra en las cards de partido. Si el admin le puso una
+// descripcion propia al cargar el fixture (ej: "SEMIFINALES", "Playoffs -
+// Cuartos de Final", "Copa de Oro"), se muestra tal cual — sin esto se exigia
+// que la descripcion contuviera literalmente la palabra "playoff" para
+// distinguirse, y una fecha cargada como "SEMIFINALES" seguia mostrando
+// "Fecha 10" en el sitio aunque el admin ya la hubiera nombrado bien.
+// Si no le pusieron descripcion, cae al default "Fecha N".
 export function labelFecha(fecha) {
   if (!fecha) return null;
   const desc = (fecha.descripcion ?? '').trim();
-  if (desc && /playoff/i.test(desc)) {
-    const resto = desc.replace(/^playoffs?\s*(femenino|masculino)?\s*[-–—:]*\s*/i, '').trim();
-    return resto ? `Playoffs · ${resto}` : 'Playoffs';
-  }
-  return `Fecha ${fecha.numero}`;
+  return desc || `Fecha ${fecha.numero}`;
 }

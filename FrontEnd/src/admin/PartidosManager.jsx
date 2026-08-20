@@ -335,7 +335,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
           <input type="text" placeholder="Ej: Playoffs - Semifinal" value={descripcion}
             onChange={e=>setDescripcion(e.target.value)} style={F.input}/>
           <div style={{ fontSize:11, color:'#6B7A99', marginTop:4 }}>
-            Si escribís "Playoffs" acá, en el sitio se va a mostrar como "Playoffs · [lo que pongas después]" en vez de "Fecha {jornada || 'N'}".
+            Lo que escribas acá se muestra tal cual en el sitio en vez de "Fecha {jornada || 'N'}" (ej: "Playoffs - Semifinal", "SEMIFINALES", "Copa de Oro").
           </div>
         </div>
       </div>

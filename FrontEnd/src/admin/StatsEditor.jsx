@@ -60,15 +60,15 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
   };
 
   const getBg = () => {
-    if (tieneEdits) return 'rgba(240,180,41,.06)';
-    return idx % 2 === 0 ? '#0E1420' : '#141C2A';
+    if (tieneEdits) return `linear-gradient(90deg, ${equipo.color}22, rgba(240,180,41,.06) 60%)`;
+    return idx % 2 === 0 ? `linear-gradient(90deg, ${equipo.color}18, #0E1420 60%)` : `linear-gradient(90deg, ${equipo.color}14, #141C2A 60%)`;
   };
 
   return (
     <>
       {/* Fila principal */}
       <tr style={{ background: getBg(), cursor:'pointer' }} onClick={() => setExpanded(e => !e)}>
-        <td style={{ padding:'10px 12px', minWidth:180, position:'sticky', left:0, zIndex:1, background:getBg(), boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>
+        <td style={{ padding:'10px 12px 10px 9px', minWidth:180, position:'sticky', left:0, zIndex:1, background:getBg(), borderLeft:`3px solid ${equipo.color}`, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {/* Avatar */}
             <div style={{
@@ -337,7 +337,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
       {/* Stats del equipo seleccionado */}
       {equipo && !loading && (
-        <div style={S.equipoHeader}>
+        <div style={{ ...S.equipoHeader, background:`linear-gradient(115deg, ${equipo.color}2A, #0E1420 55%)`, borderColor:`${equipo.color}55` }}>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
             <img src={equipo.logo} alt={equipo.name} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:`2px solid ${equipo.color}40` }}
               onError={e=>{e.target.style.display='none';}}/>
@@ -418,8 +418,9 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
             const hasEdit = Boolean(ed);
             return (
               <div key={j.id} style={{
-                background: hasEdit ? 'linear-gradient(160deg,rgba(240,180,41,.1),#0B111C)' : 'linear-gradient(160deg,#101826,#0B111C)',
-                border:`1px solid ${hasEdit?'rgba(240,180,41,.3)':'#1C2535'}`,
+                background: hasEdit ? `linear-gradient(160deg,${equipo.color}22,rgba(240,180,41,.08) 55%,#0B111C)` : `linear-gradient(160deg,${equipo.color}1E,#0B111C 60%)`,
+                border:`1px solid ${hasEdit?'rgba(240,180,41,.35)':equipo.color+'40'}`,
+                borderTop:`2px solid ${hasEdit?'#F0B429':equipo.color}`,
                 borderRadius:12, padding:'16px',
                 transition:'border-color .2s',
               }}>

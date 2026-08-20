@@ -17,9 +17,9 @@ import logoTorneo from '../assets/logo_torneo.jpg';
 
 // ── Navegación ────────────────────────────────────────────────────────────────
 const TABS = [
-  { id:'dashboard', icon:'🏠', label:'Resumen',       desc:'Vista general del torneo' },
+  { id:'dashboard', icon:'🏀', label:'Resumen',       desc:'Vista general del torneo' },
   { id:'partidos',  icon:'📅', label:'Partidos',       desc:'Fixture y resultados' },
-  { id:'stats',     icon:'✏️', label:'Estadísticas',   desc:'Corrección manual' },
+  { id:'stats',     icon:'📊', label:'Estadísticas',   desc:'Corrección manual' },
   { id:'historial', icon:'🗂️', label:'Historial',      desc:'Ver cargas anteriores' },
 ];
 const TOOLS = [
@@ -28,7 +28,7 @@ const TOOLS = [
   { id:'fusionar',   icon:'🧬', label:'Fusionar jugadores', desc:'Unir duplicados del roster' },
   { id:'recalcular', icon:'🔄', label:'Recalcular',         desc:'Reprocesar promedios' },
 ];
-const CARGAR = { id:'excel', icon:'📊', label:'Subir Partido', desc:'Cargar planilla Excel' };
+const CARGAR = { id:'excel', icon:'📤', label:'Subir Partido', desc:'Cargar planilla Excel' };
 
 // Mismo degradado dorado que usa el título del Hero en el sitio público
 // (.hero-title-accent) — para que el logo del admin se sienta parte de la

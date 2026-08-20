@@ -92,7 +92,14 @@ function buildExtra(partidosCat, fechaMap) {
   })();
   const quedanSemana = conFecha.filter(p => p.estado === 'pendiente' && p.effDate >= lunesActual && p.effDate <= domingoActual).length;
 
-  return { pctTotal, porSemana, jugadosHoy, diaTop, quedanSemana };
+  return { pctTotal, jugados, total, porSemana, jugadosHoy, diaTop, quedanSemana };
+}
+
+function fmtSemana(wk) {
+  try {
+    const d = new Date(`${wk}T00:00:00`);
+    return d.toLocaleDateString('es-AR', { day:'2-digit', month:'short' });
+  } catch { return wk; }
 }
 
 // ── Sub-componentes ──────────────────────────────────────────────────────────
@@ -199,16 +206,58 @@ function MiniStat({ value, label, color }) {
   );
 }
 
+function SemanaChart({ porSemana }) {
+  const [hover, setHover] = useState(null);
+  const W = 180, H = 60, PAD = 6;
+  const maxCount = Math.max(1, ...porSemana.map(s => s.count));
+  const stepX = porSemana.length > 1 ? (W - PAD * 2) / (porSemana.length - 1) : 0;
+  const pts = porSemana.map((s, i) => ({
+    ...s,
+    x: porSemana.length > 1 ? PAD + i * stepX : W / 2,
+    y: PAD + (H - PAD * 2) - (s.count / maxCount) * (H - PAD * 2),
+  }));
+  const pathD = pts.map((p, i) => `${i===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const activo = hover != null ? pts[hover] : null;
+
+  if (porSemana.length < 2) {
+    return <div style={{ fontSize:10, color:'#2C3A52', textAlign:'center', padding:'16px 0' }}>Sin datos suficientes (hace falta fecha en al menos 2 semanas distintas)</div>;
+  }
+
+  return (
+    <div style={{ position:'relative' }}>
+      <svg width="100%" height="60" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display:'block', overflow:'visible' }}>
+        {[0.25, 0.5, 0.75].map(f => (
+          <line key={f} x1={PAD} x2={W-PAD} y1={PAD+(H-PAD*2)*f} y2={PAD+(H-PAD*2)*f} stroke="#1C2535" strokeWidth="1"/>
+        ))}
+        <path d={pathD} fill="none" stroke="#60A5FA" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {pts.map((p, i) => (
+          <circle key={p.wk} cx={p.x} cy={p.y} r={hover===i?4.5:2.5}
+            fill={hover===i?'#93C5FD':'#60A5FA'} stroke="#0B111C" strokeWidth="1.2"
+            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor:'pointer' }}/>
+        ))}
+      </svg>
+      {activo && (
+        <ChartTooltip left={`${(activo.x / W) * 100}%`}>
+          <div style={{ color:'#60A5FA', fontWeight:700, marginBottom:2 }}>Semana del {fmtSemana(activo.wk)}</div>
+          <div style={{ color:'#8899BB' }}>{activo.count} partido{activo.count===1?'':'s'}</div>
+        </ChartTooltip>
+      )}
+      <div style={{ display:'flex', marginTop:2 }}>
+        {pts.map((p, i) => (
+          <div key={p.wk} style={{ flex:1, textAlign:'center', fontSize:8, color: hover===i?'#F0B429':'#2C3A52', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', whiteSpace:'nowrap' }}>
+            {fmtSemana(p.wk)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MiniMultiChart({ extra }) {
   if (!extra) return null;
-  const { pctTotal, porSemana, jugadosHoy, diaTop, quedanSemana } = extra;
+  const { pctTotal, jugados, total, porSemana, jugadosHoy, diaTop, quedanSemana } = extra;
   const r = 24, C = 2 * Math.PI * r;
   const offset = C - (Math.min(100, pctTotal) / 100) * C;
-
-  const W = 100, H = 42;
-  const maxCount = Math.max(1, ...porSemana.map(s => s.count));
-  const stepX = porSemana.length > 1 ? W / (porSemana.length - 1) : W;
-  const pts = porSemana.map((s, i) => ({ x: porSemana.length > 1 ? i * stepX : W / 2, y: H - (s.count / maxCount) * H }));
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:18 }}>
@@ -221,16 +270,11 @@ function MiniMultiChart({ extra }) {
           <text x="32" y="37" textAnchor="middle" fill="#EEF2F8" fontFamily="'Bebas Neue',sans-serif" fontSize="16">{Math.round(pctTotal)}%</text>
         </svg>
         <div style={{ fontSize:9, color:'#4A566E', marginTop:4 }}>Avance total</div>
+        <div style={{ fontSize:9, color:'#6B7A99', marginTop:1 }}>{jugados}/{total} partidos</div>
       </div>
       <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'12px 10px' }}>
         <div style={{ fontSize:9, color:'#4A566E', marginBottom:6 }}>Partidos por semana</div>
-        {porSemana.length > 1 ? (
-          <svg width="100%" height="42" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            <polyline points={pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke="#60A5FA" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-          </svg>
-        ) : (
-          <div style={{ fontSize:10, color:'#2C3A52', textAlign:'center', padding:'12px 0' }}>Sin datos suficientes</div>
-        )}
+        <SemanaChart porSemana={porSemana}/>
       </div>
       <div style={{ gridColumn:'1 / 3', background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'12px 10px', display:'flex', alignItems:'center', justifyContent:'space-around', flexWrap:'wrap', gap:10 }}>
         <MiniStat value={jugadosHoy} label="jugados hoy" color="#22D07A"/>

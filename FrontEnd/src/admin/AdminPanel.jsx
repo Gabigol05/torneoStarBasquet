@@ -160,56 +160,72 @@ function ToolsDropdown({ sec, setSec }) {
 function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, showToggle, onClose }) {
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:299 }}/>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(5,8,14,.72)', backdropFilter:'blur(2px)', zIndex:299 }}/>
       <aside style={{
-        position:'fixed', top:0, left:0, bottom:0, width:'min(280px, 82vw)', maxWidth:280,
-        height:'100dvh', maxHeight:'100vh', zIndex:300, overflowY:'auto', WebkitOverflowScrolling:'touch',
+        position:'fixed', top:0, left:0, bottom:0, width:'min(300px, 84vw)', maxWidth:300,
+        height:'100dvh', maxHeight:'100vh', zIndex:300, boxSizing:'border-box',
         background:'linear-gradient(180deg,#0C1220 0%,#080C12 100%)', borderRight:'1px solid #1C2535',
-        boxShadow:'6px 0 24px rgba(0,0,0,.4)',
-        animation:'slideIn .22s ease', padding:'1.25rem 1rem calc(1rem + env(safe-area-inset-bottom))',
-        display:'flex', flexDirection:'column', boxSizing:'border-box',
+        boxShadow:'8px 0 32px rgba(0,0,0,.45)', animation:'slideIn .22s ease',
+        display:'grid', gridTemplateRows:'auto 1fr auto', overflow:'hidden',
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-          <div style={{ width:52, height:52, borderRadius:12, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 16px rgba(240,180,41,.2)', flexShrink:0 }}>
-            <img src={logoTorneo} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+        {/* Header fijo: marca + saludo + acciones rapidas */}
+        <div style={{ padding:'1.1rem 1rem .9rem', borderBottom:'1px solid #1C2535' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+            <div style={{ width:46, height:46, borderRadius:11, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 14px rgba(240,180,41,.2)', flexShrink:0 }}>
+              <img src={logoTorneo} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+            </div>
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", ...GOLD_TEXT, fontSize:18, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
+              <div style={{ color:'#4A566E', fontSize:9.5, letterSpacing:1, textTransform:'uppercase', marginTop:2 }}>Admin Panel</div>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar menú" style={{
+              width:32, height:32, borderRadius:8, flexShrink:0, cursor:'pointer',
+              background:'rgba(255,255,255,.04)', border:'1px solid #1C2535', color:'#8899BB',
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
-          <div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", ...GOLD_TEXT, fontSize:19, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
-            <div style={{ color:'#4A566E', fontSize:10, letterSpacing:1, textTransform:'uppercase', marginTop:2 }}>Admin Panel</div>
+
+          <div style={{ fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif" }}>
+            {greeting}
           </div>
+
+          {showToggle && <div style={{ marginTop:10 }}><CategoriaToggle categoria={categoria} setCategoria={setCategoria}/></div>}
+
+          {sec !== 'excel' && (
+            <button onClick={() => { setSec('excel'); onClose(); }} style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'11px',
+              marginTop:12, borderRadius:9, cursor:'pointer', border:'none',
+              background:'linear-gradient(135deg,#F0B429,#FF6B2B)', color:'#0B0E14',
+              fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:14, letterSpacing:.5,
+            }}>
+              + Cargar partido
+            </button>
+          )}
         </div>
-        <div style={{ fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, paddingBottom:14, borderBottom:'1px solid #1C2535' }}>
-          {greeting}
+
+        {/* Nav scrollable: unica zona con overflow, no puede pisar al header ni al footer */}
+        <div style={{ overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'.9rem 1rem', minHeight:0 }}>
+          <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>NAVEGACIÓN</div>
+          <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:16 }}>
+            {TABS.map(item => (
+              <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
+            ))}
+          </nav>
+
+          <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>HERRAMIENTAS</div>
+          <nav style={{ display:'flex', flexDirection:'column', gap:2 }}>
+            {TOOLS.map(item => (
+              <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
+            ))}
+          </nav>
         </div>
 
-        {showToggle && <div style={{ marginBottom:6 }}><CategoriaToggle categoria={categoria} setCategoria={setCategoria}/></div>}
-
-        {sec !== 'excel' && (
-          <button onClick={() => { setSec('excel'); onClose(); }} style={{
-            display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'11px',
-            marginBottom:14, borderRadius:9, cursor:'pointer', border:'none',
-            background:'linear-gradient(135deg,#F0B429,#FF6B2B)', color:'#0B0E14',
-            fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:14, letterSpacing:.5,
-          }}>
-            + Cargar partido
-          </button>
-        )}
-
-        <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4, paddingBottom:4, borderBottom:'1px solid #1C2535' }}>NAVEGACIÓN</div>
-        <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:14, flexShrink:0 }}>
-          {TABS.map(item => (
-            <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
-          ))}
-        </nav>
-
-        <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4, paddingBottom:4, borderBottom:'1px solid #1C2535' }}>HERRAMIENTAS</div>
-        <nav style={{ display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
-          {TOOLS.map(item => (
-            <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
-          ))}
-        </nav>
-
-        <div style={{ borderTop:'1px solid #1C2535', paddingTop:14, marginTop:14, flexShrink:0 }}>
+        {/* Footer fijo: siempre visible, nunca se lo tapa el contenido scrolleable */}
+        <div style={{ padding:'.9rem 1rem calc(.9rem + env(safe-area-inset-bottom))', borderTop:'1px solid #1C2535' }}>
           <button onClick={logout} style={{
             display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'10px',
             background:'rgba(240,64,96,.08)', border:'1px solid rgba(240,64,96,.2)', borderRadius:8, color:'#F04060',

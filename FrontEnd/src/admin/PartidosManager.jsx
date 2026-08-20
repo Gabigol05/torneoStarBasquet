@@ -752,9 +752,13 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
                   {/* Partidos de esta fecha */}
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {ps.map(p => (
+                    {ps.map(p => {
+                      const cA = EQUIPOS.find(e=>e.id===p.equipo_local_id)?.color ?? '#4A566E';
+                      const cB = EQUIPOS.find(e=>e.id===p.equipo_visit_id)?.color ?? '#4A566E';
+                      return (
                       <div key={p.id} style={{
-                        background:'#0E1420', border:'1px solid #1C2535',
+                        background:`linear-gradient(115deg, ${cA}22, #0E1420 45%, ${cB}22)`,
+                        border:'1px solid #1C2535',
                         borderRadius:12, padding:'14px 16px',
                         display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
                       }}>
@@ -799,7 +803,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                         </div>
 
                         {/* Acciones */}
-                        <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
+                        <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
                           {/* Cambio rápido de estado */}
                           {p.estado==='pendiente' && (
                             <button onClick={()=>handleEstado(p.id,'en_juego')}
@@ -813,17 +817,18 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                               ✓ Finalizar
                             </button>
                           )}
-                          <button onClick={()=>handleEdit(p)}
-                            style={{ ...F.quickBtn, borderColor:'#1C2535', color:'#6B7A99' }}>
+                          <button onClick={()=>handleEdit(p)} title="Editar partido"
+                            style={{ ...F.iconBtn, borderColor:'#1C2535', color:'#6B7A99' }}>
                             ✏️
                           </button>
-                          <button onClick={()=>handleDelete(p.id)}
-                            style={{ ...F.quickBtn, borderColor:'rgba(240,64,96,.2)', color:'#F04060' }}>
+                          <button onClick={()=>handleDelete(p.id)} title="Eliminar partido"
+                            style={{ ...F.iconBtn, borderColor:'rgba(240,64,96,.3)', color:'#F04060' }}>
                             🗑️
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -847,4 +852,5 @@ const F = {
   btnPrimary:{ padding:'11px 20px', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', border:'none', borderRadius:9, color:'#080C12', fontFamily:"'Bebas Neue',sans-serif", fontSize:17, letterSpacing:1, cursor:'pointer' },
   btnSec:    { padding:'10px 18px', background:'transparent', border:'1px solid #4A566E', borderRadius:9, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
+  iconBtn:   { width:32, height:32, padding:0, background:'rgba(255,255,255,.04)', border:'1px solid', borderRadius:'50%', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
 };

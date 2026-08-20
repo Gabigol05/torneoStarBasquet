@@ -68,7 +68,7 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
     <>
       {/* Fila principal */}
       <tr style={{ background: getBg(), cursor:'pointer' }} onClick={() => setExpanded(e => !e)}>
-        <td style={{ padding:'10px 12px', minWidth:180 }}>
+        <td style={{ padding:'10px 12px', minWidth:180, position:'sticky', left:0, zIndex:1, background:getBg(), boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {/* Avatar */}
             <div style={{
@@ -168,7 +168,11 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   const [saving,    setSaving]    = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [msg,       setMsg]       = useState(null);
-  const [viewMode,  setViewMode]  = useState('tabla'); // 'tabla' | 'cards'
+  // En celular arranca en modo Cards (mas comodo que una tabla ancha con scroll
+  // horizontal); en desktop arranca en Tabla como antes.
+  const [viewMode,  setViewMode]  = useState(() =>
+    (typeof window !== 'undefined' && window.innerWidth <= 640) ? 'cards' : 'tabla'
+  ); // 'tabla' | 'cards'
   // Masculino no tiene roster estático (los jugadores se cargan vía Excel a la
   // tabla jugadores_masculino), así que hay que traerlo de la base.
   const [rosterMasc, setRosterMasc] = useState([]);
@@ -374,7 +378,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr>
-                <th style={{ ...S.th, textAlign:'left', minWidth:200 }}>Jugadora</th>
+                <th style={{ ...S.th, textAlign:'left', minWidth:200, position:'sticky', left:0, zIndex:2, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>Jugadora</th>
                 <th style={{ ...S.th, color:'#F0B429' }}>PTS</th>
                 <th style={{ ...S.th, color:'#60A5FA' }}>REB</th>
                 <th style={{ ...S.th, color:'#22D07A' }}>AST</th>

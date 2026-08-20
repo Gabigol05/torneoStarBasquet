@@ -373,9 +373,37 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const reset = () => {
     setStep('archivo'); setParsed(null); setJugadoras([]);
     setFileName(''); setLog([]); setDuplicate(null);
+    cargarRecientes();
   };
 
   useEffect(() => { reset(); }, [categoria]);
+
+  // ── Últimas cargas (contexto rápido antes de subir una nueva) ────────────────
+  const [recientes, setRecientes] = useState([]);
+  const cargarRecientes = async () => {
+    const { data, error } = await supabase
+      .from(tablas.uploadLog)
+      .select(`*, ${tablas.fechas}(numero)`)
+      .order('cargado_en', { ascending: false })
+      .limit(4);
+    if (error) {
+      const { data: plain } = await supabase.from(tablas.uploadLog).select('*').order('cargado_en', { ascending: false }).limit(4);
+      setRecientes(plain ?? []);
+    } else {
+      setRecientes(data ?? []);
+    }
+  };
+
+  const tiempoRelativo = (iso) => {
+    if (!iso) return '';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) return 'recién';
+    if (min < 60) return `hace ${min} min`;
+    const hs = Math.floor(min / 60);
+    if (hs < 24) return `hace ${hs}hs`;
+    return `hace ${Math.floor(hs / 24)}d`;
+  };
 
   const addLog = msg => setLog(l => [...l, msg]);
 
@@ -659,6 +687,29 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
               {parsed.errores.map((e,i)=><p key={i} style={{margin:'4px 0'}}>❌ {e}</p>)}
             </div>
           )}
+
+          {recientes.length > 0 && (
+            <div style={s.recientesBox}>
+              <div style={s.recientesTitle}>Últimas cargas</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {recientes.map(r => {
+                  const numFecha = r[tablas.fechas]?.numero ?? r.fecha_id ?? '?';
+                  const conProblema = (r.jugadoras_skip ?? 0) > 0;
+                  return (
+                    <div key={r.id} style={s.recienteRow}>
+                      <div style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: conProblema ? '#F0B429' : '#22D07A' }}/>
+                      <div style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'#CBD5E8', fontSize:13 }}>
+                        Fecha {numFecha} · {r.equipo_local} vs {r.equipo_visit}
+                      </div>
+                      <div style={{ color:'#4A566E', fontSize:11, flexShrink:0 }}>
+                        {r.jugadoras_ok ?? 0}✓{conProblema ? ` ${r.jugadoras_skip}⚠️` : ''} · {tiempoRelativo(r.cargado_en)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -751,8 +802,8 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      {['#','Nombre plantel (Excel)','PTS','VAL','TL C/F','2P C/F','3P C/F','AS','RD','RO','ROB','TAP','PÉR','FP'].map(h=>(
-                        <th key={h} style={s.th}>{h}</th>
+                      {['#','Nombre plantel (Excel)','PTS','VAL','TL C/F','2P C/F','3P C/F','AS','RD','RO','ROB','TAP','PÉR','FP'].map((h,hi)=>(
+                        <th key={h} style={hi===0 ? {...s.th,position:'sticky',left:0,zIndex:2} : hi===1 ? {...s.th,position:'sticky',left:36,zIndex:2,boxShadow:'2px 0 4px rgba(0,0,0,.3)'} : s.th}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -761,10 +812,11 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                       const esNuevo = j.matchMethod === 'nuevo';
                       const color = (!j.jugadora && !esNuevo) ? '#F04060' : esNuevo ? '#60A5FA' : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
                       const methodBadge = esNuevo ? '🆕' : !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
+                      const rowBg = i%2===0?'#0E1420':'#141C2A';
                       return (
-                        <tr key={i} style={{background:i%2===0?'#0E1420':'#141C2A',opacity:(j.jugadora||esNuevo)?1:0.4}}>
-                          <td style={s.td}>{j.numero??'–'}</td>
-                          <td style={{...s.td,textAlign:'left',minWidth:180}}>
+                        <tr key={i} style={{background:rowBg,opacity:(j.jugadora||esNuevo)?1:0.4}}>
+                          <td style={{...s.td,position:'sticky',left:0,zIndex:1,background:rowBg}}>{j.numero??'–'}</td>
+                          <td style={{...s.td,textAlign:'left',minWidth:180,position:'sticky',left:36,zIndex:1,background:rowBg,boxShadow:'2px 0 4px rgba(0,0,0,.3)'}}>
                             <div style={{color,fontWeight:600,fontSize:13}}>
                               {methodBadge} {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
                             </div>
@@ -904,10 +956,13 @@ const s = {
   metaGroup:  {display:'flex',flexDirection:'column',gap:6,flex:1,minWidth:140},
   label:      {fontSize:10,fontWeight:700,letterSpacing:2,color:'#4A566E'},
   input:      {padding:'11px 12px',background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,color:'#EEF2F8',fontSize:14,outline:'none'},
-  dropZone:   {border:'2px dashed #1C2535',borderRadius:14,padding:'2.5rem 1rem',textAlign:'center',cursor:'pointer',marginBottom:20,transition:'border-color .2s'},
+  dropZone:   {border:'2px dashed #1C2535',borderRadius:14,padding:'2.5rem 1rem',textAlign:'center',cursor:'pointer',marginBottom:20,transition:'border-color .2s, background .2s',background:'linear-gradient(160deg,#101826,#0B111C)'},
   errBox:     {background:'rgba(240,64,96,.1)',border:'1px solid rgba(240,64,96,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F04060',fontSize:14},
   warnBox:    {background:'rgba(240,180,41,.08)',border:'1px solid rgba(240,180,41,.25)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F0B429',fontSize:13},
-  marcadorCard:{background:'#0E1420',border:'1px solid #1C2535',borderRadius:14,padding:'1.5rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
+  recientesBox:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:12,padding:'14px 16px'},
+  recientesTitle:{fontSize:10,fontWeight:700,letterSpacing:2,color:'#4A566E',marginBottom:10,textTransform:'uppercase'},
+  recienteRow:{display:'flex',alignItems:'center',gap:10,padding:'6px 4px'},
+  marcadorCard:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:14,padding:'1.5rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
   marcSide:   {flex:1,textAlign:'center',minWidth:120},
   marcNombre: {fontFamily:"'Bebas Neue',sans-serif",fontSize:17,letterSpacing:1,color:'#EEF2F8',marginBottom:4},
   marcTotal:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:62,color:'#F0B429',lineHeight:1},
@@ -915,8 +970,8 @@ const s = {
   parcial:    {background:'#141C2A',padding:'3px 8px',borderRadius:4,fontSize:13,color:'#EEF2F8'},
   vs:         {fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:'#4A566E'},
   pctRow:     {display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'},
-  pctCard:    {flex:1,minWidth:90,background:'#0E1420',border:'1px solid #1C2535',borderRadius:8,padding:'10px 12px',textAlign:'center'},
-  resumenBar: {display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center',padding:'10px 14px',background:'rgba(255,255,255,.03)',borderRadius:8,border:'1px solid #1C2535'},
+  pctCard:    {flex:1,minWidth:90,background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:8,padding:'10px 12px',textAlign:'center'},
+  resumenBar: {display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center',padding:'12px 16px',background:'linear-gradient(160deg,#101826,#0B111C)',borderRadius:10,border:'1px solid #1C2535'},
   resumenItem:{display:'flex',alignItems:'center',gap:6},
   resumenDot: c=>({width:8,height:8,borderRadius:'50%',background:c,flexShrink:0}),
   teamLabel:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:19,letterSpacing:1,color:'#EEF2F8',marginBottom:10,paddingBottom:8,borderBottom:'1px solid #1C2535'},
@@ -925,7 +980,7 @@ const s = {
   td:         {padding:'7px 8px',textAlign:'center',color:'#EEF2F8',borderBottom:'1px solid #1C2535'},
   btnPublish: {flex:1,maxWidth:280,padding:'13px',background:'linear-gradient(135deg,#F0B429,#FF6B2B)',border:'none',borderRadius:10,color:'#080C12',fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:1,cursor:'pointer'},
   btnCancel:  {padding:'10px 20px',background:'transparent',border:'1px solid #4A566E',borderRadius:8,color:'#6B7A99',cursor:'pointer',fontSize:14},
-  logBox:     {background:'#0E1420',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',minHeight:200},
-  successBox: {textAlign:'center',padding:'3rem 1rem',background:'rgba(34,208,122,.05)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
-  dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'rgba(240,180,41,.05)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
+  logBox:     {background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',minHeight:200},
+  successBox: {textAlign:'center',padding:'3rem 1rem',background:'linear-gradient(160deg,rgba(34,208,122,.08),#0B111C)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
+  dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'linear-gradient(160deg,rgba(240,180,41,.08),#0B111C)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };

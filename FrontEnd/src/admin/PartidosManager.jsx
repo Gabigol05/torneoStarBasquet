@@ -297,7 +297,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
   };
 
   return (
-    <div style={{ background:'#0E1420', border:'1px solid rgba(240,180,41,.25)', borderRadius:14, padding:'1.5rem', marginBottom:20 }}>
+    <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid rgba(240,180,41,.25)', borderRadius:14, padding:'1.5rem', marginBottom:20 }}>
       {ConfirmDialogFixture}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
@@ -728,7 +728,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
                   {/* Editor inline de la fecha (número/nombre/día) */}
                   {fecha && editandoFechaId === fecha.id && (
-                    <div style={{ background:'#0E1420', border:'1px solid rgba(240,180,41,.25)', borderRadius:10, padding:14, marginBottom:14, display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
+                    <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid rgba(240,180,41,.25)', borderRadius:10, padding:14, marginBottom:14, display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
                       <div style={{ minWidth:100 }}>
                         <label style={F.label}>NÚMERO</label>
                         <input type="number" value={fechaEditForm.numero} style={F.input}
@@ -843,7 +843,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 const F = {
   label:   { fontSize:10, fontWeight:700, letterSpacing:2, color:'#4A566E', display:'block', marginBottom:6 },
   input:   { width:'100%', padding:'10px 12px', background:'#141C2A', border:'1px solid #1C2535', borderRadius:8, color:'#EEF2F8', fontSize:14, outline:'none', boxSizing:'border-box', transition:'border-color .2s' },
-  card:    { background:'#0E1420', border:'1px solid rgba(240,180,41,.2)', borderRadius:14, padding:'1.5rem', marginBottom:20 },
+  card:    { background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid rgba(240,180,41,.2)', borderRadius:14, padding:'1.5rem', marginBottom:20 },
   row:     { display:'flex', gap:14, marginBottom:16, flexWrap:'wrap' },
   group:   { flex:1, minWidth:160, display:'flex', flexDirection:'column' },
   qth:     { padding:'8px 10px', color:'#6B7A99', fontSize:11, letterSpacing:.5, background:'#080C12', border:'1px solid #1C2535', textAlign:'center' },

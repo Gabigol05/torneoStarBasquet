@@ -132,7 +132,7 @@ const s = {
   hint:       { color:'#6B7A99', fontSize:13, marginBottom:16, lineHeight:1.6 },
   btnRefresh: { padding:'8px 16px', background:'transparent', border:'1px solid #1C2535', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:13, marginBottom:4 },
   empty:      { textAlign:'center', padding:'3rem', color:'#6B7A99' },
-  card:       { background:'#0E1420', border:'1px solid #1C2535', borderRadius:10, padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start' },
+  card:       { background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10, padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start' },
   badge:      { background:'rgba(240,180,41,.15)', color:'#F0B429', padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:700 },
   btnDel:     { background:'transparent', border:'1px solid rgba(240,64,96,.3)', borderRadius:6, padding:'6px 10px', cursor:'pointer', fontSize:16, flexShrink:0 },
 };

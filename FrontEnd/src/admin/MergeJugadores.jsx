@@ -270,8 +270,8 @@ const S = {
   btnDanger: { padding: '13px 32px', background: 'linear-gradient(135deg,#F04060,#B8203E)', border: 'none',
              borderRadius: 10, color: '#fff', fontFamily: "'Bebas Neue',sans-serif", fontSize: 18,
              letterSpacing: 1, cursor: 'pointer', marginTop: 4 },
-  analisisBox: { background: '#0E1420', border: '1px solid #1C2535', borderRadius: 10, padding: '14px 16px',
+  analisisBox: { background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 10, padding: '14px 16px',
              fontSize: 13, color: '#EEF2F8', lineHeight: 1.7, marginBottom: 16, maxWidth: 720 },
-  logBox:  { marginTop: 20, background: '#0E1420', border: '1px solid #1C2535', borderRadius: 10,
+  logBox:  { marginTop: 20, background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 10,
              padding: '1rem', minHeight: 60 },
 };

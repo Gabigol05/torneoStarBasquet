@@ -184,7 +184,7 @@ const S = {
   msg:     { color: '#8899BB', fontSize: 14, padding: '1rem 0' },
   empty:   { color: '#4A566E', fontSize: 14, padding: '2rem 0', textAlign: 'center' },
   count:   { color: '#4A566E', fontSize: 12, marginBottom: 10, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 0.5 },
-  tableWrap: { background: '#0E1420', border: '1px solid #1C2535', borderRadius: 10, overflow: 'hidden' },
+  tableWrap: { background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 10, overflow: 'hidden' },
   table:   { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th:      { textAlign: 'left', padding: '10px 14px', color: '#6B7A99', fontFamily: "'Barlow Condensed',sans-serif",
              fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', borderBottom: '1px solid #1C2535' },

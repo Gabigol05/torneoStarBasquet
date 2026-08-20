@@ -29,6 +29,14 @@ const TOOLS = [
   { id:'recalcular', icon:'🔄', label:'Recalcular',         desc:'Reprocesar promedios' },
 ];
 const CARGAR = { id:'excel', icon:'📊', label:'Subir Partido', desc:'Cargar planilla Excel' };
+
+// Mismo degradado dorado que usa el título del Hero en el sitio público
+// (.hero-title-accent) — para que el logo del admin se sienta parte de la
+// misma marca en vez de un dorado plano distinto.
+const GOLD_TEXT = {
+  background: 'linear-gradient(100deg, #F0B429 0%, #FF6B2B 52%, #FFD166 100%)',
+  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+};
 const NAV_TODO = [CARGAR, ...TABS, ...TOOLS];
 const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar'];
 
@@ -158,13 +166,13 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
         background:'linear-gradient(180deg,#0C1220 0%,#080C12 100%)', borderRight:'1px solid #1C2535',
         animation:'slideIn .22s ease', padding:'1.25rem 1rem', display:'flex', flexDirection:'column',
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-          <div style={{ width:40, height:40, borderRadius:10, overflow:'hidden', border:'2px solid rgba(240,180,41,.3)', flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+          <div style={{ width:52, height:52, borderRadius:12, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 16px rgba(240,180,41,.2)', flexShrink:0 }}>
             <img src={logoTorneo} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
           </div>
           <div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", color:'#F0B429', fontSize:15, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
-            <div style={{ color:'#4A566E', fontSize:10, letterSpacing:1, textTransform:'uppercase' }}>Admin Panel</div>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", ...GOLD_TEXT, fontSize:19, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
+            <div style={{ color:'#4A566E', fontSize:10, letterSpacing:1, textTransform:'uppercase', marginTop:2 }}>Admin Panel</div>
           </div>
         </div>
         <div style={{ fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, paddingBottom:14, borderBottom:'1px solid #1C2535' }}>
@@ -271,13 +279,13 @@ export default function AdminPanel() {
       {/* Top bar desktop */}
       <header data-admin-topbar style={S.topbar}>
         <div style={S.topbarRow}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:38, height:38, borderRadius:9, overflow:'hidden', border:'2px solid rgba(240,180,41,.3)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:56, height:56, borderRadius:13, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 18px rgba(240,180,41,.2)', flexShrink:0 }}>
               <img src={logoTorneo} alt="Torneo Star" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
             </div>
             <div>
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", color:'#F0B429', fontSize:15, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
-              <div style={{ color:'#4A566E', fontSize:9, letterSpacing:1, textTransform:'uppercase' }}>Admin Panel</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", ...GOLD_TEXT, fontSize:22, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
+              <div style={{ color:'#4A566E', fontSize:10, letterSpacing:1.5, textTransform:'uppercase', marginTop:2 }}>Admin Panel</div>
             </div>
           </div>
 
@@ -322,9 +330,9 @@ export default function AdminPanel() {
           </svg>
         </button>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <img src={logoTorneo} alt="" style={{ width:32, height:32, borderRadius:'50%', objectFit:'cover' }}/>
-          <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:17, letterSpacing:1, color:'#EEF2F8' }}>
-            TORNEO STAR <span style={{ color:'#F0B429' }}>ADMIN</span>
+          <img src={logoTorneo} alt="" style={{ width:40, height:40, borderRadius:11, objectFit:'cover', border:'2px solid rgba(240,180,41,.4)' }}/>
+          <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:19, letterSpacing:1 }}>
+            <span style={GOLD_TEXT}>TORNEO STAR</span> <span style={{ color:'#EEF2F8' }}>ADMIN</span>
           </span>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
@@ -343,7 +351,7 @@ export default function AdminPanel() {
       <main data-admin-main style={S.main}>
         <div data-admin-content style={S.content}>
           <SectionHeader nav={NAV_TODO} sec={sec}/>
-          {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} />}
+          {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} />}
           {sec === 'excel'      && <ExcelUpload categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'historial'  && <UploadHistory categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} />}

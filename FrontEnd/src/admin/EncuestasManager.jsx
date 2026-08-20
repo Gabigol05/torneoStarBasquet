@@ -66,7 +66,7 @@ function EncuestaForm({ form, setForm, onSave, onCancel, loading }) {
           onChange={e => setForm(f => ({ ...f, pregunta: e.target.value }))} style={F.input} />
       </div>
 
-      <div style={{ background: '#080C12', border: '1px solid #1C2535', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+      <div style={{ background: 'linear-gradient(160deg,#0E1420,#080C12)', border: '1px solid #1C2535', borderRadius: 10, padding: 14, marginBottom: 16 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4A566E', marginBottom: 12 }}>
           OPCIONES {roster.length > 0 && '(elegí un equipo o escribí texto libre)'}
         </div>
@@ -249,7 +249,7 @@ export default function EncuestasManager() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {encuestas.map(enc => (
-              <div key={enc.id} style={{ background: '#0E1420', border: '1px solid #1C2535', borderRadius: 12, padding: '14px 16px' }}>
+              <div key={enc.id} style={{ background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 12, padding: '14px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <CategoriaBadge categoria={enc.categoria} />
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4,
@@ -288,7 +288,7 @@ export default function EncuestasManager() {
 const F = {
   label: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4A566E', display: 'block', marginBottom: 6 },
   input: { width: '100%', padding: '10px 12px', background: '#141C2A', border: '1px solid #1C2535', borderRadius: 8, color: '#EEF2F8', fontSize: 14, outline: 'none', boxSizing: 'border-box' },
-  card: { background: '#0E1420', border: '1px solid rgba(240,180,41,.2)', borderRadius: 14, padding: '1.5rem', marginBottom: 20 },
+  card: { background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid rgba(240,180,41,.2)', borderRadius: 14, padding: '1.5rem', marginBottom: 20 },
   row: { display: 'flex', gap: 14, marginBottom: 16, flexWrap: 'wrap' },
   group: { flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column' },
   btnPrimary: { padding: '11px 20px', background: 'linear-gradient(135deg,#F0B429,#FF6B2B)', border: 'none', borderRadius: 9, color: '#080C12', fontFamily: "'Bebas Neue',sans-serif", fontSize: 17, letterSpacing: 1, cursor: 'pointer' },

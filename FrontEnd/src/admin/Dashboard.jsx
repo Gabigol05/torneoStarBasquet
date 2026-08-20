@@ -46,12 +46,19 @@ function fmtHora(hora) {
 }
 
 // ── Sub-componentes ──────────────────────────────────────────────────────────
-function KpiCard({ icon, label, value, sub, accent }) {
+function KpiCard({ icon, label, value, sub, accent, onClick }) {
+  const [hover, setHover] = useState(false);
+  const clickable = !!onClick;
   return (
-    <div style={{
-      background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14,
-      padding:'16px 18px', display:'flex', flexDirection:'column', gap:6, minWidth:0,
-    }}>
+    <div onClick={onClick}
+      onMouseEnter={() => clickable && setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        background: hover ? `linear-gradient(160deg,#141F30,${accent}14)` : 'linear-gradient(160deg,#101826,#0B111C)',
+        border: hover ? `1px solid ${accent}55` : '1px solid #1C2535', borderRadius:14,
+        padding:'16px 18px', display:'flex', flexDirection:'column', gap:6, minWidth:0,
+        cursor: clickable ? 'pointer' : 'default', transition:'background .15s, border-color .15s',
+        position:'relative',
+      }}>
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <div style={{ width:30, height:30, borderRadius:9, background:`${accent}1A`, border:`1px solid ${accent}33`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, flexShrink:0 }}>
           {icon}
@@ -59,51 +66,163 @@ function KpiCard({ icon, label, value, sub, accent }) {
         <div style={{ fontSize:11, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.8, textTransform:'uppercase' }}>
           {label}
         </div>
+        {clickable && (
+          <span style={{ marginLeft:'auto', fontSize:13, color: hover ? accent : '#2C3A52', transition:'color .15s' }}>→</span>
+        )}
       </div>
       <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:30, lineHeight:1, color:'#EEF2F8', letterSpacing:.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize:12, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{sub}</div>}
+      {sub && <div style={{ fontSize:12, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub}</div>}
+    </div>
+  );
+}
+
+function ChartToggleBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      padding:'6px 14px', borderRadius:7, cursor:'pointer',
+      background: active ? 'rgba(240,180,41,.15)' : 'transparent',
+      border: active ? '1px solid rgba(240,180,41,.35)' : '1px solid #1C2535',
+      color: active ? '#F0B429' : '#6B7A99',
+      fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:12, letterSpacing:.5,
+    }}>
+      {children}
+    </button>
+  );
+}
+
+function ChartTooltip({ left, children }) {
+  return (
+    <div style={{
+      position:'absolute', bottom:'calc(100% + 8px)', left, transform:'translateX(-50%)',
+      background:'#0E1420', border:'1px solid #F0B42955', borderRadius:8, padding:'7px 11px',
+      fontSize:11, whiteSpace:'nowrap', zIndex:5, boxShadow:'0 4px 16px rgba(0,0,0,.5)',
+      fontFamily:"'Barlow Condensed',sans-serif", pointerEvents:'none',
+    }}>
+      {children}
     </div>
   );
 }
 
 function AvanceChart({ puntos }) {
   const [hover, setHover] = useState(null);
+  const [vista, setVista] = useState('fecha'); // 'fecha' | 'acumulado'
+
+  const acumulado = useMemo(() => {
+    let runJ = 0, runT = 0;
+    return puntos.map(p => {
+      runJ += p.finalizados; runT += p.total;
+      return { ...p, pctAcum: runT ? (runJ / runT) * 100 : 0, jugadosAcum: runJ, totalAcum: runT };
+    });
+  }, [puntos]);
+
   if (!puntos.length) return <div style={{ color:'#4A566E', fontSize:13, padding:'20px 0' }}>Todavía no hay fechas cargadas.</div>;
-  const max = Math.max(1, ...puntos.map(p => p.total));
-  const w = 100 / puntos.length;
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:6 }}>
+          <ChartToggleBtn active={vista==='fecha'} onClick={() => setVista('fecha')}>Por fecha</ChartToggleBtn>
+          <ChartToggleBtn active={vista==='acumulado'} onClick={() => setVista('acumulado')}>Acumulado</ChartToggleBtn>
+        </div>
+        <div style={{ marginLeft:'auto', display:'flex', gap:14, fontSize:11, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", alignItems:'center' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ width:9, height:9, borderRadius:3, background:'linear-gradient(135deg,#FFD166,#F0B429)', display:'inline-block' }}/>Jugados
+          </span>
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ width:9, height:9, borderRadius:3, background:'#141C2A', border:'1px solid #2C3A52', display:'inline-block' }}/>Pendientes
+          </span>
+        </div>
+      </div>
+
+      {vista === 'fecha' ? (
+        <div>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:7, height:150 }}>
+            {puntos.map((p, i) => {
+              const activo = hover === i;
+              const pctFin = p.total ? (p.finalizados / p.total) * 100 : 0;
+              return (
+                <div key={p.id} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+                  style={{ flex:1, height:'100%', display:'flex', flexDirection:'column', justifyContent:'flex-end', position:'relative', cursor:'pointer', minWidth:0 }}>
+                  {activo && (
+                    <ChartTooltip left="50%">
+                      <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>{p.label}</div>
+                      <div style={{ color:'#8899BB' }}>{p.finalizados}/{p.total} jugados · {Math.round(pctFin)}%</div>
+                    </ChartTooltip>
+                  )}
+                  <div style={{
+                    width:'100%', height:'100%', borderRadius:'7px 7px 0 0', overflow:'hidden',
+                    display:'flex', flexDirection:'column-reverse',
+                    border: activo ? '1px solid rgba(240,180,41,.55)' : '1px solid transparent',
+                    boxShadow: activo ? '0 0 16px rgba(240,180,41,.25)' : 'none',
+                    transition:'box-shadow .15s, border-color .15s',
+                  }}>
+                    <div style={{ height:`${pctFin}%`, background:'linear-gradient(180deg,#FFD166,#F0B429)', transition:'height .2s' }}/>
+                    <div style={{ height:`${100-pctFin}%`, background:'#141C2A', transition:'height .2s' }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:'flex', gap:7, padding:'8px 0 0', borderTop:'1px solid #1C2535', marginTop:8 }}>
+            {puntos.map((p, i) => (
+              <div key={p.id} style={{ flex:1, textAlign:'center', fontSize:9, color: hover===i ? '#F0B429' : '#2C3A52', fontFamily:"'Barlow Condensed',sans-serif" }}>
+                {p.numero}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <AcumuladoChart puntos={acumulado} hover={hover} setHover={setHover} />
+      )}
+    </div>
+  );
+}
+
+function AcumuladoChart({ puntos, hover, setHover }) {
+  const W = 600, H = 150;
+  const n = puntos.length;
+  const stepX = n > 1 ? W / (n - 1) : W;
+  const pts = puntos.map((p, i) => ({ ...p, x: n > 1 ? i * stepX : W / 2, y: H - (p.pctAcum / 100) * H }));
+  const pathD = pts.map((pt, i) => `${i===0?'M':'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');
+  const areaD = `${pathD} L ${pts[pts.length-1].x.toFixed(1)} ${H} L ${pts[0].x.toFixed(1)} ${H} Z`;
+  const activo = hover != null ? pts[hover] : null;
+
   return (
     <div style={{ position:'relative' }}>
-      <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:120, padding:'0 2px' }}>
-        {puntos.map((p, i) => {
-          const hTot  = max ? (p.total / max) * 100 : 0;
-          const activo = hover === i;
-          return (
-            <div key={p.id} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
-              style={{ flex:`0 0 ${w}%`, maxWidth:w+'%', height:'100%', display:'flex', alignItems:'flex-end', position:'relative', cursor:'pointer' }}>
-              <div style={{ width:'100%', height:`${hTot}%`, background:'rgba(255,255,255,.05)', borderRadius:'4px 4px 0 0', position:'relative', overflow:'hidden', border: activo ? '1px solid rgba(240,180,41,.4)' : '1px solid transparent' }}>
-                <div style={{ position:'absolute', bottom:0, left:0, right:0, height:`${p.total ? (p.finalizados/p.total)*100 : 0}%`, background: activo ? 'linear-gradient(180deg,#FFD166,#F0B429)' : 'linear-gradient(180deg,#F0B429AA,#F0B42966)', transition:'background .15s' }}/>
-              </div>
-              {activo && (
-                <div style={{
-                  position:'absolute', bottom:'calc(100% + 8px)', left:'50%', transform:'translateX(-50%)',
-                  background:'#0E1420', border:'1px solid #F0B42955', borderRadius:8, padding:'6px 10px',
-                  fontSize:11, whiteSpace:'nowrap', zIndex:5, boxShadow:'0 4px 16px rgba(0,0,0,.5)',
-                  fontFamily:"'Barlow Condensed',sans-serif",
-                }}>
-                  <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>{p.label}</div>
-                  <div style={{ color:'#8899BB' }}>{p.finalizados}/{p.total} jugados</div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width:'100%', height:150, display:'block', overflow:'visible' }}>
+        <defs>
+          <linearGradient id="acumFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#F0B429" stopOpacity="0.35"/>
+            <stop offset="100%" stopColor="#F0B429" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {[25,50,75].map(pct => (
+          <line key={pct} x1="0" x2={W} y1={H-(pct/100)*H} y2={H-(pct/100)*H} stroke="#1C2535" strokeWidth="1"/>
+        ))}
+        <path d={areaD} fill="url(#acumFill)" stroke="none"/>
+        <path d={pathD} fill="none" stroke="#F0B429" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {pts.map((pt, i) => (
+          <circle key={pt.id} cx={pt.x} cy={pt.y} r={hover===i?5:3}
+            fill={hover===i?'#FFD166':'#F0B429'} stroke="#0B111C" strokeWidth="1.5"/>
+        ))}
+      </svg>
+      <div style={{ position:'absolute', inset:0, display:'flex' }}>
+        {pts.map((pt, i) => (
+          <div key={pt.id} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ flex:1, cursor:'pointer' }}/>
+        ))}
       </div>
-      <div style={{ display:'flex', gap:4, padding:'6px 2px 0', marginTop:2, borderTop:'1px solid #1C2535' }}>
-        {puntos.map((p, i) => (
-          <div key={p.id} style={{ flex:`0 0 ${w}%`, maxWidth:w+'%', textAlign:'center', fontSize:9, color: hover===i ? '#F0B429' : '#2C3A52', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-            {p.numero}
+      {activo && (
+        <ChartTooltip left={`${(activo.x / W) * 100}%`}>
+          <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>{activo.label}</div>
+          <div style={{ color:'#8899BB' }}>{Math.round(activo.pctAcum)}% acumulado · {activo.jugadosAcum}/{activo.totalAcum}</div>
+        </ChartTooltip>
+      )}
+      <div style={{ display:'flex', padding:'8px 0 0', borderTop:'1px solid #1C2535', marginTop:8 }}>
+        {pts.map((pt, i) => (
+          <div key={pt.id} style={{ flex:1, textAlign:'center', fontSize:9, color: hover===i ? '#F0B429' : '#2C3A52', fontFamily:"'Barlow Condensed',sans-serif" }}>
+            {pt.numero}
           </div>
         ))}
       </div>
@@ -130,7 +249,7 @@ function LeaderRow({ rank, nombre, equipo, value, unit }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ irACargarPartido }) {
+export default function Dashboard({ irACargarPartido, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [categoriaLeaders, setCategoriaLeaders] = useState('femenino');
   const [categoriaFixture, setCategoriaFixture] = useState('femenino');
@@ -266,13 +385,15 @@ export default function Dashboard({ irACargarPartido }) {
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12 }}>
-        <KpiCard icon="🏀" label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"/>
-        <KpiCard icon="⏳" label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"/>
+        <KpiCard icon="🏀" label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
+          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
+        <KpiCard icon="⏳" label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"
+          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
         <KpiCard icon="📅" label="Próximo partido" value={proximoLabel ?? '—'}
           sub={kpis.proximo ? `${fmtFecha(kpis.proximo.fecha_partido)}${fmtHora(kpis.proximo.hora_inicio) ? ' · '+fmtHora(kpis.proximo.hora_inicio)+'hs' : ''}` : 'sin fecha cargada'}
-          accent="#22D07A"/>
+          accent="#22D07A" onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
         <KpiCard icon="🗳️" label="Encuesta activa" value={kpis.encuesta ? `${kpis.encuesta.votos} votos` : 'ninguna'}
-          sub={kpis.encuesta?.pregunta ?? '—'} accent="#E8187A"/>
+          sub={kpis.encuesta?.pregunta ?? '—'} accent="#E8187A" onClick={onNavigate ? () => onNavigate('encuestas') : undefined}/>
       </div>
 
       {/* Avance por fecha */}

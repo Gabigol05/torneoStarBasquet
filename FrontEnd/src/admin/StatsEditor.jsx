@@ -108,7 +108,7 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:16 }}>
               {GRUPOS.map(grupo => (
                 <div key={grupo.label} style={{
-                  background:'#0E1420', border:'1px solid #1C2535', borderRadius:10, padding:'12px 14px',
+                  background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10, padding:'12px 14px',
                 }}>
                   <div style={{
                     fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase',
@@ -418,7 +418,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
             const hasEdit = Boolean(ed);
             return (
               <div key={j.id} style={{
-                background: hasEdit ? 'rgba(240,180,41,.06)' : '#0E1420',
+                background: hasEdit ? 'linear-gradient(160deg,rgba(240,180,41,.1),#0B111C)' : 'linear-gradient(160deg,#101826,#0B111C)',
                 border:`1px solid ${hasEdit?'rgba(240,180,41,.3)':'#1C2535'}`,
                 borderRadius:12, padding:'16px',
                 transition:'border-color .2s',
@@ -512,11 +512,11 @@ const S = {
   select:      { width:'100%', padding:'10px 12px', background:'#141C2A', border:'1px solid #1C2535', borderRadius:8, color:'#EEF2F8', fontSize:14, outline:'none', boxSizing:'border-box' },
   th:          { background:'#141C2A', color:'#6B7A99', padding:'10px 12px', textAlign:'center', fontSize:11, letterSpacing:.5, whiteSpace:'nowrap', position:'sticky', top:0 },
   warning:     { display:'flex', gap:10, alignItems:'flex-start', background:'rgba(240,180,41,.06)', border:'1px solid rgba(240,180,41,.2)', borderRadius:10, padding:'11px 14px', marginBottom:20, color:'#F0B429', fontSize:13 },
-  equipoHeader:{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0E1420', border:'1px solid #1C2535', borderRadius:12, padding:'14px 16px', marginBottom:16, flexWrap:'wrap', gap:12 },
+  equipoHeader:{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:12, padding:'14px 16px', marginBottom:16, flexWrap:'wrap', gap:12 },
   viewBtn:     { padding:'8px 14px', background:'transparent', border:'1px solid #1C2535', borderRadius:7, color:'#6B7A99', cursor:'pointer', fontSize:13 },
   viewBtnActive:{ background:'#1C2535', border:'1px solid #F0B429', color:'#F0B429' },
   btnPrimary:  { padding:'9px 20px', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', border:'none', borderRadius:8, color:'#080C12', fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:1, cursor:'pointer', fontWeight:700 },
   btnSec:      { padding:'9px 16px', background:'transparent', border:'1px solid #4A566E', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:13 },
-  stickyBar:   { position:'sticky', bottom:16, background:'#0E1420', border:'1px solid rgba(240,180,41,.3)', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.5)', zIndex:50 },
+  stickyBar:   { position:'sticky', bottom:16, background:'linear-gradient(160deg,#141F30,#0B111C)', border:'1px solid rgba(240,180,41,.3)', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.5)', zIndex:50 },
   emptyState:  { textAlign:'center', padding:'4rem 2rem', color:'#6B7A99' },
 };

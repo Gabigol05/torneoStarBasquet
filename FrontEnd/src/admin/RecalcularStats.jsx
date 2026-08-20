@@ -175,6 +175,6 @@ const S = {
   btn:    { padding:'13px 32px', background:'linear-gradient(135deg,#F0B429,#FF6B2B)', border:'none',
             borderRadius:10, color:'#080C12', fontFamily:"'Bebas Neue',sans-serif", fontSize:20,
             letterSpacing:1, cursor:'pointer' },
-  logBox: { marginTop:20, background:'#0E1420', border:'1px solid #1C2535', borderRadius:10,
+  logBox: { marginTop:20, background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10,
             padding:'1rem', minHeight:100 },
 };

@@ -162,9 +162,12 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
     <>
       <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:299 }}/>
       <aside style={{
-        position:'fixed', top:0, left:0, bottom:0, width:280, zIndex:300, overflowY:'auto',
+        position:'fixed', top:0, left:0, bottom:0, width:'min(280px, 82vw)', maxWidth:280,
+        height:'100dvh', maxHeight:'100vh', zIndex:300, overflowY:'auto', WebkitOverflowScrolling:'touch',
         background:'linear-gradient(180deg,#0C1220 0%,#080C12 100%)', borderRight:'1px solid #1C2535',
-        animation:'slideIn .22s ease', padding:'1.25rem 1rem', display:'flex', flexDirection:'column',
+        boxShadow:'6px 0 24px rgba(0,0,0,.4)',
+        animation:'slideIn .22s ease', padding:'1.25rem 1rem calc(1rem + env(safe-area-inset-bottom))',
+        display:'flex', flexDirection:'column', boxSizing:'border-box',
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
           <div style={{ width:52, height:52, borderRadius:12, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 16px rgba(240,180,41,.2)', flexShrink:0 }}>
@@ -192,21 +195,21 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
           </button>
         )}
 
-        <div style={{ fontSize:9, fontWeight:700, letterSpacing:2.5, color:'#2C3A52', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>NAVEGACIÓN</div>
-        <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:14 }}>
+        <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4, paddingBottom:4, borderBottom:'1px solid #1C2535' }}>NAVEGACIÓN</div>
+        <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:14, flexShrink:0 }}>
           {TABS.map(item => (
             <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
           ))}
         </nav>
 
-        <div style={{ fontSize:9, fontWeight:700, letterSpacing:2.5, color:'#2C3A52', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>HERRAMIENTAS</div>
-        <nav style={{ flex:1, display:'flex', flexDirection:'column', gap:2 }}>
+        <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4, paddingBottom:4, borderBottom:'1px solid #1C2535' }}>HERRAMIENTAS</div>
+        <nav style={{ display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
           {TOOLS.map(item => (
             <DrawerItem key={item.id} item={item} active={sec === item.id} onClick={() => { setSec(item.id); onClose(); }}/>
           ))}
         </nav>
 
-        <div style={{ borderTop:'1px solid #1C2535', paddingTop:14, marginTop:8 }}>
+        <div style={{ borderTop:'1px solid #1C2535', paddingTop:14, marginTop:14, flexShrink:0 }}>
           <button onClick={logout} style={{
             display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'10px',
             background:'rgba(240,64,96,.08)', border:'1px solid rgba(240,64,96,.2)', borderRadius:8, color:'#F04060',

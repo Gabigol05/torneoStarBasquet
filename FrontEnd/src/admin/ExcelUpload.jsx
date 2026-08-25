@@ -34,10 +34,17 @@ const canonEquipo = texto => {
   const n = normStr(texto);
   return ALIAS_EQUIPOS_TEXTO[n] ?? n;
 };
-// Busca un equipo por texto: primero por igualdad exacta (tolerando el alias
-// de arriba), y si no hay hit, recién ahí cae al fuzzy matching normal.
-function buscarEquipo(texto, fuseEq, lista) {
+// Busca un equipo por texto: primero por los alias cargados desde el panel
+// (Herramientas → Alias de Equipos, `equipoAliasMap`: texto normalizado ->
+// id de equipo), después por igualdad exacta tolerando los alias
+// hardcodeados de arriba, y si no hay hit, recién ahí cae al fuzzy matching.
+function buscarEquipo(texto, fuseEq, lista, equipoAliasMap = {}) {
   if (!texto) return null;
+  const aliasId = equipoAliasMap[normStr(texto)];
+  if (aliasId) {
+    const porAlias = lista.find(e => e.id === aliasId);
+    if (porAlias) return porAlias;
+  }
   const canon = canonEquipo(texto);
   const exacto = lista.find(e => normStr(e.name) === canon);
   if (exacto) return exacto;
@@ -115,7 +122,7 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
   if (!nombreRaw) return { jugadora: null, method: 'empty', score: 1 };
   const clean    = normStr(String(nombreRaw));
   const aliases  = await cargarAliases(categoria, tablas);
-  const eqMatch  = equipoHint ? buscarEquipo(equipoHint, fuseEq, ctx.equipos) : null;
+  const eqMatch  = equipoHint ? buscarEquipo(equipoHint, fuseEq, ctx.equipos, ctx.equipoAliasMap) : null;
   const equipoId = eqMatch?.id;
 
   // 1️⃣ Lookup exacto en tabla de aliases (prioridad máxima)
@@ -429,21 +436,41 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   // si alguien se agregaba directo en la base).
   const [jugadoresMasc, setJugadoresMasc] = useState([]);
   const [jugadorasFem,  setJugadorasFem]  = useState([]);
+  // ⚠️ FIX: antes esta consulta no revisaba `error` — si fallaba (ej: corte
+  // momentáneo de conexión), el índice de jugadoras/es quedaba VACÍO en
+  // silencio, y cada nombre del Excel aparecía como "no encontrado" sin
+  // ninguna pista de que la causa real era que no se pudo traer el plantel.
+  const [errorPlantel, setErrorPlantel] = useState('');
   useEffect(() => {
     (async () => {
-      if (categoria === 'masculino') {
-        const { data } = await supabase.from(tablas.jugadores).select('*');
-        setJugadoresMasc((data ?? []).map(formatJugadorMasc));
-      } else {
-        const { data } = await supabase.from(tablas.jugadores).select('*');
-        setJugadorasFem((data ?? []).map(formatJugadoraFem));
+      setErrorPlantel('');
+      const { data, error } = await supabase.from(tablas.jugadores).select('*');
+      if (error) {
+        setErrorPlantel(`No se pudo traer el plantel de ${categoria}: ${error.message} — el buscador de nombres del Excel va a fallar hasta que esto se resuelva. Recargá la página o probá de nuevo en un momento.`);
+        return;
       }
+      if (categoria === 'masculino') setJugadoresMasc(data.map(formatJugadorMasc));
+      else setJugadorasFem(data.map(formatJugadoraFem));
     })();
-  }, [categoria]);
+  }, [categoria, tablas.jugadores]);
+
+  // Alias de EQUIPO cargados desde el panel (Herramientas → Alias de
+  // Equipos) — ej: "La Reserva V.A" -> Villa Azalais. Se suman a los alias
+  // hardcodeados en ALIAS_EQUIPOS_TEXTO (que quedan para casos históricos
+  // conocidos tipo "Ene Ene"/"NN"), pero estos los puede cargar Alvaro solo,
+  // sin depender de un cambio de código cada vez que aparece un apodo nuevo.
+  const [equipoAliasMap, setEquipoAliasMap] = useState({});
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from(tablas.equipoAliases).select('alias,equipo_id');
+      if (error) { console.warn('[ExcelUpload] equipo_aliases:', error.message); setEquipoAliasMap({}); return; }
+      setEquipoAliasMap(Object.fromEntries((data ?? []).map(r => [normStr(r.alias), r.equipo_id])));
+    })();
+  }, [categoria, tablas.equipoAliases]);
 
   const todasJugadoras  = categoria === 'masculino' ? jugadoresMasc : jugadorasFem;
   const fuseJugadoras   = useMemo(() => buildFuseJugadores(todasJugadoras), [todasJugadoras]);
-  const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras, equipos: roster };
+  const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras, equipos: roster, equipoAliasMap };
 
   const [step,      setStep]      = useState('archivo');
   const [parsed,    setParsed]    = useState(null);    // datos del parser (sin resolver)
@@ -489,6 +516,9 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   }, [esPlayoff, copaPO, instanciaPO, temporadaActivaId, tablas]);
   const [log,       setLog]       = useState([]);
   const [duplicate, setDuplicate] = useState(null);
+  // Partido pendiente encontrado (ver buscarPendiente) al que se le puede
+  // "adjuntar" este resultado en vez de crear uno nuevo — ver paso 'adjuntar'.
+  const [pendienteEncontrado, setPendienteEncontrado] = useState(null);
   // _rowId de la fila que se está reasignando a mano en el preview (ver ✏️).
   const [editando,  setEditando]  = useState(null);
   const fileRef = useRef();
@@ -521,6 +551,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     setStep('archivo'); setParsed(null); setJugadoras([]);
     setFileName(''); setLog([]); setDuplicate(null); setEditando(null);
     setEsPlayoff(false); setCopaPO(''); setInstanciaPO(''); setLlavePO('');
+    setPendienteEncontrado(null);
     cargarRecientes();
   };
 
@@ -541,6 +572,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const resetParaNuevoArchivo = () => {
     setStep('archivo'); setParsed(null); setJugadoras([]);
     setFileName(''); setLog([]); setDuplicate(null); setEditando(null);
+    setPendienteEncontrado(null);
     cargarRecientes();
   };
 
@@ -624,86 +656,142 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     return dupes?.length > 0 ? dupes[0] : null;
   };
 
-  const handlePublish = async (forceOverwrite = false) => {
+  // Busca un partido PENDIENTE (ya programado, sin resultado) para estos dos
+  // equipos en la temporada activa, sin importar en qué fecha esté — es lo
+  // que permite "adjuntar" el resultado del Excel al partido que ya estaba
+  // agendado (por ejemplo uno generado por Playoffs, con su Copa/Instancia/
+  // Llave ya puestas) en vez de crear uno nuevo a ciegas por el número de
+  // fecha tipeado, que es lo que terminaba pisando la marca de Playoffs
+  // (mismo bug de fondo que el de la fecha 10/semifinal).
+  const buscarPendiente = async (eqLId, eqVId) => {
+    const { data: fechasT, error: fErr } = await supabase
+      .from(tablas.fechas).select('id,numero,descripcion').eq('temporada_id', temporadaActivaId);
+    if (fErr) throw new Error(`ver fechas: ${fErr.message}`);
+    const fechaMap = Object.fromEntries((fechasT ?? []).map(f => [f.id, f]));
+    const ids = Object.keys(fechaMap).map(Number);
+    if (ids.length === 0) return null;
+    const { data, error } = await supabase
+      .from(tablas.partidos)
+      .select('id, fecha_id, estado, es_playoff, copa, instancia, llave')
+      .in('fecha_id', ids)
+      .eq('estado', 'pendiente')
+      .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
+    if (error) throw new Error(`buscar partido pendiente: ${error.message}`);
+    if (!data?.length) return null;
+    return { ...data[0], fecha: fechaMap[data[0].fecha_id] };
+  };
+
+  const handlePublish = async (forceOverwrite = false, attachPartido = null, skipPendienteCheck = false) => {
     if (!parsed || !jornada) { alert('Ingresá el número de fecha'); return; }
     setStep('publicando');
     setLog([]);
     try {
-      // Resolver equipos (con alias tipo "Ene Ene" -> "NN" antes del fuzzy)
-      const eqLocalItem = buscarEquipo(parsed.equipoLocal, fuseEq, roster);
-      const eqVisitItem = buscarEquipo(parsed.equipoVisit, fuseEq, roster);
-      if (!eqLocalItem) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}"`);
-      if (!eqVisitItem) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}"`);
+      // Resolver equipos (alias del panel -> alias hardcodeados tipo "Ene
+      // Ene"->"NN" -> fuzzy, en ese orden — ver buscarEquipo)
+      const eqLocalItem = buscarEquipo(parsed.equipoLocal, fuseEq, roster, equipoAliasMap);
+      const eqVisitItem = buscarEquipo(parsed.equipoVisit, fuseEq, roster, equipoAliasMap);
+      if (!eqLocalItem) throw new Error(`Equipo local no encontrado: "${parsed.equipoLocal}" — si el Excel lo escribe distinto al nombre oficial, agregalo como alias en Herramientas → Alias de Equipos.`);
+      if (!eqVisitItem) throw new Error(`Equipo visitante no encontrado: "${parsed.equipoVisit}" — si el Excel lo escribe distinto al nombre oficial, agregalo como alias en Herramientas → Alias de Equipos.`);
       const eqLId = eqLocalItem.id, eqVId = eqVisitItem.id;
       addLog(`✅ ${eqLocalItem.name} vs ${eqVisitItem.name}`);
 
-      // Check duplicado
-      if (!forceOverwrite) {
-        addLog('🔍 Verificando duplicados...');
-        const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
-        if (dupe) { setDuplicate(dupe); setStep('duplicado'); return; }
-        addLog('✅ Sin duplicados');
-      } else {
-        const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
-        if (dupe) {
-          const { error: delErr } = await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
-          if (delErr) throw new Error(`No se pudo borrar el partido anterior (ID ${dupe.id}) antes de sobreescribir: ${delErr.message}`);
-          addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
-        }
+      // ¿Hay un partido pendiente ya agendado para estos dos equipos? Si es
+      // así, se le pregunta al admin si quiere publicar el resultado ahí
+      // (conservando fecha/Copa/Instancia/Llave) en vez de crear uno nuevo.
+      if (!attachPartido && !skipPendienteCheck && !forceOverwrite) {
+        addLog('🔍 Buscando partido pendiente para estos equipos...');
+        const pendiente = await buscarPendiente(eqLId, eqVId);
+        if (pendiente) { setPendienteEncontrado(pendiente); setStep('adjuntar'); return; }
+        addLog('✅ Ningún partido pendiente coincide — se va a crear uno nuevo');
       }
 
-      // Fecha
-      addLog('📅 Creando fecha...');
-      // OJO: antes esto era un upsert con descripcion:`Fecha ${jornada}` a
-      // secas — si la fecha ya existía (ej: ya se le había puesto "Playoffs
-      // - Semifinal" a mano desde el fixture masivo), esta carga se la pisaba
-      // de vuelta a "Fecha N" en cada Excel que se subiera para esa jornada.
-      // Ahora: si ya existe, no se toca su descripción.
-      // La búsqueda se limita a la temporada ACTIVA — el número de fecha se
-      // reinicia en cada temporada nueva, así que "Fecha 1" de este torneo y
-      // "Fecha 1" de uno anterior son filas distintas.
-      const { data:fechaExistente } = await supabase
-        .from(tablas.fechas).select('id')
-        .eq('numero', Number(jornada))
-        .eq('temporada_id', temporadaActivaId)
-        .maybeSingle();
       let fd;
-      if (fechaExistente) {
-        fd = fechaExistente;
+      if (attachPartido) {
+        fd = attachPartido.fecha ?? { id: attachPartido.fecha_id };
+        addLog(`📎 Publicando en el partido pendiente ya agendado (ID ${attachPartido.id})...`);
       } else {
-        const { data:fdNueva, error:fErr } = await supabase
-          .from(tablas.fechas)
-          .insert({ numero:Number(jornada), descripcion:`Fecha ${jornada}`, temporada_id: temporadaActivaId })
-          .select('id').single();
-        if (fErr) throw new Error(`Fecha: ${fErr.message}`);
-        fd = fdNueva;
+        // Check duplicado
+        if (!forceOverwrite) {
+          addLog('🔍 Verificando duplicados...');
+          const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
+          if (dupe) { setDuplicate(dupe); setStep('duplicado'); return; }
+          addLog('✅ Sin duplicados');
+        } else {
+          const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
+          if (dupe) {
+            const { error: delErr } = await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
+            if (delErr) throw new Error(`No se pudo borrar el partido anterior (ID ${dupe.id}) antes de sobreescribir: ${delErr.message}`);
+            addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
+          }
+        }
+
+        // Fecha
+        addLog('📅 Creando fecha...');
+        // OJO: antes esto era un upsert con descripcion:`Fecha ${jornada}` a
+        // secas — si la fecha ya existía (ej: ya se le había puesto "Playoffs
+        // - Semifinal" a mano desde el fixture masivo), esta carga se la pisaba
+        // de vuelta a "Fecha N" en cada Excel que se subiera para esa jornada.
+        // Ahora: si ya existe, no se toca su descripción.
+        // La búsqueda se limita a la temporada ACTIVA — el número de fecha se
+        // reinicia en cada temporada nueva, así que "Fecha 1" de este torneo y
+        // "Fecha 1" de uno anterior son filas distintas.
+        const { data:fechaExistente } = await supabase
+          .from(tablas.fechas).select('id')
+          .eq('numero', Number(jornada))
+          .eq('temporada_id', temporadaActivaId)
+          .maybeSingle();
+        if (fechaExistente) {
+          fd = fechaExistente;
+        } else {
+          const { data:fdNueva, error:fErr } = await supabase
+            .from(tablas.fechas)
+            .insert({ numero:Number(jornada), descripcion:`Fecha ${jornada}`, temporada_id: temporadaActivaId })
+            .select('id').single();
+          if (fErr) throw new Error(`Fecha: ${fErr.message}`);
+          fd = fdNueva;
+        }
+        addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
       }
-      addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
 
       // Partido
-      addLog('🏀 Insertando partido...');
+      addLog(attachPartido ? '🏀 Actualizando partido...' : '🏀 Insertando partido...');
       const m=parsed.marcador, p=parsed.pct;
       if (m.local.total === m.visit.total) {
         throw new Error(`El Excel da un empate ${m.local.total}-${m.visit.total} — el básquet no admite empates, revisá la planilla antes de publicar.`);
       }
-      const { data:pd, error:pErr } = await supabase
-        .from(tablas.partidos)
-        .insert({
-          fecha_id:fd.id, equipo_local_id:eqLId, equipo_visit_id:eqVId,
-          q1_local:m.local.q1, q2_local:m.local.q2, q3_local:m.local.q3,
-          q4_local:m.local.q4, ot_local:m.local.ot,
-          q1_visit:m.visit.q1, q2_visit:m.visit.q2, q3_visit:m.visit.q3,
-          q4_visit:m.visit.q4, ot_visit:m.visit.ot,
-          pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
-          pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
-          lugar:lugar||null, fecha_partido:fechaPartido||null, estado:'finalizado',
+      const camposResultado = {
+        q1_local:m.local.q1, q2_local:m.local.q2, q3_local:m.local.q3,
+        q4_local:m.local.q4, ot_local:m.local.ot,
+        q1_visit:m.visit.q1, q2_visit:m.visit.q2, q3_visit:m.visit.q3,
+        q4_visit:m.visit.q4, ot_visit:m.visit.ot,
+        pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
+        pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
+        lugar:lugar||null, fecha_partido:fechaPartido||null, estado:'finalizado',
+        // Si estamos ADJUNTANDO a un partido ya agendado, es_playoff/copa/
+        // instancia/llave NO se tocan — se dejan tal cual estaban (por eso no
+        // van acá abajo). Es la única forma de garantizar que publicar un
+        // resultado nunca borre una marca de Playoffs ya bien puesta.
+        ...(attachPartido ? {} : {
           es_playoff: esPlayoff,
           copa:       esPlayoff ? (copaPO || null) : null,
           instancia:  esPlayoff ? (instanciaPO || null) : null,
           llave:      esPlayoff && llavePO ? Number(llavePO) : null,
-        })
-        .select('id').single();
-      if (pErr) throw new Error(`Partido: ${pErr.message}`);
+        }),
+      };
+
+      let pd;
+      if (attachPartido) {
+        const { data, error } = await supabase.from(tablas.partidos)
+          .update(camposResultado).eq('id', attachPartido.id).select('id').single();
+        if (error) throw new Error(`Partido: ${error.message}`);
+        pd = data;
+      } else {
+        const { data, error } = await supabase.from(tablas.partidos)
+          .insert({ fecha_id:fd.id, equipo_local_id:eqLId, equipo_visit_id:eqVId, ...camposResultado })
+          .select('id').single();
+        if (error) throw new Error(`Partido: ${error.message}`);
+        pd = data;
+      }
       addLog(`✅ Partido ID ${pd.id} — ${m.local.total}-${m.visit.total}`);
       addLog(`   Local:  Q1=${m.local.q1} Q2=${m.local.q2} Q3=${m.local.q3} Q4=${m.local.q4}`);
       addLog(`   Visita: Q1=${m.visit.q1} Q2=${m.visit.q2} Q3=${m.visit.q3} Q4=${m.visit.q4}`);
@@ -854,7 +942,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
       <div style={s.stepper}>
         {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([num,lbl],i)=>{
           const arr=['archivo','preview','publicando','listo'];
-          const cur=arr.indexOf(step==='duplicado'?'publicando':step);
+          const cur=arr.indexOf((step==='duplicado'||step==='adjuntar')?'publicando':step);
           const done=i<cur, active=i===cur;
           return (
             <div key={num} style={s.stepWrap}>
@@ -867,6 +955,13 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           );
         })}
       </div>
+
+      {errorPlantel && (
+        <div style={{...s.errBox, display:'flex', alignItems:'center', gap:10}}>
+          <span style={{fontSize:20}}>🚫</span>
+          <span>{errorPlantel}</span>
+        </div>
+      )}
 
       {/* ── PASO 1: Archivo ── */}
       {step==='archivo' && (
@@ -1269,6 +1364,45 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             </button>
             <button onClick={()=>setStep('preview')} style={s.btnCancel}>
               ← Volver al preview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADJUNTAR A PARTIDO PENDIENTE ── */}
+      {step==='adjuntar' && pendienteEncontrado && (
+        <div style={s.dupeBox}>
+          <div style={{fontSize:48,marginBottom:12}}>📎</div>
+          <h3 style={{color:'#F0B429',margin:'0 0 12px',fontFamily:"'Bebas Neue',sans-serif",fontSize:26}}>
+            YA HAY UN PARTIDO AGENDADO
+          </h3>
+          <p style={{color:'#EEF2F8',marginBottom:8}}>
+            Estos dos equipos ya tienen un partido <strong>pendiente</strong> cargado
+            {pendienteEncontrado.fecha?.descripcion ? <> en <strong>{pendienteEncontrado.fecha.descripcion}</strong></> : (pendienteEncontrado.fecha?.numero ? <> en <strong>Fecha {pendienteEncontrado.fecha.numero}</strong></> : null)}.
+          </p>
+          <div style={{background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,padding:'14px',marginBottom:16,textAlign:'left',fontSize:13,color:'#8899BB',lineHeight:1.7}}>
+            <div>ID del partido: <span style={{color:'#EEF2F8'}}>{pendienteEncontrado.id}</span></div>
+            {pendienteEncontrado.es_playoff && (
+              <div style={{color:'#F0B429',fontWeight:700}}>
+                🏆 PLAYOFFS
+                {pendienteEncontrado.copa && ` · ${COPA_LABEL[pendienteEncontrado.copa] ?? pendienteEncontrado.copa}`}
+                {pendienteEncontrado.instancia && ` · ${INSTANCIA_LABEL[pendienteEncontrado.instancia] ?? pendienteEncontrado.instancia}`}
+                {pendienteEncontrado.llave && ` (Llave ${pendienteEncontrado.llave})`}
+              </div>
+            )}
+          </div>
+          <p style={{color:'#8899BB', fontSize:13, marginBottom:20}}>
+            Lo más seguro es publicar el resultado de este Excel <strong>ahí mismo</strong> — así se conserva
+            la Fecha/Copa/Instancia/Llave que ya tenía cargadas ese partido. Si en cambio esto es un
+            partido distinto (una casualidad de que sean los mismos dos equipos), podés crear uno nuevo
+            en la Fecha {jornada} tipeada arriba.
+          </p>
+          <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
+            <button onClick={()=>handlePublish(false, pendienteEncontrado)} style={{...s.btnPublish,maxWidth:280}}>
+              📎 SÍ, PUBLICAR EN ESE PARTIDO
+            </button>
+            <button onClick={()=>handlePublish(false, null, true)} style={s.btnCancel}>
+              ➕ No, crear uno nuevo en Fecha {jornada}
             </button>
           </div>
         </div>

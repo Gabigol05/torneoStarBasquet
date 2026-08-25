@@ -12,6 +12,7 @@ import UploadHistory from './UploadHistory';
 import RecalcularStats from './RecalcularStats';
 import EncuestasManager from './EncuestasManager';
 import AliasesManager from './AliasesManager';
+import EquipoAliasesManager from './EquipoAliasesManager';
 import MergeJugadores from './MergeJugadores';
 import TemporadasManager from './TemporadasManager';
 import PlantelManager from './PlantelManager';
@@ -32,6 +33,7 @@ const TOOLS = [
   { id:'playoffs',   icon:'🥇', label:'Cerrar Temporada',   desc:'Armar cruces de playoff automáticamente' },
   { id:'encuestas',  icon:'🗳️', label:'Encuestas',          desc:'Votaciones públicas' },
   { id:'alias',      icon:'🔗', label:'Alias',              desc:'Ver/borrar nombres vinculados' },
+  { id:'equipo-alias', icon:'🛡️', label:'Alias de Equipos', desc:'Nombres de equipo distintos al oficial (ej: apodos del Excel)' },
   { id:'fusionar',   icon:'🧬', label:'Fusionar jugadores', desc:'Unir duplicados del roster' },
   { id:'recalcular', icon:'🔄', label:'Recalcular',         desc:'Reprocesar promedios' },
 ];
@@ -63,7 +65,7 @@ const NAV_TODO = [CARGAR, ...TABS, ...TOOLS];
 // propósito (una temporada es global, no es "de femenino" ni "de
 // masculino"); 'encuestas' también, porque hoy EncuestasManager no separa
 // por categoría.
-const SECCIONES_CON_CATEGORIA = ['dashboard', 'excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar', 'plantel', 'playoffs'];
+const SECCIONES_CON_CATEGORIA = ['dashboard', 'excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'equipo-alias', 'fusionar', 'plantel', 'playoffs'];
 
 // ── Indicador Realtime ────────────────────────────────────────────────────────
 function RealtimeDot({ status, compact = false }) {
@@ -418,6 +420,7 @@ export default function AdminPanel() {
           {sec === 'stats'      && <StatsEditor categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'recalcular' && <RecalcularStats categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'alias'      && <AliasesManager categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'equipo-alias' && <EquipoAliasesManager categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'fusionar'   && <MergeJugadores categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'encuestas'  && <EncuestasManager />}
           {sec === 'temporadas' && <TemporadasManager onNavigate={setSec} />}

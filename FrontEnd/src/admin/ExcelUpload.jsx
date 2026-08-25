@@ -497,6 +497,26 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     cargarRecientes();
   };
 
+  // BUG REAL (encontrado por reporte de Alvaro, fecha 10 semifinal publicada
+  // como Temporada Regular pese a haber tildado "¿Es Playoff?"): handleFile
+  // llamaba a reset() a secas apenas se soltaba el Excel. reset() borra
+  // esPlayoff/copaPO/instanciaPO/llavePO — pero esos campos se llenan A
+  // PROPÓSITO antes de soltar el archivo (están arriba del dropzone, mismo
+  // paso 1). Resultado: tildabas "Es Playoff", completabas Copa/Instancia/
+  // Llave, soltabas el Excel, y para cuando llegabas al preview esos cuatro
+  // campos ya habían vuelto a quedar vacíos — sin forma de volver a
+  // tildarlos, porque esa sección solo existe en el paso 1. El partido se
+  // publicaba igual, pero como Temporada Regular en vez de Playoffs.
+  // "N° de fecha", "Lugar" y "Fecha de este partido" nunca tuvieron este
+  // problema porque reset() nunca los tocó — este reset para archivo nuevo
+  // sigue el mismo criterio: limpia lo que es de la carga anterior (parsed,
+  // jugadoras, log...) y respeta lo que el admin ya configuró a propósito.
+  const resetParaNuevoArchivo = () => {
+    setStep('archivo'); setParsed(null); setJugadoras([]);
+    setFileName(''); setLog([]); setDuplicate(null); setEditando(null);
+    cargarRecientes();
+  };
+
   useEffect(() => { reset(); }, [categoria]);
 
   // ── Últimas cargas (contexto rápido antes de subir una nueva) ────────────────
@@ -531,7 +551,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const handleFile = async (e) => {
     const file = (e.dataTransfer?.files ?? e.target.files)[0];
     if (!file) return;
-    reset();
+    resetParaNuevoArchivo();
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = async (ev) => {
@@ -554,11 +574,17 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   };
 
   // ── Verificar duplicado ──
+  // OJO: esta búsqueda de fecha tiene que filtrar por temporada activa igual
+  // que la de más abajo (donde se crea/reusa la fecha al publicar) — si no,
+  // en cuanto exista más de una temporada con el mismo número de fecha (ej:
+  // "Fecha 10" de la temporada 2026 Y "Fecha 10" de una temporada anterior),
+  // .maybeSingle() encuentra dos filas y tira error al verificar duplicados.
   const checkDuplicate = async (eqLId, eqVId, fechaNum) => {
     const { data: fechaData, error: fechaErr } = await supabase
       .from(tablas.fechas)
       .select('id')
       .eq('numero', Number(fechaNum))
+      .eq('temporada_id', temporadaActivaId)
       .maybeSingle();
     if (fechaErr) throw new Error(`ver fecha: ${fechaErr.message}`);
     if (!fechaData) return null;

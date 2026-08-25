@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from './AuthContext';
 import { useRealtimeStatus } from './useRealtimeStatus';
 import { useTournament } from '../context/TournamentContext';
 import { CategoriaToggle } from './categoriaAdmin';
 import { saludoCompleto } from './greeting';
 import Dashboard from './Dashboard';
-import ExcelUpload from './ExcelUpload';
 import PartidosManager from './PartidosManager';
 import StatsEditor from './StatsEditor';
 import UploadHistory from './UploadHistory';
@@ -19,6 +18,11 @@ import PlantelManager from './PlantelManager';
 import PlayoffsAdmin from './PlayoffsAdmin';
 import AdminSearch from './AdminSearch';
 import logoTorneo from '../assets/logo_torneo.jpg';
+
+// Carga diferida: trae xlsx + fuse.js, que solo hacen falta el día que se
+// abre esta sección. Antes se importaba fijo arriba, así que ese peso se
+// descargaba en CUALQUIER sesión de admin, aunque nunca se tocara Excel.
+const ExcelUpload = lazy(() => import('./ExcelUpload'));
 
 // ── Navegación ────────────────────────────────────────────────────────────────
 const TABS = [
@@ -414,7 +418,11 @@ export default function AdminPanel() {
         <div data-admin-content style={S.content}>
           <SectionHeader nav={NAV_TODO} sec={sec}/>
           {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} categoria={categoria} setCategoria={setCategoria} />}
-          {sec === 'excel'      && <ExcelUpload categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'excel'      && (
+            <Suspense fallback={<div style={{ padding:'2rem', textAlign:'center', color:'#8899BB', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando…</div>}>
+              <ExcelUpload categoria={categoria} setCategoria={setCategoria} />
+            </Suspense>
+          )}
           {sec === 'historial'  && <UploadHistory categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} foco={foco} />}
           {sec === 'stats'      && <StatsEditor categoria={categoria} setCategoria={setCategoria} />}

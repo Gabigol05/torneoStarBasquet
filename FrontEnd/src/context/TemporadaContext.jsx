@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
 
 // Temporadas/torneos (ej. "Temporada 2026", "Apertura 2027"). Ver
@@ -100,19 +100,36 @@ export function TemporadaProvider({ children }) {
   const temporadaSeleccionada = temporadas.find(t => t.id === temporadaSeleccionadaId) ?? null;
   const esTemporadaActiva = temporadaActivaId == null || temporadaSeleccionadaId === temporadaActivaId;
 
+  // Este contexto envuelve TODA la app — sin memoizar, cualquier render de
+  // TemporadaProvider (por ejemplo por el `loading`/`temporadas` cambiando)
+  // arma un objeto `value` nuevo y fuerza a re-renderizar a cada componente
+  // que use useTemporada(), lo haya pedido o no. Con useMemo, el objeto solo
+  // cambia cuando alguno de sus campos realmente cambió.
+  const value = useMemo(() => ({
+    temporadas,
+    temporadaActivaId,
+    temporadaSeleccionadaId,
+    setTemporadaSeleccionadaId,
+    temporadaSeleccionada,
+    esTemporadaActiva,
+    crearTemporada,
+    activarTemporada,
+    loading,
+    refetch: cargar,
+  }), [
+    temporadas,
+    temporadaActivaId,
+    temporadaSeleccionadaId,
+    temporadaSeleccionada,
+    esTemporadaActiva,
+    crearTemporada,
+    activarTemporada,
+    loading,
+    cargar,
+  ]);
+
   return (
-    <TemporadaContext.Provider value={{
-      temporadas,
-      temporadaActivaId,
-      temporadaSeleccionadaId,
-      setTemporadaSeleccionadaId,
-      temporadaSeleccionada,
-      esTemporadaActiva,
-      crearTemporada,
-      activarTemporada,
-      loading,
-      refetch: cargar,
-    }}>
+    <TemporadaContext.Provider value={value}>
       {children}
     </TemporadaContext.Provider>
   );

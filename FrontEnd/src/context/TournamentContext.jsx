@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, useRef } from 'react';
+import { createContext, useState, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackEvent } from '../lib/analytics.js';
 
 const TournamentContext = createContext();
@@ -21,9 +21,9 @@ export function TournamentProvider({ children }) {
   const [mode, setMode] = useState(readStoredMode); // 'masculino' | 'femenino'
   const isFirstRender = useRef(true);
 
-  const toggleMode = () => {
+  const toggleMode = useCallback(() => {
     setMode((prev) => (prev === 'masculino' ? 'femenino' : 'masculino'));
-  };
+  }, []);
 
   useEffect(() => {
     // Aplicar la clase al document.body para theming global
@@ -41,8 +41,13 @@ export function TournamentProvider({ children }) {
     }
   }, [mode]);
 
+  // Este contexto envuelve toda la app (theming + qué categoría se ve) — sin
+  // memoizar, cada render de TournamentProvider fuerza un re-render en cadena
+  // de todo lo que llama useTournament(), use o no `mode`.
+  const value = useMemo(() => ({ mode, setMode, toggleMode }), [mode, toggleMode]);
+
   return (
-    <TournamentContext.Provider value={{ mode, setMode, toggleMode }}>
+    <TournamentContext.Provider value={value}>
       {children}
     </TournamentContext.Provider>
   );

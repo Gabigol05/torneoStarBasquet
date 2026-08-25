@@ -5918,5 +5918,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 }
 @media (max-width: 480px) {
   .dash-table-row { grid-template-columns: 20px 1fr 34px 56px; font-size: 11.5px; }
-  .dash-table-row .dash-col-prom { display: none; }
+  /* Se oculta la columna que NO está activa según el toggle Promedio/Acumulado
+     (ver dash-col-secondary en LeaderTableRow) — antes esto ocultaba siempre
+     "prom", así que en modo Acumulado desaparecía la columna que sí importaba. */
+  .dash-table-row .dash-col-secondary { display: none; }
 }

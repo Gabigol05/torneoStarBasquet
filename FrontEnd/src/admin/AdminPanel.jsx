@@ -420,7 +420,7 @@ export default function AdminPanel() {
           {sec === 'alias'      && <AliasesManager categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'fusionar'   && <MergeJugadores categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'encuestas'  && <EncuestasManager />}
-          {sec === 'temporadas' && <TemporadasManager />}
+          {sec === 'temporadas' && <TemporadasManager onNavigate={setSec} />}
           {sec === 'plantel'    && <PlantelManager categoria={categoria} setCategoria={setCategoria} foco={foco} />}
           {sec === 'playoffs'   && <PlayoffsAdmin categoria={categoria} setCategoria={setCategoria} />}
         </div>

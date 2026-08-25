@@ -149,6 +149,9 @@ export default function MergeJugadores({ categoria: categoriaProp, setCategoria:
         creando un jugador nuevo). Elegí a cuál te quedás ("mantener") y cuál se
         fusiona y desaparece ("duplicado"): sus partidos, MVPs y alias pasan al que
         se mantiene, y los promedios se recalculan solos.
+        <br/>Si todavía no se llegó a duplicar (el sistema te marcó un nombre como
+        dudoso antes de crear nada), no hace falta esto — resolvelo desde el
+        selector ✏️ en el preview de "Subir Partido", o en <b>Alias</b>.
       </p>
       {categoria === 'femenino' && (
         <div style={S.warning}>

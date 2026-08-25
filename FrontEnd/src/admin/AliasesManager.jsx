@@ -100,6 +100,8 @@ export default function AliasesManager({ categoria: categoriaProp, setCategoria:
         permanente a un jugador/a. Se usan para que las próximas planillas reconozcan ese
         nombre directamente, sin pasar por búsqueda difusa. Borrá un alias solo si está
         mal vinculado — la próxima carga con ese nombre va a volver a preguntar coincidencia.
+        <br/>¿Ya se llegó a crear un jugador/a duplicado/a por este motivo (dos fichas para
+        la misma persona)? Esto no lo arregla — para unir dos fichas en una usá <b>Fusionar jugadores</b>.
       </p>
 
       <input

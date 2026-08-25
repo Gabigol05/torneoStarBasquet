@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
+import { COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
+import { useTemporada } from '../context/TemporadaContext';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
@@ -37,30 +39,12 @@ function buscarEquipo(texto, fuseEq, lista) {
   return fuseEq.search(texto)[0]?.item ?? null;
 }
 
-// ─── Índice fuzzy de JUGADORAS/ES — femenino es estático (roster fijo) ────────
-const TODAS_JUGADORAS_FEM = equiposFemenino.flatMap(eq =>
-  eq.jugadoras.filter(j => j && j.nombre).map(j => {
-    const partes = j.nombre.trim().split(/\s+/);
-    return {
-      id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
-      equipoId: eq.id, equipo: eq.name, equipoNorm: normStr(eq.name),
-      t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
-      t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
-    };
-  })
-);
-const fuseJugadorasFem = new Fuse(TODAS_JUGADORAS_FEM, {
-  keys: [
-    { name:'t0', weight:0.35 }, { name:'t1', weight:0.35 },
-    { name:'t2', weight:0.2  }, { name:'t3', weight:0.1  },
-    { name:'nombreNorm', weight:0.4 },
-  ],
-  threshold: 0.38, minMatchCharLength: 2, includeScore: true,
-});
-
-// Masculino NO tiene roster estático — los jugadores se van creando a medida
-// que se cargan los Excel. El índice fuzzy se arma dinámicamente desde la
-// tabla jugadores_masculino (ver buildIndiceJugadoresMasc en el componente).
+// ─── Índice fuzzy de JUGADORAS/ES — ambas categorías vienen de la base ────────
+// Femenino usaba un roster fijo (data/femeninoData.js): si alguien se
+// agregaba directo en la base y no también en ese archivo (pasó más de una
+// vez), el buscador de nombres del Excel no la reconocía. Ahora el índice se
+// arma en vivo desde jugadoras_femenino, igual que ya se hacía con
+// jugadores_masculino, así el buscador siempre tiene el plantel real.
 function buildFuseJugadores(lista) {
   return new Fuse(lista, {
     keys: [
@@ -72,12 +56,14 @@ function buildFuseJugadores(lista) {
   });
 }
 
-// Arma la entrada de indice fuzzy para un jugador masculino recien creado o
-// traido de la base, con el mismo formato en ambos lugares (fetch inicial
-// y alta al publicar) para no duplicar la logica.
-function formatJugadorMasc(j) {
+// Arma la entrada de indice fuzzy para un jugador/a recien creado/a o
+// traido/a de la base, con el mismo formato en ambos lugares (fetch inicial
+// y alta al publicar) para no duplicar la logica. `equipos` es el roster de
+// equipos de la categoria (equiposMasculino o equiposFemenino) — solo se usa
+// para resolver el nombre del equipo a mostrar en el listado de resolucion.
+function formatJugador(j, equipos) {
   const partes = (j.nombre ?? '').trim().split(/\s+/);
-  const equipoNombre = equiposMasculino.find(e => e.id === j.equipo_id)?.name ?? j.equipo_id;
+  const equipoNombre = equipos.find(e => e.id === j.equipo_id)?.name ?? j.equipo_id;
   return {
     id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
     equipoId: j.equipo_id, equipo: equipoNombre, equipoNorm: normStr(equipoNombre),
@@ -85,6 +71,10 @@ function formatJugadorMasc(j) {
     t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
   };
 }
+// Alias con el nombre viejo — lo siguen llamando así en algunos lugares de
+// más abajo del archivo.
+const formatJugadorMasc = j => formatJugador(j, equiposMasculino);
+const formatJugadoraFem = j => formatJugador(j, equiposFemenino);
 
 // ─── Resolver jugadora: aliases → fuzzy → (masculino) nuevo jugador ──────────
 const aliasesCache = { femenino: null, masculino: null };
@@ -338,20 +328,29 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const tablas = TABLAS[categoria];
   const roster = categoria === 'masculino' ? equiposMasculino : equiposFemenino;
   const fuseEq = categoria === 'masculino' ? fuseEqMasc : fuseEqFem;
+  // Todo lo que se publica desde acá cae en la temporada ACTIVA.
+  const { temporadaActivaId } = useTemporada();
 
-  // Índice de jugadores para fuzzy matching. Femenino: estático. Masculino: se
-  // trae de la base cada vez que se cambia de categoría (crece con cada carga).
+  // Índice de jugadores/as para fuzzy matching — se trae de la base cada vez
+  // que se cambia de categoría, para las dos categorías por igual (antes
+  // femenino usaba un roster fijo en el código, que se podía desactualizar
+  // si alguien se agregaba directo en la base).
   const [jugadoresMasc, setJugadoresMasc] = useState([]);
+  const [jugadorasFem,  setJugadorasFem]  = useState([]);
   useEffect(() => {
-    if (categoria !== 'masculino') return;
     (async () => {
-      const { data } = await supabase.from(tablas.jugadores).select('*');
-      setJugadoresMasc((data ?? []).map(formatJugadorMasc));
+      if (categoria === 'masculino') {
+        const { data } = await supabase.from(tablas.jugadores).select('*');
+        setJugadoresMasc((data ?? []).map(formatJugadorMasc));
+      } else {
+        const { data } = await supabase.from(tablas.jugadores).select('*');
+        setJugadorasFem((data ?? []).map(formatJugadoraFem));
+      }
     })();
   }, [categoria]);
 
-  const todasJugadoras  = categoria === 'masculino' ? jugadoresMasc : TODAS_JUGADORAS_FEM;
-  const fuseJugadoras   = useMemo(() => categoria === 'masculino' ? buildFuseJugadores(jugadoresMasc) : fuseJugadorasFem, [categoria, jugadoresMasc]);
+  const todasJugadoras  = categoria === 'masculino' ? jugadoresMasc : jugadorasFem;
+  const fuseJugadoras   = useMemo(() => buildFuseJugadores(todasJugadoras), [todasJugadoras]);
   const ctx = { categoria, tablas, fuseEq, fuseJugadoras, todasJugadoras, equipos: roster };
 
   const [step,      setStep]      = useState('archivo');
@@ -366,6 +365,14 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   // asi que no alcanza con la fecha de la jornada. Opcional: si se deja vacio
   // el partido sigue mostrando la fecha de la jornada como antes.
   const [fechaPartido, setFechaPartido] = useState('');
+  // Playoffs — mismas claves que PartidosManager.jsx, PlayoffsBracket.jsx y
+  // add_playoffs.sql. Este es el flujo que se usa para cargar los partidos
+  // realmente jugados (con planilla de stats), así que es el lugar más
+  // importante para poder tildar "Es Playoff" al publicar.
+  const [esPlayoff, setEsPlayoff] = useState(false);
+  const [copaPO,    setCopaPO]    = useState('');
+  const [instanciaPO, setInstanciaPO] = useState('');
+  const [llavePO,   setLlavePO]   = useState('');
   const [log,       setLog]       = useState([]);
   const [duplicate, setDuplicate] = useState(null);
   const fileRef = useRef();
@@ -373,6 +380,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const reset = () => {
     setStep('archivo'); setParsed(null); setJugadoras([]);
     setFileName(''); setLog([]); setDuplicate(null);
+    setEsPlayoff(false); setCopaPO(''); setInstanciaPO(''); setLlavePO('');
     cargarRecientes();
   };
 
@@ -479,11 +487,30 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
       // Fecha
       addLog('📅 Creando fecha...');
-      const { data:fd, error:fErr } = await supabase
-        .from(tablas.fechas)
-        .upsert({ numero:Number(jornada), descripcion:`Fecha ${jornada}` }, { onConflict:'numero' })
-        .select('id').single();
-      if (fErr) throw new Error(`Fecha: ${fErr.message}`);
+      // OJO: antes esto era un upsert con descripcion:`Fecha ${jornada}` a
+      // secas — si la fecha ya existía (ej: ya se le había puesto "Playoffs
+      // - Semifinal" a mano desde el fixture masivo), esta carga se la pisaba
+      // de vuelta a "Fecha N" en cada Excel que se subiera para esa jornada.
+      // Ahora: si ya existe, no se toca su descripción.
+      // La búsqueda se limita a la temporada ACTIVA — el número de fecha se
+      // reinicia en cada temporada nueva, así que "Fecha 1" de este torneo y
+      // "Fecha 1" de uno anterior son filas distintas.
+      const { data:fechaExistente } = await supabase
+        .from(tablas.fechas).select('id')
+        .eq('numero', Number(jornada))
+        .eq('temporada_id', temporadaActivaId)
+        .maybeSingle();
+      let fd;
+      if (fechaExistente) {
+        fd = fechaExistente;
+      } else {
+        const { data:fdNueva, error:fErr } = await supabase
+          .from(tablas.fechas)
+          .insert({ numero:Number(jornada), descripcion:`Fecha ${jornada}`, temporada_id: temporadaActivaId })
+          .select('id').single();
+        if (fErr) throw new Error(`Fecha: ${fErr.message}`);
+        fd = fdNueva;
+      }
       addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
 
       // Partido
@@ -503,6 +530,10 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
           pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
           lugar:lugar||null, fecha_partido:fechaPartido||null, estado:'finalizado',
+          es_playoff: esPlayoff,
+          copa:       esPlayoff ? (copaPO || null) : null,
+          instancia:  esPlayoff ? (instanciaPO || null) : null,
+          llave:      esPlayoff && llavePO ? Number(llavePO) : null,
         })
         .select('id').single();
       if (pErr) throw new Error(`Partido: ${pErr.message}`);
@@ -671,6 +702,48 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           <p style={{ color:'#4A566E', fontSize:11, margin:'-8px 0 12px' }}>
             Completala solo si esta fecha se juega en mas de un dia (ej: algunos partidos el sabado y otros el domingo). Si la dejás vacía, se usa la fecha general de la jornada.
           </p>
+
+          {/* Playoffs — si se tilda, este partido NO cuenta para la tabla de
+              posiciones (solo temporada regular) y aparece en el cuadro de
+              playoffs y en el chip "Playoffs" de Resultados en vez de
+              mezclarse con la fecha regular. Este es el flujo que se usa
+              para cargar partidos ya jugados con planilla de stats, así que
+              es el lugar más importante para marcarlo bien. */}
+          <div style={{
+            background: esPlayoff ? 'rgba(240,180,41,.06)' : 'transparent',
+            border: esPlayoff ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
+            borderRadius: 8, padding: esPlayoff ? '10px 12px' : '0', marginBottom: 16, transition: 'all .15s',
+          }}>
+            <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color: esPlayoff ? '#F0B429' : '#8899BB', cursor:'pointer', fontWeight: esPlayoff ? 700 : 400 }}>
+              <input type="checkbox" checked={esPlayoff} onChange={e => {
+                setEsPlayoff(e.target.checked);
+                if (!e.target.checked) { setCopaPO(''); setInstanciaPO(''); setLlavePO(''); }
+              }}/>
+              🏆 ¿Es Playoff?
+            </label>
+            {esPlayoff && (
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                <select value={copaPO} onChange={e=>setCopaPO(e.target.value)} style={{ ...s.input, flex:'0 0 150px' }}>
+                  <option value="">Copa —</option>
+                  <option value="oro">Copa de Oro</option>
+                  <option value="plata">Copa de Plata</option>
+                  <option value="bronce">Copa de Bronce</option>
+                </select>
+                <select value={instanciaPO} onChange={e=>setInstanciaPO(e.target.value)} style={{ ...s.input, flex:'0 0 170px' }}>
+                  <option value="">Instancia —</option>
+                  <option value="cuartos">Cuartos de Final</option>
+                  <option value="semifinal">Semifinal</option>
+                  <option value="final">Final</option>
+                  <option value="tercer_puesto">Tercer Puesto</option>
+                </select>
+                <input type="number" min="1" placeholder="Llave (1, 2...)" value={llavePO}
+                  onChange={e=>setLlavePO(e.target.value)}
+                  title="Posición del cruce dentro de esa copa+instancia — ej: Cuartos tiene 4 cruces (llave 1 a 4), Semifinal tiene 2 (llave 1 y 2), Final y Tercer Puesto tienen 1."
+                  style={{ ...s.input, flex:'0 0 130px' }}/>
+              </div>
+            )}
+          </div>
+
           <div style={s.dropZone} onClick={()=>fileRef.current.click()}
             onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e);}}>
             <div style={{fontSize:52,marginBottom:10}}>📁</div>
@@ -850,7 +923,56 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             </div>
           ))}
 
-          <div style={{display:'flex',gap:12,marginTop:8}}>
+          {/* Resumen final antes de publicar — la idea es que de un vistazo,
+              sin tener que releer el formulario de arriba, quede clarísimo
+              QUÉ se está por subir: qué partido, qué fecha, y sobre todo si
+              cuenta como temporada regular o como playoff (y de qué copa e
+              instancia) — para evitar que se publique un cruce de semifinal
+              como si fuera un partido regular por error. */}
+          <div style={{
+            background: esPlayoff ? 'linear-gradient(160deg,rgba(240,180,41,.10),#0B111C)' : 'linear-gradient(160deg,#101826,#0B111C)',
+            border: esPlayoff ? '1px solid rgba(240,180,41,.35)' : '1px solid #1C2535',
+            borderRadius: 12, padding: '16px 18px', marginTop: 20, marginBottom: 4,
+          }}>
+            <div style={{color:'#6B7A99',fontSize:11,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+              Antes de publicar, revisá
+            </div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:.5,color:'#EEF2F8',marginBottom:10}}>
+              {parsed.equipoLocal} <span style={{color:'#4A566E',fontSize:16}}>vs</span> {parsed.equipoVisit}
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontSize:13,color:'#8899BB'}}>
+                Fecha {jornada || '—'}
+              </span>
+              {esPlayoff ? (
+                <span style={{
+                  display:'inline-flex',alignItems:'center',gap:6,
+                  background:'rgba(240,180,41,.15)',border:'1px solid rgba(240,180,41,.4)',
+                  color:'#F0B429',fontWeight:700,fontSize:13,borderRadius:20,padding:'4px 12px',
+                }}>
+                  🏆 PLAYOFFS
+                  {copaPO && ` · ${COPA_LABEL[copaPO] ?? copaPO}`}
+                  {instanciaPO && ` · ${INSTANCIA_LABEL[instanciaPO] ?? instanciaPO}`}
+                  {llavePO && ` (Llave ${llavePO})`}
+                </span>
+              ) : (
+                <span style={{
+                  display:'inline-flex',alignItems:'center',gap:6,
+                  background:'rgba(96,165,250,.12)',border:'1px solid rgba(96,165,250,.3)',
+                  color:'#60A5FA',fontWeight:600,fontSize:13,borderRadius:20,padding:'4px 12px',
+                }}>
+                  📅 Temporada Regular
+                </span>
+              )}
+            </div>
+            {esPlayoff && (!copaPO || !instanciaPO) && (
+              <div style={{marginTop:10,color:'#F04060',fontSize:12,fontWeight:600}}>
+                ⚠️ Falta elegir {!copaPO && 'la Copa'}{!copaPO && !instanciaPO && ' y '}{!instanciaPO && 'la Instancia'} arriba en "¿Es Playoff?" — sin eso no va a aparecer bien identificado en el cuadro ni en los filtros.
+              </div>
+            )}
+          </div>
+
+          <div style={{display:'flex',gap:12,marginTop:12}}>
             <button onClick={()=>handlePublish(false)} disabled={!jornada}
               style={{...s.btnPublish,opacity:jornada?1:0.5}}>
               🚀 PUBLICAR PARTIDO

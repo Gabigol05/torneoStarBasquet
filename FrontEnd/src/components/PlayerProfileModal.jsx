@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
+import { labelPartidoCorto } from '../lib/fechaLabel';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
 // resto de las tarjetas con color de equipo) — evita color-mix()/variables
@@ -216,7 +217,10 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         const st    = statsPorPartido?.[p.id]?.[player.id];
         const fecha = fechas.find(f => f.id === p.fecha_id);
         return {
-          match: fecha ? `F${fecha.numero}` : `P${p.id}`,
+          // Playoffs: "Semifinal Oro" en vez de "F11" — la instancia/copa
+          // viven en el partido, no en la fecha (ver lib/fechaLabel.js).
+          match:     labelPartidoCorto(p, fecha) ?? (fecha ? `F${fecha.numero}` : `P${p.id}`),
+          esPlayoff: !!p.es_playoff,
           pts:   st?.pts ?? 0,
           reb:   (st?.rd ?? 0) + (st?.ro ?? 0),
           ast:   st?.as_ ?? 0,
@@ -410,8 +414,13 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
                       </thead>
                       <tbody>
                         {historialGrafico.map((r, i) => (
-                          <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)' }}>
-                            <td style={{ color: '#6B7A99', padding: '7px 8px', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: 14 }}>{r.match}</td>
+                          <tr key={i} style={{
+                            background: r.esPlayoff
+                              ? 'rgba(240,180,41,.06)'
+                              : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)'),
+                            boxShadow: r.esPlayoff ? 'inset 3px 0 0 #F0B429' : 'none',
+                          }}>
+                            <td style={{ color: r.esPlayoff ? '#F0B429' : '#6B7A99', padding: '7px 8px', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: r.esPlayoff ? 12 : 14, whiteSpace: 'nowrap' }}>{r.match}</td>
                             <td style={{ color: '#F0B429', padding: '7px 8px', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: 17, fontWeight: 700 }}>{r.pts}</td>
                             <td style={{ color: '#EEF2F8', padding: '7px 8px', textAlign: 'center' }}>{r.reb}</td>
                             <td style={{ color: '#EEF2F8', padding: '7px 8px', textAlign: 'center' }}>{r.ast}</td>

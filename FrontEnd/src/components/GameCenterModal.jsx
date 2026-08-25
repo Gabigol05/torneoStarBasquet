@@ -2,6 +2,7 @@
 import { supabase, isConfigured } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
+import { esPartidoPlayoff, labelInstanciaCorta } from '../lib/fechaLabel';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
 // resto de las tarjetas con color de equipo) — evita color-mix()/variables
@@ -117,34 +118,26 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
 
     let ignore = false;
     setLoading(true);
-    // El roster femenino esta hardcodeado en femeninoData.js (trae "jugadoras"
-    // adentro de cada equipo), pero el de masculino vive en la tabla
-    // jugadores_masculino — equiposMasculino NO tiene ese campo. Sin esto,
-    // el box score de masculino mostraba el ID interno del jugador en vez
-    // del nombre (y el MVP nunca se resolvia).
+    // Los nombres de jugador/a vienen de la base para las dos categorías
+    // (jugadores_masculino / jugadoras_femenino) — femenino usaba antes un
+    // roster fijo en el código (data/femeninoData.js), pero ese archivo ya
+    // no trae planteles, así que el nombre siempre se resuelve en vivo.
+    const tablaJugadores = esMasc ? 'jugadores_masculino' : 'jugadoras_femenino';
     const queries = [
       supabase.from(tablaPartido).select('*').eq('id', partidoId).single(),
       supabase.from(tablaStats).select('*').eq('partido_id', partidoId),
+      supabase.from(tablaJugadores).select('id,nombre'),
     ];
-    if (esMasc) queries.push(supabase.from('jugadores_masculino').select('id,nombre'));
 
-    Promise.all(queries).then(([{ data: partido }, { data: stats }, jugadoresRes]) => {
+    Promise.all(queries).then(([{ data: partido }, { data: stats }, { data: jugadoresRows }]) => {
       if (ignore) return;
       if (!partido) { setLoading(false); return; }
 
       const eqLocal = roster.find(e => e.id === partido.equipo_local_id);
       const eqVisit = roster.find(e => e.id === partido.equipo_visit_id);
 
-      const nombrePorId = esMasc
-        ? Object.fromEntries((jugadoresRes?.data ?? []).map(j => [j.id, j.nombre]))
-        : null;
-
-      const resolverNombre = (r) => {
-        if (esMasc) return nombrePorId[r[idField]] ?? r[idField];
-        const eq  = roster.find(e => e.id === r.equipo_id);
-        const jug = eq?.jugadoras?.find(j => j.id === r[idField]);
-        return jug?.nombre ?? r[idField];
-      };
+      const nombrePorId = Object.fromEntries((jugadoresRows ?? []).map(j => [j.id, j.nombre]));
+      const resolverNombre = (r) => nombrePorId[r[idField]] ?? r[idField];
 
       const enrich = (rows, eqId) =>
         (rows ?? [])
@@ -161,14 +154,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
       const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
       if (mvpJugId) {
         mvpRow = (stats ?? []).find(r => r[idField] === mvpJugId) ?? null;
-        if (esMasc) {
-          mvpNombre = nombrePorId[mvpJugId] ?? null;
-        } else {
-          const mvpEq = eqLocal?.jugadoras?.find(j => j.id === mvpJugId)
-            ? eqLocal
-            : (eqVisit?.jugadoras?.find(j => j.id === mvpJugId) ? eqVisit : null);
-          mvpNombre = mvpEq?.jugadoras?.find(j => j.id === mvpJugId)?.nombre ?? null;
-        }
+        mvpNombre = nombrePorId[mvpJugId] ?? null;
       }
 
       setData({ partido, eqLocal, eqVisit, statsLocal, statsVisit, mvpRow, mvpNombre });
@@ -259,6 +245,16 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 <span style={{ color: 'var(--gray)', fontFamily: "'Barlow Condensed'", fontWeight: 600, letterSpacing: '2px', fontSize: '12px' }}>
                   {esMasc ? 'TORNEO MASCULINO' : 'TORNEO FEMENINO'}
                 </span>
+                {esPartidoPlayoff(data.partido) && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 11, letterSpacing: 1,
+                    color: '#F0B429', background: 'rgba(240,180,41,.14)', border: '1px solid rgba(240,180,41,.4)',
+                    padding: '4px 10px', borderRadius: 100, textTransform: 'uppercase',
+                  }}>
+                    🏆 {labelInstanciaCorta(data.partido)}
+                  </span>
+                )}
               </div>
 
               <div className="gc-score-board">

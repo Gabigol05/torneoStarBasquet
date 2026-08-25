@@ -2,12 +2,16 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { equiposFemenino } from '../data/femeninoData';
 
 // Valor por defecto seguro — nunca es null
+// El plantel (jugadoras) ya no está embebido en equiposFemenino (ahora vive
+// en la base, jugadoras_femenino) — este DEFAULT solo se usa como estado
+// "todavía no cargó nada" antes de que el hook traiga los datos reales, así
+// que un array vacío alcanza (a la par de como ya funcionaba masculino).
 const DEFAULT = {
   equipos:         equiposFemenino.map(e => ({
     ...e,
     pj:0, pg:0, pp:0, pf:0, pc:0,
     historial:[], proximos:[],
-    jugadoras: e.jugadoras.map(j => ({ ...j, pts:0, reb:0, ast:0, rob:0, tap:0, fgp:0, tpp:0, tlp:0, pj:0 })),
+    jugadoras: [],
   })),
   partidos:        [],
   fechas:          [],

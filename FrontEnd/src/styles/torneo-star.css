@@ -5747,6 +5747,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   min-width: 0;
 }
 .ev-result-label span:not(.ev-crown):not(.ev-your-vote) {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

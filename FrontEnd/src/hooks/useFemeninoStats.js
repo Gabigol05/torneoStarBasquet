@@ -19,42 +19,74 @@ function buildEquiposBase() {
     ...e,
     pj:0, pg:0, pp:0, pf:0, pc:0,
     historial:[], proximos:[],
-    jugadoras: e.jugadoras.map(j => ({ ...j, ...DEFAULT_STATS })),
+    jugadoras: [],
   }));
 }
 
 // ─── Fetch optimizado: una sola ronda de queries paralelas ────────────────────
-async function fetchTodo() {
+// El plantel (jugadoras_femenino) viene de la base igual que en masculino —
+// dejó de ser un array estático para que el roster esté siempre al día
+// (altas/bajas por temporada) sin necesitar un deploy de código.
+//
+// `temporadaId`: si se pasa, deja afuera todo lo que no sea de esa temporada
+// (fechas, y por lo tanto los partidos y stats que cuelgan de ellas) — así
+// una temporada vieja se puede seguir mirando sin que se mezcle con la
+// actual. Si es null/undefined trae todo sin filtrar (fallback mientras
+// TemporadaContext todavía no resolvió cuál es la temporada activa).
+async function fetchTodo(temporadaId) {
   if (!isConfigured) return null;
 
-  // Todas las queries en paralelo — mucho más rápido que secuencial
+  let fechasQuery = supabase.from('fechas_femenino').select('*').order('numero', { ascending: true });
+  if (temporadaId != null) fechasQuery = fechasQuery.eq('temporada_id', temporadaId);
+  let statsQuery = supabase.from('estadisticas_femenino').select('*');
+  if (temporadaId != null) statsQuery = statsQuery.eq('temporada_id', temporadaId);
+
+  // Todas las queries en paralelo — mucho más rápido que secuencial.
+  // partidos_femenino y stats_partido_femenino NO tienen temporada_id propio
+  // (cuelgan de fechas_femenino.temporada_id), así que se traen completos y
+  // se filtran acá abajo contra las fechas ya filtradas — evita una vuelta
+  // secuencial extra sin perder el filtro.
   const [
+    { data: jugadorasRows, error: e0 },
     { data: statsRows,     error: e1 },
     { data: partidosRows,  error: e2 },
     { data: fechasRows,    error: e3 },
     { data: statsPartRows, error: e4 },
   ] = await Promise.all([
-    supabase.from('estadisticas_femenino').select('*'),
+    supabase.from('jugadoras_femenino').select('*'),
+    statsQuery,
     supabase.from('partidos_femenino')
       .select('*')
       .order('fecha_id', { ascending: true }),
-    supabase.from('fechas_femenino')
-      .select('*')
-      .order('numero', { ascending: true }),
+    fechasQuery,
     supabase.from('stats_partido_femenino')
       .select('partido_id,jugadora_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf'),
   ]);
 
   // Log errores sin crashear — tablas pueden no existir todavía
+  if (e0) console.warn('[useFemeninoStats] jugadoras:', e0.message);
   if (e1) console.warn('[useFemeninoStats] estadisticas:', e1.message);
   if (e2) console.warn('[useFemeninoStats] partidos:', e2.message);
   if (e3) console.warn('[useFemeninoStats] fechas:', e3.message);
   if (e4) console.warn('[useFemeninoStats] stats_partido:', e4.message);
 
+  const jugadoras = jugadorasRows ?? [];
   const stats     = statsRows    ?? [];
-  const partidos  = partidosRows ?? [];
   const fechas    = fechasRows   ?? [];
-  const statsPart = statsPartRows ?? [];
+
+  // Filtrar partidos/stats de partido contra las fechas de la temporada
+  // seleccionada (fechasRows ya viene filtrado por fechasQuery de arriba).
+  const fechaIds       = new Set(fechas.map(f => f.id));
+  const partidos       = (partidosRows  ?? []).filter(p => fechaIds.has(p.fecha_id));
+  const partidoIds     = new Set(partidos.map(p => p.id));
+  const statsPart      = (statsPartRows ?? []).filter(r => partidoIds.has(r.partido_id));
+
+  // Roster por equipo (viene de la base, a la par de masculino)
+  const rosterPorEquipo = {};
+  for (const j of jugadoras) {
+    if (!rosterPorEquipo[j.equipo_id]) rosterPorEquipo[j.equipo_id] = [];
+    rosterPorEquipo[j.equipo_id].push(j);
+  }
 
   // ── Maps de lookup O(1) ──
   const statsMap = Object.fromEntries(stats.map(r => [r.jugadora_id, r]));
@@ -66,9 +98,13 @@ async function fetchTodo() {
   }
 
   // ── Posiciones calculadas desde partidos finalizados ──
+  // Los partidos de playoff (es_playoff=true) quedan afuera: la tabla de
+  // posiciones es solo de temporada regular, si no un resultado de semifinal
+  // o final terminaría sumando PJ/PG/PP/PF/PC como si fuera una fecha más.
   const posMap = {};
   for (const p of partidos) {
     if (p.estado !== 'finalizado') continue;
+    if (p.es_playoff) continue;
     const li = p.equipo_local_id, vi = p.equipo_visit_id;
     if (!posMap[li]) posMap[li] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
     if (!posMap[vi]) posMap[vi] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
@@ -108,6 +144,13 @@ async function fetchTodo() {
           resultado: (myPts ?? 0) > (rivalPts ?? 0) ? 'G' : 'P',
           fechaId:   p.fecha_id,
           fechaNum:  fecha?.numero,
+          // Playoffs: el partido trae su propia copa/instancia/llave (no la
+          // fecha) porque una misma jornada puede mezclar cruces de más de
+          // una copa el mismo fin de semana.
+          esPlayoff: !!p.es_playoff,
+          copa:      p.copa ?? null,
+          instancia: p.instancia ?? null,
+          llave:     p.llave ?? null,
         });
       }
     } else if (p.estado === 'pendiente' || p.estado === 'en_juego') {
@@ -120,6 +163,10 @@ async function fetchTodo() {
           lugar:     p.lugar,
           hora:      p.hora_inicio ? String(p.hora_inicio).slice(0,5) : null,
           estado:    p.estado,
+          esPlayoff: !!p.es_playoff,
+          copa:      p.copa ?? null,
+          instancia: p.instancia ?? null,
+          llave:     p.llave ?? null,
         });
       }
     }
@@ -127,24 +174,29 @@ async function fetchTodo() {
 
   // ── Armar equipos finales ──
   const equipos = equiposFemenino.map(eq => {
-    const pos  = posMap[eq.id] ?? { pj:0,pg:0,pp:0,pf:0,pc:0 };
+    const pos    = posMap[eq.id] ?? { pj:0,pg:0,pp:0,pf:0,pc:0 };
+    const roster = rosterPorEquipo[eq.id] ?? [];
     return {
       ...eq,
       ...pos,
       historial: historialMap[eq.id] ?? [],
       proximos:  proximosMap[eq.id]  ?? [],
-      jugadoras: eq.jugadoras.map(j => {
+      jugadoras: roster.map(j => {
         const st = statsMap[j.id] ?? {};
         return {
-          ...j,
+          nombre: j.nombre,
+          numero: j.numero,
+          fechaNac: j.fecha_nac,
+          fotoUrl: j.foto_url,
+          equipoId: j.equipo_id,
           ...DEFAULT_STATS,
           ...st,
           // ⚠️ FIX: estadisticas_femenino tiene su propia columna "id"
           // (autoincremental, PK de esa tabla) distinta de jugadora_id — el
-          // spread de arriba la pisaba, así que el resto del sitio terminaba
-          // usando ese id numérico en vez del id real de la jugadora
-          // (ej. "f_tl_13"), rompiendo cualquier búsqueda posterior que
-          // dependiera de él (como el historial de stats por fecha).
+          // spread de arriba la pisaría si no se reafirmara, y el resto del
+          // sitio terminaría usando ese id numérico en vez del id real de la
+          // jugadora (ej. "f_tl_13"), rompiendo cualquier búsqueda posterior
+          // que dependiera de él (como el historial de stats por fecha).
           id: j.id,
           // aliases cortos
           pts: st.pts_prom  ?? 0,
@@ -177,7 +229,9 @@ async function fetchTodo() {
 // `enabled`: si es false, no pide datos ni abre el canal de Realtime — se usa
 // para no traer el femenino cuando el sitio está mostrando el masculino (y
 // viceversa), ya que antes PageHome llamaba los dos hooks siempre a la vez.
-export function useFemeninoStats(enabled = true) {
+// `temporadaId`: qué temporada mirar (normalmente `temporadaSeleccionadaId`
+// de useTemporada()) — null trae todo sin filtrar por temporada.
+export function useFemeninoStats(enabled = true, temporadaId = null) {
   const [equipos,         setEquipos]         = useState(buildEquiposBase);
   const [partidos,        setPartidos]        = useState([]);
   const [fechas,          setFechas]          = useState([]);
@@ -194,7 +248,7 @@ export function useFemeninoStats(enabled = true) {
     fetchingRef.current = true;
     try {
       setIsLoading(true);
-      const data = await fetchTodo();
+      const data = await fetchTodo(temporadaId);
       if (!data) return;
       setEquipos(data.equipos);
       setPartidos(data.partidos);
@@ -209,9 +263,11 @@ export function useFemeninoStats(enabled = true) {
       setIsLoading(false);
       fetchingRef.current = false;
     }
-  }, []);
+  }, [temporadaId]);
 
-  // Fetch inicial
+  // Fetch inicial — y de nuevo cada vez que cambia la temporada elegida
+  // (refresh ya cambia de identidad cuando cambia temporadaId, así que este
+  // efecto se re-dispara solo).
   useEffect(() => {
     if (!enabled) return;
     refresh();
@@ -223,6 +279,7 @@ export function useFemeninoStats(enabled = true) {
     if (!isConfigured || !supabase) return;
     const channel = supabase
       .channel('torneo-fem-rt')
+      .on('postgres_changes', { event:'*', schema:'public', table:'jugadoras_femenino'      }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'estadisticas_femenino'  }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'partidos_femenino'       }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'stats_partido_femenino'  }, refresh)

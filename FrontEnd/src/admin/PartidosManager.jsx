@@ -4,6 +4,7 @@ import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { useTemporada } from '../context/TemporadaContext';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -13,7 +14,125 @@ const EMPTY_PARTIDO = {
   q1_local:'', q2_local:'', q3_local:'', q4_local:'', ot_local:'',
   q1_visit:'', q2_visit:'', q3_visit:'', q4_visit:'', ot_visit:'',
   fecha_id:'', hora_inicio:'', lugar:'', estado:'pendiente', fecha_partido:'',
+  es_playoff:false, copa:'', instancia:'', llave:'',
 };
+
+// Copa e instancia de playoff — mismas claves que usa el cuadro público
+// (PlayoffsBracket.jsx) y la migración SQL (add_playoffs.sql).
+const COPAS_PLAYOFF = [
+  { value:'oro',    label:'Copa de Oro'    },
+  { value:'plata',  label:'Copa de Plata'  },
+  { value:'bronce', label:'Copa de Bronce' },
+];
+const INSTANCIAS_PLAYOFF = [
+  { value:'cuartos',        label:'Cuartos de Final' },
+  { value:'semifinal',      label:'Semifinal'        },
+  { value:'final',          label:'Final'            },
+  { value:'tercer_puesto',  label:'Tercer Puesto'    },
+];
+
+// ── Historial de ediciones ────────────────────────────────────────────────
+// El registro de qué cambió y quién lo hizo lo escribe un trigger en la base
+// (ver add_partido_historial.sql) para cualquier UPDATE a un partido, sin
+// importar desde qué botón del panel se hizo. Acá solo lo leemos y lo
+// mostramos legible — traduciendo nombres de columna, ids de equipo/fecha y
+// valores técnicos (estado, copa, instancia) a texto entendible.
+const ESTADO_LABEL = { pendiente:'Pendiente', en_juego:'En juego', finalizado:'Finalizado' };
+const CAMPO_LABEL = {
+  equipo_local_id:'Equipo local', equipo_visit_id:'Equipo visitante', fecha_id:'Fecha asignada',
+  estado:'Estado', lugar:'Lugar', hora_inicio:'Hora', fecha_partido:'Día del partido',
+  puntos_local:'Puntos local', puntos_visit:'Puntos visitante',
+  q1_local:'Q1 local', q2_local:'Q2 local', q3_local:'Q3 local', q4_local:'Q4 local', ot_local:'OT local',
+  q1_visit:'Q1 visitante', q2_visit:'Q2 visitante', q3_visit:'Q3 visitante', q4_visit:'Q4 visitante', ot_visit:'OT visitante',
+  es_playoff:'¿Es playoff?', copa:'Copa', instancia:'Instancia', llave:'Llave',
+};
+function labelCampo(campo) { return CAMPO_LABEL[campo] ?? campo; }
+function formatValorCampo(campo, val, { equipos, fechas }) {
+  if (val === null || val === undefined || val === '') return '—';
+  if (campo === 'equipo_local_id' || campo === 'equipo_visit_id') return equipos.find(e => e.id === val)?.nombre ?? val;
+  if (campo === 'fecha_id') { const f = fechas.find(f => f.id === Number(val)); return f ? (f.descripcion ?? `Fecha ${f.numero}`) : `#${val}`; }
+  if (campo === 'estado') return ESTADO_LABEL[val] ?? val;
+  if (campo === 'copa') return COPAS_PLAYOFF.find(c => c.value === val)?.label ?? val;
+  if (campo === 'instancia') return INSTANCIAS_PLAYOFF.find(i => i.value === val)?.label ?? val;
+  if (campo === 'es_playoff') return val === true || val === 'true' ? 'Sí' : 'No';
+  return String(val);
+}
+function formatFechaHora(iso) {
+  try {
+    return new Date(iso).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
+
+function HistorialPanel({ loading, rows, equipos, fechas }) {
+  if (loading) return <div style={{ padding:'10px 14px', color:'#6B7A99', fontSize:12.5 }}>Cargando historial...</div>;
+  if (!rows || rows.length === 0) {
+    return <div style={{ padding:'10px 14px', color:'#4A566E', fontSize:12.5 }}>Todavía no hay ediciones registradas para este partido.</div>;
+  }
+  return (
+    <div style={{
+      marginTop:6, padding:'10px 14px', borderRadius:10, background:'#080C12',
+      border:'1px solid #1C2535', display:'flex', flexDirection:'column', gap:10,
+    }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:2, color:'#4A566E' }}>🕘 HISTORIAL DE EDICIONES</div>
+      {rows.map(r => (
+        <div key={r.id} style={{ borderLeft:'2px solid rgba(240,180,41,.3)', paddingLeft:10 }}>
+          <div style={{ fontSize:12, color:'#CBD5E8', marginBottom:3 }}>
+            <strong style={{ color:'#F0B429' }}>{r.editor_email ?? 'Alguien'}</strong>
+            <span style={{ color:'#4A566E' }}> · {formatFechaHora(r.editado_en)}</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+            {Object.entries(r.cambios ?? {}).map(([campo, { antes, despues }]) => (
+              <div key={campo} style={{ fontSize:12, color:'#8899BB' }}>
+                <span style={{ color:'#6B7A99' }}>{labelCampo(campo)}:</span>{' '}
+                {formatValorCampo(campo, antes, { equipos, fechas })}
+                {' → '}
+                <span style={{ color:'#EEF2F8' }}>{formatValorCampo(campo, despues, { equipos, fechas })}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Bloque reutilizable de "¿Es Playoff?" + Copa/Instancia/Llave — se usa tanto
+// en el alta/edición individual (PartidoForm) como en cada fila del fixture
+// masivo (FixtureMasivo). `values`/`onChange` son genéricos para servir a
+// los dos casos sin duplicar el JSX.
+function PlayoffFields({ values, onChange, compact=false }) {
+  return (
+    <div style={{
+      background: values.es_playoff ? 'rgba(240,180,41,.06)' : 'transparent',
+      border: values.es_playoff ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
+      borderRadius: 8, padding: values.es_playoff ? '10px 12px' : '0', transition: 'all .15s',
+    }}>
+      <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color: values.es_playoff ? '#F0B429' : '#8899BB', cursor:'pointer', fontWeight: values.es_playoff ? 700 : 400 }}>
+        <input type="checkbox" checked={!!values.es_playoff}
+          onChange={e => onChange({ ...values, es_playoff: e.target.checked, copa: e.target.checked ? values.copa : '', instancia: e.target.checked ? values.instancia : '', llave: e.target.checked ? values.llave : '' })}/>
+        🏆 ¿Es Playoff?
+      </label>
+      {values.es_playoff && (
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+          <select value={values.copa} onChange={e => onChange({ ...values, copa:e.target.value })}
+            style={{ ...F.input, flex: compact?'0 0 150px':1, minWidth:130 }}>
+            <option value="">Copa —</option>
+            {COPAS_PLAYOFF.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          <select value={values.instancia} onChange={e => onChange({ ...values, instancia:e.target.value })}
+            style={{ ...F.input, flex: compact?'0 0 170px':1, minWidth:150 }}>
+            <option value="">Instancia —</option>
+            {INSTANCIAS_PLAYOFF.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+          </select>
+          <input type="number" min="1" placeholder="Llave (1, 2...)" value={values.llave}
+            onChange={e => onChange({ ...values, llave:e.target.value })}
+            title="Posición del cruce dentro de esa copa+instancia — ej: Cuartos tiene 4 cruces (llave 1 a 4), Semifinal tiene 2 (llave 1 y 2), Final y Tercer Puesto tienen 1."
+            style={{ ...F.input, flex: compact?'0 0 130px':1, minWidth:110 }}/>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function LogoEq({ id, equipos, size=28 }) {
   const eq = equipos.find(e => e.id === id);
@@ -166,12 +285,79 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
           dia (ej: algunos partidos el sabado, otros el domingo) — si no, con
           la fecha de la jornada alcanza y este campo se puede dejar vacio. */}
 
+      {/* Playoffs — si se tilda, este partido NO cuenta para la tabla de
+          posiciones (solo temporada regular) y aparece en el cuadro de
+          playoffs y en el chip "Playoffs" de Resultados en vez de mezclarse
+          con la fecha regular. */}
+      <div style={{ marginBottom:16 }}>
+        <PlayoffFields values={form} onChange={setForm}/>
+      </div>
+
       {/* Sugerir encuesta */}
       {!editId && form.estado !== 'finalizado' && (
         <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, fontSize:13, color:'#8899BB', cursor:'pointer' }}>
           <input type="checkbox" checked={crearEncuesta} onChange={e => setCrearEncuesta(e.target.checked)} />
           🗳️ Crear encuesta "¿Quién gana?" automáticamente para este partido
         </label>
+      )}
+
+      {/* Resumen antes de guardar — mismo criterio que en la carga de Excel:
+          de un vistazo, sin releer todo el formulario, que quede clarísimo
+          qué se está por guardar y si cuenta como Temporada Regular o
+          Playoffs (el toggle de arriba se puede perder de vista en un
+          formulario largo). */}
+      {(form.equipo_local_id || form.equipo_visit_id) && (
+        <div style={{
+          background: form.es_playoff ? 'linear-gradient(160deg,rgba(240,180,41,.10),#0B111C)' : 'linear-gradient(160deg,#101826,#0B111C)',
+          border: form.es_playoff ? '1px solid rgba(240,180,41,.35)' : '1px solid #1C2535',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+        }}>
+          <div style={{ color:'#6B7A99', fontSize:10, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>
+            Vas a guardar
+          </div>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8', marginBottom:8 }}>
+            {equipos.find(e => e.id === form.equipo_local_id)?.nombre ?? '— Local —'}
+            {' '}<span style={{ color:'#4A566E', fontSize:14 }}>vs</span>{' '}
+            {equipos.find(e => e.id === form.equipo_visit_id)?.nombre ?? '— Visitante —'}
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+            <span style={{ fontSize:12, color:'#8899BB' }}>
+              {fechas.find(f => String(f.id) === String(form.fecha_id))?.descripcion
+                ?? (form.fecha_id ? `Fecha #${form.fecha_id}` : 'Sin fecha asignada')}
+            </span>
+            {form.es_playoff ? (
+              <span style={{
+                display:'inline-flex', alignItems:'center', gap:6,
+                background:'rgba(240,180,41,.15)', border:'1px solid rgba(240,180,41,.4)',
+                color:'#F0B429', fontWeight:700, fontSize:12, borderRadius:20, padding:'3px 10px',
+              }}>
+                🏆 PLAYOFFS
+                {form.copa && ` · ${COPAS_PLAYOFF.find(c=>c.value===form.copa)?.label ?? form.copa}`}
+                {form.instancia && ` · ${INSTANCIAS_PLAYOFF.find(i=>i.value===form.instancia)?.label ?? form.instancia}`}
+                {form.llave && ` (Llave ${form.llave})`}
+              </span>
+            ) : (
+              <span style={{
+                display:'inline-flex', alignItems:'center', gap:6,
+                background:'rgba(96,165,250,.12)', border:'1px solid rgba(96,165,250,.3)',
+                color:'#60A5FA', fontWeight:600, fontSize:12, borderRadius:20, padding:'3px 10px',
+              }}>
+                📅 Temporada Regular
+              </span>
+            )}
+            <span style={{
+              fontSize:11, fontWeight:700, letterSpacing:.5, textTransform:'uppercase',
+              color: form.estado === 'finalizado' ? '#22D07A' : form.estado === 'en_juego' ? '#F0B429' : '#8899BB',
+            }}>
+              {form.estado === 'finalizado' ? '✓ Finalizado' : form.estado === 'en_juego' ? '● En juego' : '○ Pendiente'}
+            </span>
+          </div>
+          {form.es_playoff && (!form.copa || !form.instancia) && (
+            <div style={{ marginTop:8, color:'#F04060', fontSize:11, fontWeight:600 }}>
+              ⚠️ Falta elegir {!form.copa && 'la Copa'}{!form.copa && !form.instancia && ' y '}{!form.instancia && 'la Instancia'} arriba en "¿Es Playoff?".
+            </div>
+          )}
+        </div>
       )}
 
       {/* Botones */}
@@ -187,19 +373,19 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
 }
 
 // ── Carga masiva de fixture ───────────────────────────────────────────────────
-function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClose }) {
+function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, onCrearFecha, onClose }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
   const [partidos,     setPartidos]     = useState([
-    { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'' },
+    { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'', es_playoff:false, copa:'', instancia:'', llave:'' },
   ]);
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
   const [crearEncuestas, setCrearEncuestas] = useState(true);
   const { confirm: confirmDup, ConfirmDialog: ConfirmDialogFixture } = useConfirm();
 
-  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'' }]);
+  const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'', es_playoff:false, copa:'', instancia:'', llave:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
   const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => j===i?{...r,[field]:val}:r));
 
@@ -214,22 +400,39 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
 
     setLoading(true);
     try {
-      // 1. Crear/obtener fecha
-      // Si ya existe una fecha con este numero (ej: se esta cargando un
-      // segundo lote de partidos de la misma jornada, en otro dia) y no se
-      // puso una FECHA CALENDARIO nueva, no se toca el fecha_dia existente —
-      // antes esto se pisaba siempre, y una jornada jugada en dos dias
-      // terminaba con todos los partidos mostrando el ultimo dia cargado.
-      const fechaPayload = {
-        numero:      Number(jornada),
-        descripcion: descripcion || `Fecha ${jornada}`,
-      };
-      if (fechaDia) fechaPayload.fecha_dia = fechaDia;
-      const { data:fd, error:fErr } = await supabase
+      // 1. Crear/obtener fecha — buscando SOLO dentro de la temporada activa
+      // (el número de fecha se reinicia en cada temporada, así que "Fecha 1"
+      // de este año y "Fecha 1" de un torneo anterior son filas distintas).
+      // Si ya existe (ej: se esta cargando un segundo lote de partidos de la
+      // misma jornada, en otro dia) no se pisa su descripcion/fecha_dia con
+      // un upsert — antes eso se sobreescribía siempre, y una fecha ya
+      // renombrada a mano (ej. "SEMIFINALES") volvía a "Fecha 10" sola con
+      // la próxima carga del mismo número.
+      const { data: fechaExistente, error: fExErr } = await supabase
         .from(tablas.fechas)
-        .upsert(fechaPayload, { onConflict:'numero' })
-        .select('id').single();
-      if (fErr) throw fErr;
+        .select('id')
+        .eq('numero', Number(jornada))
+        .eq('temporada_id', temporadaActivaId)
+        .maybeSingle();
+      if (fExErr) throw fExErr;
+
+      let fd;
+      if (fechaExistente) {
+        fd = fechaExistente;
+      } else {
+        const fechaPayload = {
+          numero:        Number(jornada),
+          descripcion:   descripcion || `Fecha ${jornada}`,
+          temporada_id:  temporadaActivaId,
+        };
+        if (fechaDia) fechaPayload.fecha_dia = fechaDia;
+        const { data: fdNueva, error: fErr } = await supabase
+          .from(tablas.fechas)
+          .insert(fechaPayload)
+          .select('id').single();
+        if (fErr) throw fErr;
+        fd = fdNueva;
+      }
 
       // Verificar duplicados antes de insertar
       const { data: existentes, error: exErr } = await supabase
@@ -258,6 +461,10 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
         hora_inicio:     p.hora_inicio || null,
         fecha_partido:   p.fecha_partido || null,
         estado:          'pendiente',
+        es_playoff:      !!p.es_playoff,
+        copa:            p.es_playoff ? (p.copa || null) : null,
+        instancia:       p.es_playoff ? (p.instancia || null) : null,
+        llave:           p.es_playoff && p.llave ? Number(p.llave) : null,
       }));
       const { data: inserted, error:pErr } = await supabase
         .from(tablas.partidos).insert(rows)
@@ -398,6 +605,12 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
                   title="Solo si este partido se juega otro día que el resto de la fecha"/>
               </div>
             </div>
+            {/* Playoffs por partido — una misma fecha puede juntar cruces de
+                más de una copa el mismo fin de semana, así que esto se marca
+                fila por fila y no una sola vez para todo el fixture. */}
+            <div style={{ marginTop:8 }}>
+              <PlayoffFields compact values={p} onChange={vals => setPartidos(prev => prev.map((r,j) => j===i?vals:r))}/>
+            </div>
           </div>
         ))}
       </div>
@@ -429,7 +642,7 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, onCrearFecha, onClo
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────────
-export default function PartidosManager({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
+export default function PartidosManager({ categoria: categoriaProp, setCategoria: setCategoriaProp, foco } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('femenino');
   const categoria    = categoriaProp ?? categoriaLocal;
   const setCategoria = setCategoriaProp ?? setCategoriaLocal;
@@ -437,6 +650,9 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   const EQUIPOS = useMemo(() =>
     ROSTER[categoria].map(e => ({ id: e.id, nombre: e.name ?? e.nombre, color: e.color, logo: e.logo })),
     [categoria]);
+  // Toda fecha que se crea desde el panel cae en la temporada ACTIVA — no en
+  // la que se esté mirando en el sitio público, que puede ser una vieja.
+  const { temporadaActivaId } = useTemporada();
 
   const [partidos, setPartidos] = useState([]);
   const [fechas,   setFechas]   = useState([]);
@@ -454,6 +670,25 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   // cambiaba de fecha; solo se podía fijar al crearlo la primera vez.
   const [editandoFechaId, setEditandoFechaId] = useState(null);
   const [fechaEditForm, setFechaEditForm] = useState({ numero:'', descripcion:'', fecha_dia:'' });
+  // Historial de ediciones por partido — se carga bajo demanda (recién al
+  // abrirlo la primera vez) para no pegarle una consulta extra a la base por
+  // cada partido de la lista si nadie mira el historial.
+  const [historialAbierto, setHistorialAbierto] = useState({});   // { [partidoId]: bool }
+  const [historialData,    setHistorialData]    = useState({});   // { [partidoId]: rows[] }
+  const [historialLoading, setHistorialLoading] = useState({});   // { [partidoId]: bool }
+
+  const toggleHistorial = async (partidoId) => {
+    const yaAbierto = !!historialAbierto[partidoId];
+    setHistorialAbierto(prev => ({ ...prev, [partidoId]: !yaAbierto }));
+    if (yaAbierto || historialData[partidoId]) return; // ya lo tenemos, no re-consultar
+    setHistorialLoading(prev => ({ ...prev, [partidoId]: true }));
+    const { data, error } = await supabase
+      .from(tablas.historial).select('*')
+      .eq('partido_id', partidoId).order('editado_en', { ascending:false });
+    if (error) { flash(`Error cargando historial: ${error.message}`, false); }
+    setHistorialData(prev => ({ ...prev, [partidoId]: data ?? [] }));
+    setHistorialLoading(prev => ({ ...prev, [partidoId]: false }));
+  };
 
   const abrirEditFecha = (fecha) => {
     setEditandoFechaId(fecha.id);
@@ -481,14 +716,36 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
     setForm(EMPTY_PARTIDO); setEditId(null); setView('lista');
     setFiltroFecha(''); setFiltroEstado('');
     loadAll();
-  }, [categoria]);
+  }, [categoria, temporadaActivaId]);
 
+  // Llegada desde el buscador rápido del panel ("che, ¿la Fecha 8?") — filtra
+  // la lista a esa fecha apenas se resuelve la navegación. `foco.ts` cambia
+  // en cada búsqueda nueva, incluso si es la misma fecha de vuelta, para que
+  // este efecto dispare siempre.
+  useEffect(() => {
+    if (!foco?.fechaId) return;
+    setView('lista');
+    setFiltroFecha(String(foco.fechaId));
+  }, [foco?.ts]);
+
+  // Antes esto traía TODAS las fechas/partidos de siempre, sin filtrar por
+  // temporada — apenas hay más de una temporada, esta lista mezclaba fechas
+  // de años distintos con el mismo número (ej. dos "Fecha 1"). Ahora se
+  // scopea a la temporada ACTIVA, igual que el resto del panel. Los partidos
+  // sin fecha asignada (el form individual permite guardarlos así) se traen
+  // siempre aparte, porque al no tener fecha no hay forma de saber a qué
+  // temporada "pertenecen" — se muestran como pendientes de asignar.
   const loadAll = async () => {
-    const [{ data:ps }, { data:fs }] = await Promise.all([
-      supabase.from(tablas.partidos).select('*').order('fecha_id',{ascending:true}),
-      supabase.from(tablas.fechas).select('*').order('numero',{ascending:true}),
+    if (!temporadaActivaId) { setPartidos([]); setFechas([]); return; }
+    const { data: fs } = await supabase
+      .from(tablas.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true });
+    const fechaIds = (fs ?? []).map(f => f.id);
+    const [{ data: psConFecha }, { data: psSinFecha }] = await Promise.all([
+      fechaIds.length ? supabase.from(tablas.partidos).select('*').in('fecha_id', fechaIds) : Promise.resolve({ data: [] }),
+      supabase.from(tablas.partidos).select('*').is('fecha_id', null),
     ]);
-    setPartidos(ps ?? []);
+    const ps = [...(psConFecha ?? []), ...(psSinFecha ?? [])].sort((a, b) => (a.fecha_id ?? Infinity) - (b.fecha_id ?? Infinity));
+    setPartidos(ps);
     setFechas(fs ?? []);
   };
 
@@ -537,6 +794,10 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         q3_local: Number(form.q3_local||0), q4_local: Number(form.q4_local||0), ot_local: Number(form.ot_local||0),
         q1_visit: Number(form.q1_visit||0), q2_visit: Number(form.q2_visit||0),
         q3_visit: Number(form.q3_visit||0), q4_visit: Number(form.q4_visit||0), ot_visit: Number(form.ot_visit||0),
+        es_playoff: !!form.es_playoff,
+        copa:       form.es_playoff ? (form.copa || null) : null,
+        instancia:  form.es_playoff ? (form.instancia || null) : null,
+        llave:      form.es_playoff && form.llave ? Number(form.llave) : null,
       };
       if (editId) {
         const { error } = await supabase.from(tablas.partidos).update(payload).eq('id',editId);
@@ -576,6 +837,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
       fecha_partido: p.fecha_partido??'',
       q1_local:p.q1_local??'', q2_local:p.q2_local??'', q3_local:p.q3_local??'', q4_local:p.q4_local??'', ot_local:p.ot_local??'',
       q1_visit:p.q1_visit??'', q2_visit:p.q2_visit??'', q3_visit:p.q3_visit??'', q4_visit:p.q4_visit??'', ot_visit:p.ot_visit??'',
+      es_playoff: !!p.es_playoff, copa: p.copa??'', instancia: p.instancia??'', llave: p.llave??'',
     });
     setEditId(p.id); setView('nuevo');
   };
@@ -654,6 +916,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           equipos={EQUIPOS}
           tablas={tablas}
           categoria={categoria}
+          temporadaActivaId={temporadaActivaId}
           onCrearFecha={loadAll}
           onClose={()=>setView('lista')}
         />
@@ -756,7 +1019,8 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                       const cA = EQUIPOS.find(e=>e.id===p.equipo_local_id)?.color ?? '#4A566E';
                       const cB = EQUIPOS.find(e=>e.id===p.equipo_visit_id)?.color ?? '#4A566E';
                       return (
-                      <div key={p.id} style={{
+                      <div key={p.id}>
+                      <div style={{
                         background:`linear-gradient(115deg, ${cA}22, #0E1420 45%, ${cB}22)`,
                         border:'1px solid #1C2535',
                         borderRadius:12, padding:'14px 16px',
@@ -782,6 +1046,12 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                           </div>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                             <EstadoBadge estado={p.estado}/>
+                            {p.es_playoff && (
+                              <span style={{ fontSize:10, fontWeight:700, letterSpacing:1, padding:'2px 8px', borderRadius:4,
+                                background:'rgba(240,180,41,.15)', color:'#F0B429', border:'1px solid rgba(240,180,41,.35)' }}>
+                                🏆 PLAYOFFS{p.copa ? ` · ${COPAS_PLAYOFF.find(c=>c.value===p.copa)?.label ?? p.copa}` : ''}{p.instancia ? ` · ${INSTANCIAS_PLAYOFF.find(i=>i.value===p.instancia)?.label ?? p.instancia}` : ''}
+                              </span>
+                            )}
                             {p.fecha_partido && (
                               <span style={{ fontSize:11, color:'#4FA3FF', background:'rgba(79,163,255,.1)', border:'1px solid rgba(79,163,255,.25)', borderRadius:4, padding:'1px 6px' }}>
                                 📅 {new Date(p.fecha_partido + 'T00:00:00').toLocaleDateString('es-AR')}
@@ -821,11 +1091,24 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                             style={{ ...F.iconBtn, borderColor:'#1C2535', color:'#6B7A99' }}>
                             ✏️
                           </button>
+                          <button onClick={()=>toggleHistorial(p.id)} title="Ver historial de ediciones"
+                            style={{ ...F.iconBtn, borderColor: historialAbierto[p.id] ? 'rgba(240,180,41,.4)' : '#1C2535', color: historialAbierto[p.id] ? '#F0B429' : '#6B7A99' }}>
+                            🕘
+                          </button>
                           <button onClick={()=>handleDelete(p.id)} title="Eliminar partido"
                             style={{ ...F.iconBtn, borderColor:'rgba(240,64,96,.3)', color:'#F04060' }}>
                             🗑️
                           </button>
                         </div>
+                      </div>
+                      {historialAbierto[p.id] && (
+                        <HistorialPanel
+                          loading={!!historialLoading[p.id]}
+                          rows={historialData[p.id]}
+                          equipos={EQUIPOS}
+                          fechas={fechas}
+                        />
+                      )}
                       </div>
                       );
                     })}

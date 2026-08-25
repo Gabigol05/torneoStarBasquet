@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { TABLAS, CategoriaToggle } from './categoriaAdmin';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
-import { labelFecha } from '../lib/fechaLabel';
+import { labelFecha, esPartidoPlayoff, labelInstanciaCorta } from '../lib/fechaLabel';
+import { useTemporada } from '../context/TemporadaContext';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const STAT_COLS = [
@@ -22,13 +23,16 @@ function equipoInfo(categoria, id) {
   return { nombre: eq.name ?? eq.nombre, color: eq.color, logo: eq.logo };
 }
 
-function buildJugadorMapFemenino() {
+// El plantel femenino ya no vive embebido en equiposFemenino (ver
+// femeninoData.js) — ahora se arma igual que el masculino, a partir de las
+// filas de jugadoras_femenino/jugadores_masculino que se traen de la base.
+// Antes esta función leía el campo estático `eq.jugadoras`, que ya no existe
+// desde que el plantel femenino se migró a la base — eso dejaba "Líderes
+// femenino" siempre vacío (ningún nombre resolvía). Una sola función genérica
+// para las dos categorías, en vez de mantener dos casi-iguales.
+function buildJugadorMap(rows, idField) {
   const map = {};
-  for (const eq of equiposFemenino) {
-    for (const j of (eq.jugadoras ?? [])) {
-      map[j.id] = { nombre: j.nombre, equipoId: eq.id };
-    }
-  }
+  for (const r of (rows ?? [])) map[r[idField]] = { nombre: r.nombre, equipoId: r.equipo_id };
   return map;
 }
 
@@ -61,6 +65,11 @@ function lunesDeSemana(dateStr) {
   const dia = d.getDay();
   const diff = (dia === 0 ? -6 : 1) - dia;
   d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+function domingoDeSemana(lunesStr) {
+  const d = new Date(`${lunesStr}T00:00:00`);
+  d.setDate(d.getDate() + 6);
   return d.toISOString().slice(0, 10);
 }
 function buildExtra(partidosCat, fechaMap) {
@@ -312,6 +321,57 @@ function LeaderRow({ rank, nombre, equipo, value, unit }) {
   );
 }
 
+function fmtDiaCorto(iso) {
+  try { return new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { day:'2-digit', month:'short' }); }
+  catch { return iso; }
+}
+
+// "Esta semana: 4 partidos jugados, 2 pendientes, lidera X en puntos" — de un
+// vistazo apenas se entra al panel, sin tener que armar ese resumen mental
+// mirando el fixture completo cada vez.
+function ResumenSemanalBanner({ resumen, onNavigate }) {
+  if (!resumen) return null;
+  const { jugados, pendientes, lider, lunes, domingo } = resumen;
+  return (
+    <div style={{
+      background:'linear-gradient(115deg,rgba(240,180,41,.10),#0E1420 55%,rgba(96,165,250,.08))',
+      border:'1px solid rgba(240,180,41,.25)', borderRadius:14, padding:'16px 20px',
+      display:'flex', alignItems:'center', gap:20, flexWrap:'wrap',
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+        <div style={{ width:38, height:38, borderRadius:10, background:'rgba(240,180,41,.15)', border:'1px solid rgba(240,180,41,.35)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>📆</div>
+        <div>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:.5, color:'#EEF2F8' }}>ESTA SEMANA</div>
+          <div style={{ fontSize:11, color:'#4A566E' }}>{fmtDiaCorto(lunes)} — {fmtDiaCorto(domingo)}</div>
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:22, flexWrap:'wrap', flex:1, minWidth:0 }}>
+        <button onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{ background:'none', border:'none', cursor: onNavigate ? 'pointer' : 'default', padding:0, textAlign:'left' }}>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:22, color:'#22D07A' }}>{jugados}</div>
+          <div style={{ fontSize:11, color:'#8899BB' }}>partido{jugados===1?'':'s'} jugado{jugados===1?'':'s'}</div>
+        </button>
+        <button onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{ background:'none', border:'none', cursor: onNavigate ? 'pointer' : 'default', padding:0, textAlign:'left' }}>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:22, color:'#60A5FA' }}>{pendientes}</div>
+          <div style={{ fontSize:11, color:'#8899BB' }}>pendiente{pendientes===1?'':'s'} de resultado</div>
+        </button>
+        {lider ? (
+          <div style={{ minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              {lider.equipo.logo && <img src={lider.equipo.logo} alt="" width={18} height={18} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, color:'#F0B429', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
+                {lider.categoria === 'femenino' ? '♀' : '♂'} {lider.nombre}
+              </div>
+            </div>
+            <div style={{ fontSize:11, color:'#8899BB' }}>lidera la semana con {lider.pts} pts</div>
+          </div>
+        ) : (
+          <div style={{ fontSize:12, color:'#4A566E', alignSelf:'center' }}>Todavía nadie anotó esta semana.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard({ irACargarPartido, onNavigate }) {
   const [loading, setLoading] = useState(true);
@@ -324,25 +384,45 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
   const [fixture, setFixture] = useState({ femenino:[], masculino:[] });
   const [chart, setChart] = useState({ femenino:[], masculino:[] });
   const [extra, setExtra] = useState({ femenino:null, masculino:null });
+  // Resumen semanal — "esta semana: N jugados, M pendientes, líder en puntos".
+  // Se arma con los mismos datos ya scopeados a la temporada activa, más una
+  // consulta chica extra a stats_partido para sacar quién más anotó en los
+  // partidos finalizados de esta semana puntual.
+  const [resumenSemanal, setResumenSemanal] = useState(null);
+  const { temporadaActivaId, temporadas, loading: temporadaLoading } = useTemporada();
+  const temporadaActiva = temporadas.find(t => t.id === temporadaActivaId);
 
   useEffect(() => {
+    // Todavía no resolvió cuál es la temporada activa (TemporadaContext
+    // sigue cargando) — esperar antes de pedir datos, para no traer "todo"
+    // sin filtro por un instante y mezclar temporadas en la primera pintada.
+    if (!temporadaActivaId) return;
     let cancelado = false;
     (async () => {
       setLoading(true);
       try {
+        // 1. Fechas de la temporada ACTIVA únicamente — todo lo demás se
+        // filtra a partir de estos ids, porque partidos_X no tiene
+        // temporada_id propio (solo lo tiene fechas_X).
+        const [{ data: ff }, { data: fm }] = await Promise.all([
+          supabase.from(TABLAS.femenino.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true }),
+          supabase.from(TABLAS.masculino.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true }),
+        ]);
+        if (cancelado) return;
+        const fechaIdsFem = (ff ?? []).map(f => f.id);
+        const fechaIdsMasc = (fm ?? []).map(f => f.id);
+
         const [
           { data: pf }, { data: pm },
-          { data: ff }, { data: fm },
           { data: sf }, { data: sm },
-          { data: jm },
+          { data: jf }, { data: jm },
           { data: encAct },
         ] = await Promise.all([
-          supabase.from(TABLAS.femenino.partidos).select('*'),
-          supabase.from(TABLAS.masculino.partidos).select('*'),
-          supabase.from(TABLAS.femenino.fechas).select('*').order('numero', { ascending:true }),
-          supabase.from(TABLAS.masculino.fechas).select('*').order('numero', { ascending:true }),
-          supabase.from(TABLAS.femenino.estadisticas).select('*'),
-          supabase.from(TABLAS.masculino.estadisticas).select('*'),
+          fechaIdsFem.length  ? supabase.from(TABLAS.femenino.partidos).select('*').in('fecha_id', fechaIdsFem)   : Promise.resolve({ data: [] }),
+          fechaIdsMasc.length ? supabase.from(TABLAS.masculino.partidos).select('*').in('fecha_id', fechaIdsMasc) : Promise.resolve({ data: [] }),
+          supabase.from(TABLAS.femenino.estadisticas).select('*').eq('temporada_id', temporadaActivaId),
+          supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaActivaId),
+          supabase.from(TABLAS.femenino.jugadores).select('id,nombre,equipo_id'),
           supabase.from(TABLAS.masculino.jugadores).select('id,nombre,equipo_id'),
           supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending:false }).limit(1),
         ]);
@@ -371,9 +451,56 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
         setKpis({ jugados, pendientes, proximo, encuesta });
 
         // ── Leaders ──
-        const jugadorMapFem = buildJugadorMapFemenino();
-        const jugadorMapMasc = {};
-        for (const j of (jm ?? [])) jugadorMapMasc[j.id] = { nombre: j.nombre, equipoId: j.equipo_id };
+        const jugadorMapFem = buildJugadorMap(jf, 'id');
+        const jugadorMapMasc = buildJugadorMap(jm, 'id');
+
+        // ── Resumen semanal (lunes a domingo de HOY) ──
+        const fechaMapFem  = buildFechaMap(ff);
+        const fechaMapMasc = buildFechaMap(fm);
+        const lunesActual = lunesDeSemana(hoy);
+        const domingoActual = domingoDeSemana(lunesActual);
+        const enEstaSemana = p => {
+          const fm2 = p.categoria === 'femenino' ? fechaMapFem : fechaMapMasc;
+          const eff = fechaEfectiva(p, fm2);
+          return eff && eff >= lunesActual && eff <= domingoActual;
+        };
+        const partidosSemana = partidos.filter(enEstaSemana);
+        const jugadosSemana = partidosSemana.filter(p => p.estado === 'finalizado');
+        const pendientesSemana = partidosSemana.filter(p => p.estado !== 'finalizado').length;
+        const idsSemanaFem  = jugadosSemana.filter(p => p.categoria === 'femenino').map(p => p.id);
+        const idsSemanaMasc = jugadosSemana.filter(p => p.categoria === 'masculino').map(p => p.id);
+
+        let liderSemana = null;
+        if (idsSemanaFem.length || idsSemanaMasc.length) {
+          const [{ data: stFemSemana }, { data: stMascSemana }] = await Promise.all([
+            idsSemanaFem.length  ? supabase.from(TABLAS.femenino.stats).select('jugadora_id,pts').in('partido_id', idsSemanaFem)   : Promise.resolve({ data: [] }),
+            idsSemanaMasc.length ? supabase.from(TABLAS.masculino.stats).select('jugador_id,pts').in('partido_id', idsSemanaMasc) : Promise.resolve({ data: [] }),
+          ]);
+          const sumarPts = (rows, idField) => {
+            const acc = {};
+            for (const r of (rows ?? [])) acc[r[idField]] = (acc[r[idField]] ?? 0) + Number(r.pts || 0);
+            return acc;
+          };
+          const candidatos = [
+            ...Object.entries(sumarPts(stFemSemana, 'jugadora_id')).map(([id, pts]) => {
+              const info = jugadorMapFem[id]; if (!info) return null;
+              return { id, pts, categoria:'femenino', nombre: info.nombre, equipo: equipoInfo('femenino', info.equipoId) };
+            }),
+            ...Object.entries(sumarPts(stMascSemana, 'jugador_id')).map(([id, pts]) => {
+              const info = jugadorMapMasc[id]; if (!info) return null;
+              return { id, pts, categoria:'masculino', nombre: info.nombre, equipo: equipoInfo('masculino', info.equipoId) };
+            }),
+          ].filter(Boolean).sort((a, b) => b.pts - a.pts);
+          liderSemana = candidatos[0] ?? null;
+        }
+        if (!cancelado) {
+          setResumenSemanal({
+            jugados: jugadosSemana.length,
+            pendientes: pendientesSemana,
+            lider: liderSemana,
+            lunes: lunesActual, domingo: domingoActual,
+          });
+        }
 
         const buildLeaders = (statsRows, jugadorMap, categoria) => {
           const out = {};
@@ -435,7 +562,7 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
       }
     })();
     return () => { cancelado = true; };
-  }, []);
+  }, [temporadaActivaId]);
 
   const totalPartidos = kpis.jugados + kpis.pendientes;
   const avancePct = totalPartidos ? Math.round((kpis.jugados / totalPartidos) * 100) : 0;
@@ -448,12 +575,24 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
     return `${eqL.nombre} vs ${eqV.nombre}`;
   }, [kpis.proximo]);
 
-  if (loading) {
+  if (temporadaLoading || (loading && temporadaActivaId)) {
     return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando resumen…</div>;
+  }
+  if (!temporadaActivaId) {
+    return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>No hay ninguna temporada activa todavía — creá una desde "Temporadas" en Herramientas.</div>;
   }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+      {temporadaActiva && (
+        <div style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}>
+          🏆 Mostrando <strong style={{ color:'#8899BB' }}>{temporadaActiva.nombre}</strong> (temporada activa)
+        </div>
+      )}
+
+      {/* Resumen semanal */}
+      <ResumenSemanalBanner resumen={resumenSemanal} onNavigate={onNavigate}/>
+
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12 }}>
         <KpiCard icon="🏀" label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
@@ -546,6 +685,11 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
                       background:`linear-gradient(115deg, ${p.local.color}22, #0E1420 45%, ${p.visit.color}22)`, border:'1px solid #1C2535',
                     }}>
                       <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {esPartidoPlayoff(p) && (
+                          <span style={{ fontSize:9, fontWeight:700, letterSpacing:.5, padding:'1px 6px', borderRadius:4, background:'rgba(240,180,41,.15)', color:'#F0B429', border:'1px solid rgba(240,180,41,.35)', flexShrink:0 }}>
+                            🏆 {labelInstanciaCorta(p)}
+                          </span>
+                        )}
                         {p.local.logo && <img src={p.local.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
                         <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.local.nombre}</span>
                         <span style={{ color:'#2C3A52', flexShrink:0 }}>vs</span>

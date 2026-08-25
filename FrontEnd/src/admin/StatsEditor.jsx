@@ -4,6 +4,7 @@ import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { useTemporada } from '../context/TemporadaContext';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -160,6 +161,11 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   const tablas = TABLAS[categoria];
   const roster = ROSTER[categoria];
   const { confirm, ConfirmDialog } = useConfirm();
+  // estadisticas_X ahora tiene clave compuesta (jugador_id, temporada_id) —
+  // sin este filtro, un/a jugador/a con stats de más de una temporada traía
+  // varias filas y esta pantalla se quedaba con una al azar (ver
+  // add_temporadas.sql). Todo acá corrige la temporada ACTIVA únicamente.
+  const { temporadaActivaId } = useTemporada();
 
   const [equipoId,  setEquipoId]  = useState('');
   const [busqueda,  setBusqueda]  = useState('');
@@ -173,43 +179,40 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   const [viewMode,  setViewMode]  = useState(() =>
     (typeof window !== 'undefined' && window.innerWidth <= 640) ? 'cards' : 'tabla'
   ); // 'tabla' | 'cards'
-  // Masculino no tiene roster estático (los jugadores se cargan vía Excel a la
-  // tabla jugadores_masculino), así que hay que traerlo de la base.
-  const [rosterMasc, setRosterMasc] = useState([]);
+  // Ninguna de las dos categorías tiene roster estático — jugadores_masculino
+  // y jugadoras_femenino viven las dos en la base, así que el plantel de cada
+  // equipo se trae siempre en vivo.
+  const [rosterDb, setRosterDb] = useState([]);
 
   const equipoBase = roster.find(e => e.id === equipoId);
-  const equipo = equipoBase
-    ? { ...equipoBase, jugadoras: categoria === 'masculino' ? rosterMasc : equipoBase.jugadoras }
-    : null;
+  const equipo = equipoBase ? { ...equipoBase, jugadoras: rosterDb } : null;
 
   useEffect(() => {
-    setEquipoId(''); setStatsMap({}); setEdited({}); setBusqueda(''); setRosterMasc([]);
+    setEquipoId(''); setStatsMap({}); setEdited({}); setBusqueda(''); setRosterDb([]);
   }, [categoria]);
 
   useEffect(() => {
-    if (!equipoId) return;
+    if (!equipoId || !temporadaActivaId) return;
     setEdited({});
     (async () => {
-      let jugadoras = equipoBase?.jugadoras ?? [];
-      if (categoria === 'masculino') {
-        const { data } = await supabase.from(tablas.jugadores).select('*').eq('equipo_id', equipoId);
-        jugadoras = (data ?? []).map(j => ({ id: j.id, nombre: j.nombre, fechaNac: j.fecha_nac }));
-        setRosterMasc(jugadoras);
-      }
+      const { data } = await supabase.from(tablas.jugadores).select('*').eq('equipo_id', equipoId);
+      const jugadoras = (data ?? []).map(j => ({ id: j.id, nombre: j.nombre, fechaNac: j.fecha_nac, numero: j.numero }));
+      setRosterDb(jugadoras);
       await loadStats(jugadoras);
     })();
-  }, [equipoId]);
+  }, [equipoId, temporadaActivaId]);
 
   const loadStats = async (jugadorasOverride) => {
-    if (!equipoBase) return;
+    if (!equipoBase || !temporadaActivaId) return;
     setLoading(true);
-    const jugadoras = jugadorasOverride ?? (categoria === 'masculino' ? rosterMasc : equipoBase.jugadoras);
+    const jugadoras = jugadorasOverride ?? rosterDb;
     const ids = jugadoras.map(j => j.id);
     if (ids.length === 0) { setStatsMap({}); setLoading(false); return; }
     const { data, error } = await supabase
       .from(tablas.estadisticas)
       .select('*')
-      .in(tablas.jugadorIdField, ids);
+      .in(tablas.jugadorIdField, ids)
+      .eq('temporada_id', temporadaActivaId);
     if (!error) {
       const map = {};
       for (const row of data ?? []) map[row[tablas.jugadorIdField]] = row;
@@ -239,11 +242,12 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
         [tablas.jugadorIdField]: jugId,
         ...(statsMap[jugId] ?? {}),
         ...edited[jugId],
+        temporada_id: temporadaActivaId,
         updated_at: new Date().toISOString(),
       }));
       const { error } = await supabase
         .from(tablas.estadisticas)
-        .upsert(upserts, { onConflict: tablas.jugadorIdField });
+        .upsert(upserts, { onConflict: `${tablas.jugadorIdField},temporada_id` });
       if (error) throw error;
       flash(`✅ ${upserts.length} jugadora(s) guardadas`);
       await loadStats();
@@ -256,8 +260,9 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   };
 
   const handleReset = async (jugId) => {
-    if (!(await confirm('¿Borrar todas las estadísticas de esta jugadora?'))) return;
-    await supabase.from(tablas.estadisticas).delete().eq(tablas.jugadorIdField, jugId);
+    if (!(await confirm('¿Borrar las estadísticas de esta jugadora en la temporada actual? (No toca temporadas anteriores)'))) return;
+    await supabase.from(tablas.estadisticas).delete()
+      .eq(tablas.jugadorIdField, jugId).eq('temporada_id', temporadaActivaId);
     await loadStats();
     flash('✅ Stats reseteadas');
   };

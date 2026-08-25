@@ -18,6 +18,8 @@ import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats }  from '../hooks/useFemeninoStats';
 import { useMasculinoStats } from '../hooks/useMasculinoStats';
 import { useTournament }     from '../context/TournamentContext';
+import { useTemporada }      from '../context/TemporadaContext';
+import { TemporadaChip }     from './TemporadaChip.jsx';
 import { StatsContext }     from '../context/StatsContext';
 import { FavoritoProvider } from '../hooks/useFavorito.jsx';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
@@ -69,12 +71,15 @@ export function PageHome() {
   const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
   const [deepLinkPartido, setDeepLinkPartido] = useState(null);
   const { mode, setMode } = useTournament();
+  const { temporadaSeleccionadaId } = useTemporada();
   // Antes los dos hooks pedían datos y abrían su canal de Realtime siempre,
   // aunque solo se ve un modo a la vez — cada visitante hacía el doble de
   // queries/websockets de lo necesario. Ahora solo el hook del modo activo
   // hace fetch/subscribe; el otro se activa recién si el usuario cambia de modo.
-  const statsFem  = useFemeninoStats(mode !== 'masculino');
-  const statsMasc = useMasculinoStats(mode === 'masculino');
+  // temporadaSeleccionadaId re-dispara el fetch cada vez que se cambia de
+  // temporada con el chip, trayendo los datos de esa temporada nada más.
+  const statsFem  = useFemeninoStats(mode !== 'masculino', temporadaSeleccionadaId);
+  const statsMasc = useMasculinoStats(mode === 'masculino', temporadaSeleccionadaId);
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
@@ -207,6 +212,10 @@ export function PageHome() {
       <div className="mobile-only">
         <MobileHeader onRefresh={handlePullRefresh} />
       </div>
+      {/* Chip de temporada — global, arriba de todo el contenido, para que
+          se pueda elegir qué temporada mirar antes de ver ningún dato de
+          ninguna sección. Se auto-oculta si solo hay una temporada cargada. */}
+      <TemporadaChip />
       <Hero equipos={equipos} partidos={partidos} fechas={fechas} />
       <div className="full-rule"></div>
       <TorneoView />

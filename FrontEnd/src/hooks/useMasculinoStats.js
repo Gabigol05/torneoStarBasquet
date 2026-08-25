@@ -25,9 +25,22 @@ function buildEquiposBase() {
 
 // A diferencia del femenino (roster estático + stats dinámicas), en masculino
 // TODO viene de la base: equipos (para zona), jugadores (roster) y stats.
-async function fetchTodo() {
+//
+// `temporadaId`: si se pasa, deja afuera todo lo que no sea de esa temporada
+// (fechas, y por lo tanto los partidos y stats que cuelgan de ellas) — así
+// una temporada vieja se puede seguir mirando sin que se mezcle con la
+// actual. Si es null/undefined trae todo sin filtrar.
+async function fetchTodo(temporadaId) {
   if (!isConfigured) return null;
 
+  let fechasQuery = supabase.from('fechas_masculino').select('*').order('numero', { ascending: true });
+  if (temporadaId != null) fechasQuery = fechasQuery.eq('temporada_id', temporadaId);
+  let statsQuery = supabase.from('estadisticas_masculino').select('*');
+  if (temporadaId != null) statsQuery = statsQuery.eq('temporada_id', temporadaId);
+
+  // partidos_masculino y stats_partido_masculino no tienen temporada_id
+  // propio (cuelgan de fechas_masculino.temporada_id) — se traen completos
+  // y se filtran más abajo contra las fechas ya filtradas.
   const [
     { data: equiposRows,   error: e0 },
     { data: jugadoresRows, error: e1b },
@@ -38,13 +51,11 @@ async function fetchTodo() {
   ] = await Promise.all([
     supabase.from('equipos_masculino').select('id,zona'),
     supabase.from('jugadores_masculino').select('*'),
-    supabase.from('estadisticas_masculino').select('*'),
+    statsQuery,
     supabase.from('partidos_masculino')
       .select('*')
       .order('fecha_id', { ascending: true }),
-    supabase.from('fechas_masculino')
-      .select('*')
-      .order('numero', { ascending: true }),
+    fechasQuery,
     supabase.from('stats_partido_masculino')
       .select('partido_id,jugador_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf'),
   ]);
@@ -59,9 +70,14 @@ async function fetchTodo() {
   const equiposDb  = equiposRows   ?? [];
   const jugadores  = jugadoresRows ?? [];
   const stats      = statsRows     ?? [];
-  const partidos   = partidosRows  ?? [];
   const fechas     = fechasRows    ?? [];
-  const statsPart  = statsPartRows ?? [];
+
+  // Filtrar partidos/stats de partido contra las fechas de la temporada
+  // seleccionada (fechasRows ya viene filtrado por fechasQuery de arriba).
+  const fechaIds   = new Set(fechas.map(f => f.id));
+  const partidos   = (partidosRows  ?? []).filter(p => fechaIds.has(p.fecha_id));
+  const partidoIds = new Set(partidos.map(p => p.id));
+  const statsPart  = (statsPartRows ?? []).filter(r => partidoIds.has(r.partido_id));
 
   const zonaMap  = Object.fromEntries(equiposDb.map(r => [r.id, r.zona]));
   const statsMap = Object.fromEntries(stats.map(r => [r.jugador_id, r]));
@@ -80,9 +96,13 @@ async function fetchTodo() {
   }
 
   // ── Posiciones calculadas desde partidos finalizados ──
+  // Los partidos de playoff (es_playoff=true) quedan afuera: la tabla de
+  // posiciones es solo de temporada regular, si no un resultado de semifinal
+  // o final terminaría sumando PJ/PG/PP/PF/PC como si fuera una fecha más.
   const posMap = {};
   for (const p of partidos) {
     if (p.estado !== 'finalizado') continue;
+    if (p.es_playoff) continue;
     const li = p.equipo_local_id, vi = p.equipo_visit_id;
     if (!posMap[li]) posMap[li] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
     if (!posMap[vi]) posMap[vi] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
@@ -122,6 +142,13 @@ async function fetchTodo() {
           resultado: (myPts ?? 0) > (rivalPts ?? 0) ? 'G' : 'P',
           fechaId:   p.fecha_id,
           fechaNum:  fecha?.numero,
+          // Playoffs: el partido trae su propia copa/instancia/llave (no la
+          // fecha) porque una misma jornada puede mezclar cruces de más de
+          // una copa el mismo fin de semana.
+          esPlayoff: !!p.es_playoff,
+          copa:      p.copa ?? null,
+          instancia: p.instancia ?? null,
+          llave:     p.llave ?? null,
         });
       }
     } else if (p.estado === 'pendiente' || p.estado === 'en_juego') {
@@ -134,6 +161,10 @@ async function fetchTodo() {
           lugar:     p.lugar,
           hora:      p.hora_inicio ? String(p.hora_inicio).slice(0,5) : null,
           estado:    p.estado,
+          esPlayoff: !!p.es_playoff,
+          copa:      p.copa ?? null,
+          instancia: p.instancia ?? null,
+          llave:     p.llave ?? null,
         });
       }
     }
@@ -187,7 +218,9 @@ async function fetchTodo() {
 // `enabled`: si es false, no pide datos ni abre el canal de Realtime — se usa
 // para no traer el masculino cuando el sitio está mostrando el femenino (y
 // viceversa), ya que antes PageHome llamaba los dos hooks siempre a la vez.
-export function useMasculinoStats(enabled = true) {
+// `temporadaId`: qué temporada mirar (normalmente `temporadaSeleccionadaId`
+// de useTemporada()) — null trae todo sin filtrar por temporada.
+export function useMasculinoStats(enabled = true, temporadaId = null) {
   const [equipos,         setEquipos]         = useState(buildEquiposBase);
   const [partidos,        setPartidos]        = useState([]);
   const [fechas,          setFechas]          = useState([]);
@@ -203,7 +236,7 @@ export function useMasculinoStats(enabled = true) {
     fetchingRef.current = true;
     try {
       setIsLoading(true);
-      const data = await fetchTodo();
+      const data = await fetchTodo(temporadaId);
       if (!data) return;
       setEquipos(data.equipos);
       setPartidos(data.partidos);
@@ -218,7 +251,7 @@ export function useMasculinoStats(enabled = true) {
       setIsLoading(false);
       fetchingRef.current = false;
     }
-  }, []);
+  }, [temporadaId]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { GameCenterModal } from './GameCenterModal';
-import { labelFecha } from '../lib/fechaLabel';
+import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
 // tarjetas de fixture/resultado/lider/bracket) — evita color-mix()/variables
@@ -308,8 +308,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                           onClick={() => h.partidoId && setSelectedMatch(h.partidoId)}>
                           <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
                           <div className="tp-match-header">
-                            <span className="tp-match-date">
-                              {fechaObj ? labelFecha(fechaObj) : ''}
+                            <span className="tp-match-date" style={esPartidoPlayoff(partidoFull) ? { color: '#F0B429' } : {}}>
+                              {esPartidoPlayoff(partidoFull) ? '🏆 ' : ''}
+                              {partidoFull ? (labelPartido(partidoFull, fechaObj) ?? '') : (fechaObj ? labelFecha(fechaObj) : '')}
                             </span>
                             <span className={`tp-match-result ${h.resultado === 'G' ? 'win' : 'loss'}`}>
                               {h.resultado === 'G' ? 'GANÓ' : 'PERDIÓ'}
@@ -378,10 +379,13 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                           <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
                           <div className="tp-match-header">
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span className="tp-match-date">
-                                {(p.fechaNum || p.fechaDesc)
-                                  ? labelFecha({ numero: p.fechaNum, descripcion: p.fechaDesc })
-                                  : 'Próximo'}
+                              <span className="tp-match-date" style={p.esPlayoff ? { color: '#F0B429' } : {}}>
+                                {p.esPlayoff ? '🏆 ' : ''}
+                                {p.esPlayoff
+                                  ? (labelPartido({ es_playoff:true, copa:p.copa, instancia:p.instancia }) ?? 'Próximo')
+                                  : ((p.fechaNum || p.fechaDesc)
+                                      ? labelFecha({ numero: p.fechaNum, descripcion: p.fechaDesc })
+                                      : 'Próximo')}
                               </span>
                               {p.hora && (
                                 <span style={{ fontSize: 12, color: '#F0B429', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: .5 }}>

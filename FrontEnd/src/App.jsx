@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { PageHome } from './components/PageHome.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { AuthProvider, useAuth } from './admin/AuthContext.jsx';
+import { TemporadaProvider } from './context/TemporadaContext.jsx';
 import { initAnalytics, trackPageview } from './lib/analytics.js';
 
 // Google Analytics: inicializa el script una vez y manda una "pageview"
@@ -59,12 +60,18 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <AnalyticsTracker />
-          <Routes>
-            <Route path="/"       element={<PageHome />} />
-            <Route path="/admin"  element={<AdminRoute />} />
-            <Route path="/admin/*" element={<AdminRoute />} />
-          </Routes>
+          {/* Temporadas: compartido por el sitio público (elegir qué
+              temporada mirar) y el panel admin (saber cuál es la activa,
+              donde cae todo lo nuevo que se carga) — por eso va acá arriba,
+              antes de las Routes, y no solo dentro de PageHome. */}
+          <TemporadaProvider>
+            <AnalyticsTracker />
+            <Routes>
+              <Route path="/"       element={<PageHome />} />
+              <Route path="/admin"  element={<AdminRoute />} />
+              <Route path="/admin/*" element={<AdminRoute />} />
+            </Routes>
+          </TemporadaProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

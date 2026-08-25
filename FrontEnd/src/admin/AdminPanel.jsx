@@ -13,6 +13,10 @@ import RecalcularStats from './RecalcularStats';
 import EncuestasManager from './EncuestasManager';
 import AliasesManager from './AliasesManager';
 import MergeJugadores from './MergeJugadores';
+import TemporadasManager from './TemporadasManager';
+import PlantelManager from './PlantelManager';
+import PlayoffsAdmin from './PlayoffsAdmin';
+import AdminSearch from './AdminSearch';
 import logoTorneo from '../assets/logo_torneo.jpg';
 
 // ── Navegación ────────────────────────────────────────────────────────────────
@@ -23,6 +27,9 @@ const TABS = [
   { id:'historial', icon:'🗂️', label:'Historial',      desc:'Ver cargas anteriores' },
 ];
 const TOOLS = [
+  { id:'temporadas', icon:'🏆', label:'Temporadas',         desc:'Ver y crear temporada/torneo' },
+  { id:'plantel',    icon:'👥', label:'Plantel',            desc:'Altas, bajas y cambios de equipo' },
+  { id:'playoffs',   icon:'🥇', label:'Cerrar Temporada',   desc:'Armar cruces de playoff automáticamente' },
   { id:'encuestas',  icon:'🗳️', label:'Encuestas',          desc:'Votaciones públicas' },
   { id:'alias',      icon:'🔗', label:'Alias',              desc:'Ver/borrar nombres vinculados' },
   { id:'fusionar',   icon:'🧬', label:'Fusionar jugadores', desc:'Unir duplicados del roster' },
@@ -50,7 +57,7 @@ const NAV_RESET = {
   boxSizing:'border-box',
 };
 const NAV_TODO = [CARGAR, ...TABS, ...TOOLS];
-const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar'];
+const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar', 'plantel', 'playoffs'];
 
 // ── Indicador Realtime ────────────────────────────────────────────────────────
 function RealtimeDot({ status, compact = false }) {
@@ -169,7 +176,10 @@ function ToolsDropdown({ sec, setSec }) {
 }
 
 // ── Drawer mobile (reemplaza el sidebar fijo anterior) ───────────────────────────
-function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, showToggle, onClose }) {
+function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, showToggle, onClose, setFoco }) {
+  // Al elegir un resultado del buscador dentro del drawer, además de navegar
+  // hay que cerrar el drawer — si no, el resultado navega "detrás" del menú.
+  const setSecYCerrar = (id) => { setSec(id); onClose(); };
   return (
     <>
       <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(5,8,14,.78)', zIndex:299, animation:'drawerFade .15s ease' }}/>
@@ -203,6 +213,10 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
 
           <div style={{ fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif" }}>
             {greeting}
+          </div>
+
+          <div style={{ marginTop:10 }}>
+            <AdminSearch setSec={setSecYCerrar} setCategoria={setCategoria} setFoco={setFoco}/>
           </div>
 
           {showToggle && <div style={{ marginTop:10 }}><CategoriaToggle categoria={categoria} setCategoria={setCategoria}/></div>}
@@ -284,6 +298,11 @@ export default function AdminPanel() {
   const [sec, setSec]     = useState('dashboard');
   const [open, setOpen]   = useState(false);
   const [categoria, setCategoria] = useState(mode ?? 'femenino');
+  // Adónde saltar dentro de la sección de destino cuando se elige un
+  // resultado del buscador rápido — ej: { equipoId, ts } para Plantel,
+  // { fechaId, ts } para Partidos. `ts` cambia siempre para que el efecto
+  // del componente hijo dispare aunque se busque lo mismo dos veces seguidas.
+  const [foco, setFoco]   = useState(null);
   const rtStatus          = useRealtimeStatus();
   const greeting          = saludoCompleto(user);
   const showToggle        = SECCIONES_CON_CATEGORIA.includes(sec);
@@ -322,6 +341,10 @@ export default function AdminPanel() {
 
           <div style={{ fontSize:14, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:600 }}>
             {greeting}
+          </div>
+
+          <div style={{ flex:'1 1 260px', maxWidth:360, minWidth:0 }}>
+            <AdminSearch setSec={setSec} setCategoria={setCategoria} setFoco={setFoco}/>
           </div>
 
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
@@ -375,7 +398,7 @@ export default function AdminPanel() {
       {open && (
         <MobileDrawer sec={sec} setSec={setSec} logout={logout} greeting={greeting}
           categoria={categoria} setCategoria={setCategoria} showToggle={showToggle}
-          onClose={() => setOpen(false)}/>
+          setFoco={setFoco} onClose={() => setOpen(false)}/>
       )}
 
       {/* Contenido */}
@@ -385,12 +408,15 @@ export default function AdminPanel() {
           {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} />}
           {sec === 'excel'      && <ExcelUpload categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'historial'  && <UploadHistory categoria={categoria} setCategoria={setCategoria} />}
-          {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} />}
+          {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} foco={foco} />}
           {sec === 'stats'      && <StatsEditor categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'recalcular' && <RecalcularStats categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'alias'      && <AliasesManager categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'fusionar'   && <MergeJugadores categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'encuestas'  && <EncuestasManager />}
+          {sec === 'temporadas' && <TemporadasManager />}
+          {sec === 'plantel'    && <PlantelManager categoria={categoria} setCategoria={setCategoria} foco={foco} />}
+          {sec === 'playoffs'   && <PlayoffsAdmin categoria={categoria} setCategoria={setCategoria} />}
         </div>
       </main>
     </div>

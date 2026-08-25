@@ -15,6 +15,7 @@ export const TABLAS = {
     uploadLog:      'upload_log',
     aliases:        'nombre_aliases',
     mvpField:       'mvp_jugadora_id',
+    historial:      'partido_historial_femenino',
   },
   masculino: {
     equipos:        'equipos_masculino',
@@ -27,6 +28,7 @@ export const TABLAS = {
     uploadLog:      'upload_log_masculino',
     aliases:        'nombre_aliases_masculino',
     mvpField:       'mvp_jugador_id',
+    historial:      'partido_historial_masculino',
   },
 };
 

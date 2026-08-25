@@ -3,48 +3,73 @@ import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 
+// ⚠️ FIX (importante, misma clase de bug que se arregló en StatsEditor.jsx y
+// en ExcelUpload.jsx esta sesión): desde que existen temporadas,
+// `estadisticas_*` tiene clave compuesta (jugador_id, temporada_id) y esa
+// columna es NOT NULL — pero esta función seguía juntando TODOS los
+// stats_partido de cada jugador/a sin filtrar por temporada (mezclando
+// promedios de temporadas distintas en una sola fila) y haciendo upsert con
+// `onConflict: idField` (una sola columna, ya no coincide con ninguna
+// constraint real). En la práctica esto significa que el botón "Recalcular
+// Stats" fallaba SIEMPRE, para cada jugador/a, desde que se migró a
+// temporadas — el log mostraba "❌ fallaron" en todos los casos sin explicar
+// por qué. Ahora se recalcula por separado cada combinación (jugador,
+// temporada) que tenga partidos cargados, con la clave y el onConflict
+// correctos.
 export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
   const jug = categoria === 'masculino' ? 'jugadores' : 'jugadoras';
-  onLog(`📋 Obteniendo lista de ${jug} con stats...`);
-
   const idField = tablas.jugadorIdField;
 
-  // Paginado: no confiar en el límite default de 1000 filas de Supabase
-  let statsRows = [];
-  let from = 0;
-  const PAGE = 1000;
-  while (true) {
-    const { data, error } = await supabase
-      .from(tablas.stats)
-      .select(idField)
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    if (!data?.length) break;
-    statsRows = statsRows.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
+  // Paginado: no confiar en el límite default de 1000 filas de Supabase.
+  const paginar = async (tabla, columnas) => {
+    let filas = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await supabase.from(tabla).select(columnas).range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      if (!data?.length) break;
+      filas = filas.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    return filas;
+  };
 
-  const ids = [...new Set(statsRows.map(r => r[idField]))];
-  onLog(`🔢 ${ids.length} ${jug} con partidos cargados`);
+  // stats_partido no tiene temporada_id directo — se llega vía
+  // partido -> fecha -> temporada. Se arma ese mapeo primero.
+  onLog('📅 Mapeando partidos a temporadas...');
+  const fechas = await paginar(tablas.fechas, 'id,temporada_id');
+  const fechaTemporada = new Map(fechas.map(f => [f.id, f.temporada_id]));
+  const partidos = await paginar(tablas.partidos, 'id,fecha_id');
+  const partidoTemporada = new Map(partidos.map(p => [p.id, fechaTemporada.get(p.fecha_id) ?? null]));
+
+  onLog(`📋 Obteniendo stats de ${jug}...`);
+  const statsRows = await paginar(
+    tablas.stats,
+    `${idField},partido_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf`,
+  );
+
+  // Agrupar por (jugador, temporada) — nunca promediar temporadas distintas juntas.
+  const grupos = new Map();
+  let sinTemporada = 0;
+  for (const r of statsRows) {
+    const temporadaId = partidoTemporada.get(r.partido_id);
+    if (temporadaId == null) { sinTemporada++; continue; }
+    const key = `${r[idField]}::${temporadaId}`;
+    if (!grupos.has(key)) grupos.set(key, { jugId: r[idField], temporadaId, filas: [] });
+    grupos.get(key).filas.push(r);
+  }
+  if (sinTemporada > 0) {
+    onLog(`⚠️ ${sinTemporada} fila(s) de stats de un partido sin fecha/temporada resoluble — se ignoraron.`);
+  }
+  onLog(`🔢 ${grupos.size} combinación(es) ${jug}+temporada a recalcular`);
 
   let ok = 0;
   let fallidas = [];
-  for (const jugId of ids) {
-    const { data: allStats, error: errFetch } = await supabase
-      .from(tablas.stats)
-      .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
-      .eq(idField, jugId);
-
-    if (errFetch) {
-      onLog(`❌ ${jugId}: error leyendo stats — ${errFetch.message}`);
-      fallidas.push(jugId);
-      continue;
-    }
-    if (!allStats?.length) continue;
-
-    const k   = allStats.length;
-    const sum = key => allStats.reduce((a, r) => a + (r[key] ?? 0), 0);
+  for (const { jugId, temporadaId, filas } of grupos.values()) {
+    const k   = filas.length;
+    const sum = key => filas.reduce((a, r) => a + (r[key] ?? 0), 0);
     const avg = key => +(sum(key) / k).toFixed(1);
     const tsc = sum('sc'), tsf = sum('sf');
     const tdc = sum('dc'), tdf = sum('df');
@@ -52,6 +77,7 @@ export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
 
     const { error: errUpsert } = await supabase.from(tablas.estadisticas).upsert({
       [idField]:    jugId,
+      temporada_id: temporadaId,
       pj:           k,
       pts_prom:     avg('pts'),
       reb_prom:     +((sum('rd') + sum('ro')) / k).toFixed(1),
@@ -63,8 +89,6 @@ export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
       pct_simples:  tsc + tsf > 0 ? +((tsc / (tsc + tsf)) * 100).toFixed(1) : 0,
       pct_dobles:   tdc + tdf > 0 ? +((tdc / (tdc + tdf)) * 100).toFixed(1) : 0,
       pct_triples:  ttc + ttf > 0 ? +((ttc / (ttc + ttf)) * 100).toFixed(1) : 0,
-      // ⚠️ FIX: faltaba guardar el detalle convertidos/intentados (solo se
-      // guardaba el %), por eso el modal de jugador mostraba 0/0 en TL y 2P.
       sc_total: tsc, sf_total: tsf, dc_total: tdc, df_total: tdf, tc_total: ttc, tf_total: ttf,
       pts_total:    sum('pts'),
       reb_total:    sum('rd') + sum('ro'),
@@ -73,25 +97,25 @@ export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
       tap_total:    sum('tp'),
       val_total:    sum('val'),
       per_total:    sum('pe'),
-      mejor_pts:    Math.max(...allStats.map(r => r.pts ?? 0)),
+      mejor_pts:    Math.max(...filas.map(r => r.pts ?? 0)),
       updated_at:   new Date().toISOString(),
-    }, { onConflict: idField });
+    }, { onConflict: `${idField},temporada_id` });
 
     if (errUpsert) {
-      onLog(`❌ ${jugId}: error guardando — ${errUpsert.message}`);
-      fallidas.push(jugId);
+      onLog(`❌ ${jugId} (temporada ${temporadaId}): error guardando — ${errUpsert.message}`);
+      fallidas.push(`${jugId}/${temporadaId}`);
       continue;
     }
 
     ok++;
   }
 
-  onLog(`✅ ${ok} ${jug} recalculad${categoria === 'masculino' ? 'os' : 'as'}`);
+  onLog(`✅ ${ok} combinación(es) ${jug}+temporada recalculadas`);
   if (fallidas.length > 0) {
-    onLog(`⚠️ ${fallidas.length} ${jug} fallaron: ${fallidas.join(', ')}`);
+    onLog(`⚠️ ${fallidas.length} fallaron: ${fallidas.join(', ')}`);
     onLog('Volvé a correr el recálculo — si vuelven a fallar las mismas, avisá al desarrollador.');
   } else {
-    onLog('🎉 ¡Listo! El sitio ya refleja los promedios y acumulados actualizados.');
+    onLog('🎉 ¡Listo! El sitio ya refleja los promedios y acumulados actualizados, temporada por temporada.');
   }
 }
 

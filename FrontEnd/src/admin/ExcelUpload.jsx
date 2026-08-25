@@ -47,10 +47,18 @@ function buscarEquipo(texto, fuseEq, lista) {
 // jugadores_masculino, así el buscador siempre tiene el plantel real.
 function buildFuseJugadores(lista) {
   return new Fuse(lista, {
+    // Antes t0/t1 (nombre/apellido por separado) pesaban casi lo mismo que
+    // el nombre completo (0.35+0.35 vs 0.4) — así, dos hermanos que comparten
+    // el apellido podían empatar casi en punteria con la persona real porque
+    // el apellido solo ya explicaba gran parte del score. Ahora "nombreNorm"
+    // (nombre y apellido juntos) es la señal dominante — quien coincide en
+    // el nombre completo gana con claridad; los tokens sueltos quedan como
+    // ayuda menor (reordenar "Apellido Nombre", tolerar una tilde/typo), no
+    // como algo que por sí solo pueda ganarle a una coincidencia completa.
     keys: [
-      { name:'t0', weight:0.35 }, { name:'t1', weight:0.35 },
-      { name:'t2', weight:0.2  }, { name:'t3', weight:0.1  },
-      { name:'nombreNorm', weight:0.4 },
+      { name:'nombreNorm', weight:0.7 },
+      { name:'t0', weight:0.15 }, { name:'t1', weight:0.15 },
+      { name:'t2', weight:0.05 }, { name:'t3', weight:0.05 },
     ],
     threshold: 0.38, minMatchCharLength: 2, includeScore: true,
   });
@@ -67,6 +75,10 @@ function formatJugador(j, equipos) {
   return {
     id: j.id, nombre: j.nombre, nombreNorm: normStr(j.nombre),
     equipoId: j.equipo_id, equipo: equipoNombre, equipoNorm: normStr(equipoNombre),
+    // Numero de camiseta — clave para desambiguar compañeros de equipo con
+    // nombres parecidos (ver resolverJugadora), ya que a diferencia del
+    // nombre es un dato inequívoco fila a fila.
+    numero: j.numero ?? null,
     t0: normStr(partes[0] ?? ''), t1: normStr(partes[1] ?? ''),
     t2: normStr(partes[2] ?? ''), t3: normStr(partes[3] ?? ''),
   };
@@ -101,7 +113,7 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
   if (aliasExacto) {
     const jugId = aliasExacto[tablas.jugadorIdField];
     const jug = todasJugadoras.find(j => j.id === jugId);
-    if (jug) return { jugadora: jug, method: 'alias', score: 0 };
+    if (jug) return { jugadora: jug, method: 'alias', score: 0, equipoId: jug.equipoId };
   }
 
   // 2️⃣ Fuzzy matching con filtro de equipo
@@ -116,34 +128,61 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
   const cleanInvertido = palabras.length > 1 ? [...palabras].reverse().join(' ') : null;
   const candidatosInvertido = cleanInvertido ? buscarConFiltro(cleanInvertido) : [];
 
-  const mejorNormal    = candidatosNormal[0];
-  const mejorInvertido = candidatosInvertido[0];
-  let candidatos = candidatosNormal;
-  if (mejorInvertido && (!mejorNormal || (mejorInvertido.score ?? 1) < (mejorNormal.score ?? 1))) {
-    candidatos = candidatosInvertido;
+  // Unificar candidatos del orden normal e invertido (mismo/a jugador/a puede
+  // aparecer en los dos) quedándonos con el mejor score de cada uno.
+  const porId = new Map();
+  for (const r of [...candidatosNormal, ...candidatosInvertido]) {
+    const prev = porId.get(r.item.id);
+    if (!prev || (r.score ?? 1) < (prev.score ?? 1)) porId.set(r.item.id, r);
   }
+  const candidatos = [...porId.values()].sort((a,b) => (a.score??1)-(b.score??1));
 
   if (candidatos.length === 0) {
     // Masculino: si no existe todavía, se crea al publicar (no se descarta).
     if (categoria === 'masculino' && equipoId) {
-      return { jugadora: null, method: 'nuevo', score: 0, nuevoEquipoId: equipoId };
+      return { jugadora: null, method: 'nuevo', score: 0, nuevoEquipoId: equipoId, equipoId };
     }
-    return { jugadora: null, method: 'not_found', score: 1 };
+    return { jugadora: null, method: 'not_found', score: 1, equipoId };
   }
 
-  // 3️⃣ Desambiguar por número de camiseta si hay empate (solo caso conocido femenino)
   const top    = candidatos[0];
   const second = candidatos[1];
-  if (categoria === 'femenino' && second && Math.abs((top.score??1) - (second.score??1)) < 0.05 && numeroJugadora != null) {
-    const NUMERO_MAP = { 'f_pilar': { 10: 'f_psc_01', 12: 'f_psc_03' } };
-    const byNum = NUMERO_MAP[equipoId]?.[numeroJugadora];
-    if (byNum) {
-      const jug = todasJugadoras.find(j => j.id === byNum);
-      if (jug) return { jugadora: jug, method: 'numero', score: 0.1 };
+
+  // 3️⃣ Desambiguar compañeros de equipo con nombres parecidos (típicamente
+  // hermanos: mismo apellido, distinto nombre — ej "Peleteiro"). Antes esto
+  // era un caso hardcodeado (NUMERO_MAP) para un solo equipo de femenino;
+  // ahora es genérico para las dos categorías y cualquier equipo. Se detecta
+  // comparando si el candidato top y el segundo comparten algún token de
+  // nombre (nombre o apellido) — en ese caso el score de Fuse suele estar
+  // dominado por esa parte compartida y NO alcanza para confiar ciegamente
+  // en el primero.
+  const tokensTop = [top.item.t0, top.item.t1, top.item.t2, top.item.t3].filter(Boolean);
+  const compartenToken = !!second && tokensTop.some(tok =>
+    [second.item.t0, second.item.t1, second.item.t2, second.item.t3].includes(tok)
+  );
+
+  if (compartenToken) {
+    // 3a) Número de camiseta: dato inequívoco fila a fila, se prueba primero.
+    if (numeroJugadora != null) {
+      const porNumero = candidatos.filter(c => c.item.numero != null && Number(c.item.numero) === Number(numeroJugadora));
+      if (porNumero.length === 1) {
+        return { jugadora: porNumero[0].item, method: 'numero', score: 0.1, equipoId, wasAmbiguous: true };
+      }
+    }
+    // 3b) Si no hay número (o no alcanza a desambiguar), solo se confía en el
+    // top si la diferencia de score contra el segundo es decisiva. Si no,
+    // mejor preguntar que adivinar y terminar mezclando a dos personas
+    // distintas — se marca "ambiguo" para resolver a mano en el preview.
+    const gap = (second.score ?? 1) - (top.score ?? 0);
+    if (gap < 0.2) {
+      return {
+        jugadora: null, method: 'ambiguo', score: top.score ?? 0.5, equipoId, wasAmbiguous: true,
+        candidatosAmbiguos: candidatos.slice(0, 4).map(c => ({ id: c.item.id, nombre: c.item.nombre, numero: c.item.numero })),
+      };
     }
   }
 
-  return { jugadora: top.item, method: 'fuzzy', score: top.score ?? 0.5 };
+  return { jugadora: top.item, method: 'fuzzy', score: top.score ?? 0.5, equipoId, wasAmbiguous: compartenToken };
 }
 
 // ─── Guardar alias nuevo si es un match fuzzy confirmado ─────────────────────
@@ -233,6 +272,11 @@ function parsearExcel(wb) {
 
   // Stats jugadoras (sin resolver aún — se resuelve async después)
   let equipoActual = res.equipoLocal;
+  // _rowId: id estable por fila del Excel, independiente del orden en que se
+  // termine mostrando (se filtra por equipo para la tabla del preview). Sin
+  // esto, reasignar manualmente una jugadora en el preview (ver ✏️ más abajo)
+  // podía terminar editando la fila equivocada.
+  let rowIdSeq = 0;
   for (let i=statsRow+1; i<rows.length; i++) {
     const r = rows[i];
     if (!r || r.every(v => v===null||v==='')) continue;
@@ -257,6 +301,7 @@ function parsearExcel(wb) {
     const ptsXls   = n(r[C.pts]);
 
     res.jugadorasBruto.push({
+      _rowId: rowIdSeq++,
       nombreRaw: nomStr, equipoRaw: equipoActual,
       numero: numParsed,
       sc:n(r[C.sc]), sf:n(r[C.sf]), dc:n(r[C.dc]), df:n(r[C.df]),
@@ -285,38 +330,67 @@ async function resolverJugadoras(bruto, ctx) {
   const resolved = [];
   for (const j of bruto) {
     const r = await resolverJugadora(j.nombreRaw, j.equipoRaw, j.numero, ctx);
-    resolved.push({ ...j, jugadora: r.jugadora, matchMethod: r.method, matchScore: r.score, nuevoEquipoId: r.nuevoEquipoId });
+    resolved.push({
+      ...j, jugadora: r.jugadora, matchMethod: r.method, matchScore: r.score, nuevoEquipoId: r.nuevoEquipoId,
+      equipoIdResuelto: r.equipoId, candidatosAmbiguos: r.candidatosAmbiguos, wasAmbiguous: r.wasAmbiguous,
+    });
   }
   return resolved;
 }
 
 // ─── Recalcular promedios (fallback si el trigger no está activo) ─────────────
-async function recalcularPromedios(jugadorIds, tablas) {
+// ⚠️ FIX (importante): desde que existen temporadas, `estadisticas_*` tiene
+// clave compuesta (jugador_id, temporada_id) — pero esta función seguía
+// haciendo upsert con `onConflict: idField` (una sola columna) y sin mandar
+// `temporada_id` en absoluto, que además es NOT NULL. Postgres rechaza ese
+// upsert siempre (ni el conflict target coincide con la constraint real, ni
+// se puede insertar sin temporada_id) — y como el resultado nunca se leía
+// (ni `error` ni `data` se destructuraban), fallaba en silencio: el log
+// mostraba igual "✅ Promedios actualizados" y "🎉 ¡Publicado!" aunque el
+// promedio de la jugadora NO se hubiera guardado. Además traía TODOS los
+// partidos de la jugadora sin filtrar por temporada, así que si algo
+// llegaba a guardar, mezclaba temporadas distintas en el mismo promedio.
+// Ahora: se filtra por la temporada activa (vía partido -> fecha ->
+// temporada, que es como se relacionan esas tablas), se manda temporada_id,
+// se usa el onConflict compuesto real, y un error acá corta la publicación
+// en vez de mentir que salió bien.
+async function recalcularPromedios(jugadorIds, tablas, temporadaId) {
   const idField = tablas.jugadorIdField;
+  const { data: fechasTemp, error: errFechas } = await supabase
+    .from(tablas.fechas).select('id').eq('temporada_id', temporadaId);
+  if (errFechas) throw new Error(`Recalculando (fechas de la temporada): ${errFechas.message}`);
+  const fechaIds = (fechasTemp ?? []).map(f => f.id);
+  if (fechaIds.length === 0) return;
+  const { data: partidosTemp, error: errPartidos } = await supabase
+    .from(tablas.partidos).select('id').in('fecha_id', fechaIds);
+  if (errPartidos) throw new Error(`Recalculando (partidos de la temporada): ${errPartidos.message}`);
+  const partidoIds = (partidosTemp ?? []).map(p => p.id);
+  if (partidoIds.length === 0) return;
+
   for (const jugId of [...new Set(jugadorIds)]) {
-    const { data } = await supabase
+    const { data, error: errRead } = await supabase
       .from(tablas.stats)
       .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
-      .eq(idField, jugId);
+      .eq(idField, jugId)
+      .in('partido_id', partidoIds);
+    if (errRead) throw new Error(`Recalculando promedios de "${jugId}": ${errRead.message}`);
     if (!data?.length) continue;
     const k=data.length, sum=key=>data.reduce((a,r)=>a+(r[key]??0),0), avg=key=>+(sum(key)/k).toFixed(1);
     const tsc=sum('sc'),tsf=sum('sf'),tdc=sum('dc'),tdf=sum('df'),ttc=sum('tc'),ttf=sum('tf');
-    await supabase.from(tablas.estadisticas).upsert({
-      [idField]:jugId, pj:k,
+    const { error: errUpsert } = await supabase.from(tablas.estadisticas).upsert({
+      [idField]:jugId, temporada_id:temporadaId, pj:k,
       pts_prom:avg('pts'), reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
       ast_prom:avg('as_'), rob_prom:avg('rb'), tap_prom:avg('tp'),
       per_prom:avg('pe'), val_prom:avg('val'),
       pct_simples: tsc+tsf>0?+((tsc/(tsc+tsf))*100).toFixed(1):0,
       pct_dobles:  tdc+tdf>0?+((tdc/(tdc+tdf))*100).toFixed(1):0,
       pct_triples: ttc+ttf>0?+((ttc/(ttc+ttf))*100).toFixed(1):0,
-      // ⚠️ FIX: antes solo se guardaba el %, nunca el detalle "convertidos/
-      // intentados" — el modal de jugador mostraba 0/0 aunque el % diera
-      // bien, porque leía estos campos y nunca se habían guardado.
       sc_total:tsc, sf_total:tsf, dc_total:tdc, df_total:tdf, tc_total:ttc, tf_total:ttf,
       pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
       rob_total:sum('rb'), tap_total:sum('tp'), val_total:sum('val'), per_total:sum('pe'),
       mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),
-    }, { onConflict:idField });
+    }, { onConflict:`${idField},temporada_id` });
+    if (errUpsert) throw new Error(`Guardando promedios de "${jugId}": ${errUpsert.message}`);
   }
 }
 
@@ -375,11 +449,37 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const [llavePO,   setLlavePO]   = useState('');
   const [log,       setLog]       = useState([]);
   const [duplicate, setDuplicate] = useState(null);
+  // _rowId de la fila que se está reasignando a mano en el preview (ver ✏️).
+  const [editando,  setEditando]  = useState(null);
   const fileRef = useRef();
+
+  // Plantel de un equipo puntual, para el selector manual del preview.
+  const rosterEquipo = (equipoId) =>
+    todasJugadoras.filter(j => j.equipoId === equipoId).sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+  // Reasignar a mano una fila del Excel: a un/a jugador/a puntual del plantel,
+  // o a "crear jugador nuevo" (masculino). Es el escape hatch para cuando el
+  // matching automático no puede (o no debe) adivinar solo — típicamente dos
+  // compañeros de equipo con nombres parecidos (hermanos, ej. "Peleteiro").
+  const aplicarManual = (rowId, valor) => {
+    setJugadoras(prev => prev.map(j => {
+      if (j._rowId !== rowId) return j;
+      if (valor === '__nuevo__') {
+        return { ...j, jugadora:null, matchMethod:'nuevo', matchScore:0, nuevoEquipoId:j.equipoIdResuelto, candidatosAmbiguos:null };
+      }
+      const elegido = todasJugadoras.find(t => t.id === valor);
+      if (!elegido) return j;
+      return {
+        ...j, jugadora:{ id:elegido.id, nombre:elegido.nombre, equipoId:elegido.equipoId },
+        matchMethod:'manual', matchScore:0, nuevoEquipoId:null, candidatosAmbiguos:null,
+      };
+    }));
+    setEditando(null);
+  };
 
   const reset = () => {
     setStep('archivo'); setParsed(null); setJugadoras([]);
-    setFileName(''); setLog([]); setDuplicate(null);
+    setFileName(''); setLog([]); setDuplicate(null); setEditando(null);
     setEsPlayoff(false); setCopaPO(''); setInstanciaPO(''); setLlavePO('');
     cargarRecientes();
   };
@@ -590,7 +690,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         const detalle = colisiones.map(arr =>
           `"${arr[0].jugadora.nombre}" <- [${arr.map(x=>`"${x.nombreRaw}"`).join(', ')}]`
         ).join(' | ');
-        throw new Error(`Nombres duplicados resueltos a la misma jugadora: ${detalle}. Corregi el Excel o revisa los aliases guardados antes de publicar.`);
+        throw new Error(`Nombres duplicados resueltos a la misma jugadora: ${detalle}. Usá el ✏️ en cada fila del preview para reasignar manualmente a la persona correcta antes de publicar.`);
       }
       if (jugOk.length > 0) {
         const statsRows = jugOk.map(j => ({
@@ -612,7 +712,19 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         // hubiera publicado bien antes. El propio acto de publicar (después de
         // ver la vista previa con el color de advertencia) YA es la confirmación
         // del admin — de acá en adelante ese nombre entra directo sin advertencia.
-        const fuzzyMatches = jugOk.filter(j => j.matchMethod==='fuzzy' || j.matchMethod==='numero');
+        // No se guarda alias para un nombre que en el Excel vino como una
+        // sola palabra (ej: solo el apellido) si esa fila pasó por el
+        // desambiguador de compañeros con nombre parecido (wasAmbiguous) —
+        // ese texto solo, sin la aclaración manual/número de esta carga
+        // puntual, es intrínsecamente ambiguo entre esas mismas personas y
+        // guardarlo como alias fijo reproduciría el mismo problema la
+        // próxima vez que aparezca (ej: "Peleteiro" solo, sin nombre).
+        const fuzzyMatches = jugOk.filter(j => {
+          const esCandidato = j.matchMethod==='fuzzy' || j.matchMethod==='numero' || j.matchMethod==='manual';
+          if (!esCandidato) return false;
+          const unaSolaPalabra = normStr(j.nombreRaw).split(' ').filter(Boolean).length <= 1;
+          return !(j.wasAmbiguous && unaSolaPalabra);
+        });
         for (const j of fuzzyMatches) {
           await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
         }
@@ -627,7 +739,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         }
 
         addLog('🔄 Recalculando promedios...');
-        await recalcularPromedios(statsRows.map(r=>r[tablas.jugadorIdField]), tablas);
+        await recalcularPromedios(statsRows.map(r=>r[tablas.jugadorIdField]), tablas, temporadaActivaId);
         addLog('✅ Promedios actualizados');
       }
 
@@ -650,7 +762,8 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const localJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoLocal);
   const visitJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoVisit);
   const jugOkCount = jugadoras.filter(j => j.jugadora || j.matchMethod === 'nuevo').length;
-  const jugNoCount = jugadoras.filter(j => !j.jugadora && j.matchMethod !== 'nuevo').length;
+  const jugAmbiguoCount = jugadoras.filter(j => j.matchMethod === 'ambiguo').length;
+  const jugNoCount = jugadoras.filter(j => !j.jugadora && j.matchMethod !== 'nuevo' && j.matchMethod !== 'ambiguo').length;
   const jugWarnCount = jugadoras.filter(j => j.jugadora && j.matchScore > 0.25).length;
   const jugNuevoCount = jugadoras.filter(j => j.matchMethod === 'nuevo').length;
 
@@ -854,6 +967,12 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                 <span style={{color:'#F0B429'}}>{jugWarnCount} confianza media</span>
               </div>
             )}
+            {jugAmbiguoCount>0 && (
+              <div style={s.resumenItem}>
+                <span style={s.resumenDot('#C084FC')}/>
+                <span style={{color:'#C084FC',fontWeight:700}}>🤔 {jugAmbiguoCount} para resolver a mano (bloquea publicar)</span>
+              </div>
+            )}
             {jugNoCount>0 && (
               <div style={s.resumenItem}>
                 <span style={s.resumenDot('#F04060')}/>
@@ -882,25 +1001,61 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                   </thead>
                   <tbody>
                     {jugs.map((j,i)=>{
-                      const esNuevo = j.matchMethod === 'nuevo';
-                      const color = (!j.jugadora && !esNuevo) ? '#F04060' : esNuevo ? '#60A5FA' : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
-                      const methodBadge = esNuevo ? '🆕' : !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
+                      const esNuevo   = j.matchMethod === 'nuevo';
+                      const esManual  = j.matchMethod === 'manual';
+                      const esAmbiguo = j.matchMethod === 'ambiguo';
+                      const color = esAmbiguo ? '#C084FC'
+                        : (!j.jugadora && !esNuevo) ? '#F04060'
+                        : esNuevo ? '#60A5FA' : esManual ? '#22D07A'
+                        : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
+                      const methodBadge = esAmbiguo ? '🤔' : esNuevo ? '🆕' : esManual ? '✋'
+                        : !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
                       const rowBg = i%2===0?'#0E1420':'#141C2A';
                       return (
-                        <tr key={i} style={{background:rowBg,opacity:(j.jugadora||esNuevo)?1:0.4}}>
+                        <tr key={j._rowId} style={{background:rowBg,opacity:(j.jugadora||esNuevo)?1:0.4}}>
                           <td style={{...s.td,position:'sticky',left:0,zIndex:1,background:rowBg}}>{j.numero??'–'}</td>
-                          <td style={{...s.td,textAlign:'left',minWidth:180,position:'sticky',left:36,zIndex:1,background:rowBg,boxShadow:'2px 0 4px rgba(0,0,0,.3)'}}>
-                            <div style={{color,fontWeight:600,fontSize:13}}>
-                              {methodBadge} {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
-                            </div>
-                            <div style={{color:'#4A566E',fontSize:10}}>
-                              {j.nombreRaw}
-                              {j.matchMethod && (j.jugadora || esNuevo) && (
-                                <span style={{marginLeft:6,color: j.matchMethod==='alias'?'#22D07A':'#6B7A99'}}>
-                                  [{j.matchMethod}]
-                                </span>
-                              )}
-                            </div>
+                          <td style={{...s.td,textAlign:'left',minWidth:200,position:'sticky',left:36,zIndex:1,background:rowBg,boxShadow:'2px 0 4px rgba(0,0,0,.3)'}}>
+                            {editando === j._rowId ? (
+                              <select autoFocus defaultValue=""
+                                onChange={e => e.target.value && aplicarManual(j._rowId, e.target.value)}
+                                onBlur={() => setEditando(null)}
+                                style={{...s.input,padding:'4px 6px',fontSize:12,width:'100%'}}>
+                                <option value="" disabled>Elegir jugador...</option>
+                                {rosterEquipo(j.equipoIdResuelto).map(cand => (
+                                  <option key={cand.id} value={cand.id}>
+                                    {cand.nombre}{cand.numero!=null?` (#${cand.numero})`:''}
+                                  </option>
+                                ))}
+                                {categoria === 'masculino' && (
+                                  <option value="__nuevo__">🆕 Crear jugador nuevo: "{j.nombreRaw}"</option>
+                                )}
+                              </select>
+                            ) : (
+                              <div style={{display:'flex',alignItems:'flex-start',gap:4}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{color,fontWeight:600,fontSize:13}}>
+                                    {methodBadge} {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
+                                  </div>
+                                  <div style={{color:'#4A566E',fontSize:10}}>
+                                    {j.nombreRaw}
+                                    {j.matchMethod && (j.jugadora || esNuevo) && (
+                                      <span style={{marginLeft:6,color: j.matchMethod==='alias'?'#22D07A':'#6B7A99'}}>
+                                        [{j.matchMethod}]
+                                      </span>
+                                    )}
+                                  </div>
+                                  {esAmbiguo && j.candidatosAmbiguos?.length > 0 && (
+                                    <div style={{color:'#C084FC',fontSize:10,marginTop:2}}>
+                                      ¿{j.candidatosAmbiguos.map(c=>c.nombre).join(' o ')}? Elegí con el ✏️
+                                    </div>
+                                  )}
+                                </div>
+                                <button onClick={()=>setEditando(j._rowId)} title="Elegir jugador/a manualmente"
+                                  style={{background:'transparent',border:'none',color:esAmbiguo?'#C084FC':'#4A566E',cursor:'pointer',fontSize:12,padding:'2px 2px',flexShrink:0}}>
+                                  ✏️
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td style={{...s.td,color:'#F0B429',fontWeight:700}}>{j.pts}</td>
                           <td style={{...s.td,color:j.val>=0?'#22D07A':'#F04060'}}>{j.val}</td>
@@ -972,9 +1127,14 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             )}
           </div>
 
+          {jugAmbiguoCount>0 && (
+            <div style={{...s.warnBox,background:'rgba(192,132,252,.08)',border:'1px solid rgba(192,132,252,.3)',color:'#C084FC',marginTop:12,marginBottom:0}}>
+              🤔 Hay {jugAmbiguoCount} jugador(es) con nombre ambiguo (compañeros de equipo con nombres parecidos). Elegí quién es cada uno con el ✏️ en la tabla antes de publicar.
+            </div>
+          )}
           <div style={{display:'flex',gap:12,marginTop:12}}>
-            <button onClick={()=>handlePublish(false)} disabled={!jornada}
-              style={{...s.btnPublish,opacity:jornada?1:0.5}}>
+            <button onClick={()=>handlePublish(false)} disabled={!jornada || jugAmbiguoCount>0}
+              style={{...s.btnPublish,opacity:(jornada && jugAmbiguoCount===0)?1:0.5}}>
               🚀 PUBLICAR PARTIDO
             </button>
             <button onClick={reset} style={s.btnCancel}>← Volver</button>

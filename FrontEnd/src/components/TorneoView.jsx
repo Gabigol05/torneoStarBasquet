@@ -983,13 +983,19 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         <div className="player-item-info">
                           <div className="player-item-name">{j.nombre}</div>
                           <div className="player-item-team">{j.equipo}</div>
-                          {(j.pts_prom ?? 0) > 0 && (
+                          {/* Antes se mostraba esta línea solo si pts_prom > 0 — una
+                              jugadora que jugó y no anotó ningún punto quedaba
+                              indistinguible de una que directamente no debutó
+                              (las dos sin ninguna línea de stats). Ahora se
+                              muestra apenas jugó al menos un partido (pj > 0),
+                              anote o no. */}
+                          {(j.pj ?? 0) > 0 && (
                             <div className="player-item-stats">
-                              <span style={{ color: '#F0B429' }}>{j.pts_prom} PTS</span>
+                              <span style={{ color: '#F0B429' }}>{j.pts_prom ?? 0} PTS</span>
                               <span style={{ color: '#4A566E' }}> - </span>
-                              <span>{j.reb_prom} REB</span>
+                              <span>{j.reb_prom ?? 0} REB</span>
                               <span style={{ color: '#4A566E' }}> - </span>
-                              <span>{j.ast_prom} AST</span>
+                              <span>{j.ast_prom ?? 0} AST</span>
                             </div>
                           )}
                         </div>

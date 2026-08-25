@@ -497,8 +497,21 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
+  // En "Resultados / Temporada Regular" no tiene sentido ofrecer un chip para
+  // una fecha cuyo único partido terminó re-marcado como playoff (ej: una
+  // "Fecha 10" que en realidad era la semifinal) — el chip quedaba
+  // seleccionable pero apuntaba a un "sin resultados todavía" fantasma,
+  // porque esa fecha ya no tiene ningún partido de temporada regular. El chip
+  // sigue existiendo del lado de Fixture (ahí sí puede haber un pendiente) y
+  // ese partido sigue viéndose bien del lado de Playoffs — esto solo saca el
+  // chip vacío de en medio.
+  const fechasConResultadoRegular = useMemo(
+    () => fechas.filter(f => partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado' && !p.es_playoff)),
+    [fechas, partidos]);
+
   const FechaChips = ({ modo }) => {
-    if (fechas.length === 0) return null;
+    const lista = modo === 'resultados' ? fechasConResultadoRegular : fechas;
+    if (lista.length === 0) return null;
     return (
       <div className="fecha-chips" ref={fechaChipsWheelRef} style={{ marginBottom: 16 }}>
         <button
@@ -507,7 +520,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
           style={!fechaSelId ? { borderColor: modeColor, color: modeColor } : {}}>
           ACUM
         </button>
-        {fechas.map(f => (
+        {lista.map(f => (
           <button key={f.id}
             className={`fecha-chip ${fechaSelId === f.id ? 'active' : ''}`}
             onClick={() => setFechaSelId(prev => prev === f.id ? null : f.id)}
@@ -983,19 +996,13 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         <div className="player-item-info">
                           <div className="player-item-name">{j.nombre}</div>
                           <div className="player-item-team">{j.equipo}</div>
-                          {/* Antes se mostraba esta línea solo si pts_prom > 0 — una
-                              jugadora que jugó y no anotó ningún punto quedaba
-                              indistinguible de una que directamente no debutó
-                              (las dos sin ninguna línea de stats). Ahora se
-                              muestra apenas jugó al menos un partido (pj > 0),
-                              anote o no. */}
-                          {(j.pj ?? 0) > 0 && (
+                          {(j.pts_prom ?? 0) > 0 && (
                             <div className="player-item-stats">
-                              <span style={{ color: '#F0B429' }}>{j.pts_prom ?? 0} PTS</span>
+                              <span style={{ color: '#F0B429' }}>{j.pts_prom} PTS</span>
                               <span style={{ color: '#4A566E' }}> - </span>
-                              <span>{j.reb_prom ?? 0} REB</span>
+                              <span>{j.reb_prom} REB</span>
                               <span style={{ color: '#4A566E' }}> - </span>
-                              <span>{j.ast_prom ?? 0} AST</span>
+                              <span>{j.ast_prom} AST</span>
                             </div>
                           )}
                         </div>

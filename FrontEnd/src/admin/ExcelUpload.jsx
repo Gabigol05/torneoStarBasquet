@@ -460,6 +460,28 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const [copaPO,    setCopaPO]    = useState('');
   const [instanciaPO, setInstanciaPO] = useState('');
   const [llavePO,   setLlavePO]   = useState('');
+  // Otros partidos YA cargados con esta misma Copa+Instancia (ej: la otra
+  // semifinal de Copa de Oro) — se busca apenas se elige Copa+Instancia, para
+  // poder avisar si la Llave que se va a usar ya está ocupada. Sin este
+  // aviso era muy fácil cargar dos semifinales con la misma Llave (o sin
+  // Llave): las dos quedan cargadas en la base, pero el cuadro público solo
+  // puede mostrar una por número de llave — la otra desaparece del cuadro
+  // sin ningún error, y la Final nunca se termina de armar porque le falta
+  // el segundo ganador.
+  const [crucesPO, setCrucesPO] = useState([]);
+  useEffect(() => {
+    let cancelado = false;
+    if (!esPlayoff || !copaPO || !instanciaPO || !temporadaActivaId) { setCrucesPO([]); return; }
+    (async () => {
+      const { data: fechasT } = await supabase.from(tablas.fechas).select('id').eq('temporada_id', temporadaActivaId);
+      const ids = (fechasT ?? []).map(f => f.id);
+      if (ids.length === 0) { if (!cancelado) setCrucesPO([]); return; }
+      const { data } = await supabase.from(tablas.partidos).select('id,equipo_local_id,equipo_visit_id,llave')
+        .in('fecha_id', ids).eq('es_playoff', true).eq('copa', copaPO).eq('instancia', instanciaPO);
+      if (!cancelado) setCrucesPO(data ?? []);
+    })();
+    return () => { cancelado = true; };
+  }, [esPlayoff, copaPO, instanciaPO, temporadaActivaId, tablas]);
   const [log,       setLog]       = useState([]);
   const [duplicate, setDuplicate] = useState(null);
   // _rowId de la fila que se está reasignando a mano en el preview (ver ✏️).
@@ -906,7 +928,25 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                 <input type="number" min="1" placeholder="Llave (1, 2...)" value={llavePO}
                   onChange={e=>setLlavePO(e.target.value)}
                   title="Posición del cruce dentro de esa copa+instancia — ej: Cuartos tiene 4 cruces (llave 1 a 4), Semifinal tiene 2 (llave 1 y 2), Final y Tercer Puesto tienen 1."
-                  style={{ ...s.input, flex:'0 0 130px' }}/>
+                  style={{ ...s.input, flex:'0 0 130px', borderColor: llavePO && crucesPO.some(c=>Number(c.llave)===Number(llavePO)) ? '#F04060' : undefined }}/>
+              </div>
+            )}
+            {esPlayoff && copaPO && instanciaPO && crucesPO.length > 0 && (
+              <div style={{ marginTop:8, fontSize:11.5, lineHeight:1.6 }}>
+                <div style={{ color:'#8899BB' }}>Ya cargados con esta Copa + Instancia:</div>
+                {crucesPO.map(c => {
+                  const choca = llavePO && Number(c.llave) === Number(llavePO);
+                  return (
+                    <div key={c.id} style={{ color: choca ? '#F04060' : '#6B7A99' }}>
+                      Llave {c.llave ?? '—'}: {roster.find(e=>e.id===c.equipo_local_id)?.name ?? c.equipo_local_id} vs {roster.find(e=>e.id===c.equipo_visit_id)?.name ?? c.equipo_visit_id}
+                    </div>
+                  );
+                })}
+                {llavePO && crucesPO.some(c=>Number(c.llave)===Number(llavePO)) && (
+                  <div style={{ color:'#F04060', fontWeight:700, marginTop:2 }}>
+                    ⚠️ Ya hay otro cruce con la Llave {llavePO} — usá un número distinto o el cuadro público no va a poder mostrar los dos.
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -100,7 +100,20 @@ function HistorialPanel({ loading, rows, equipos, fechas }) {
 // en el alta/edición individual (PartidoForm) como en cada fila del fixture
 // masivo (FixtureMasivo). `values`/`onChange` son genéricos para servir a
 // los dos casos sin duplicar el JSX.
-function PlayoffFields({ values, onChange, compact=false }) {
+// `crucesExistentes` (opcional, solo lo manda PartidoForm por ahora) es la
+// lista de otros partidos YA cargados con la misma Copa+Instancia — sin esto
+// era muy fácil cargar dos semifinales de la misma copa con la misma Llave
+// (o alguna sin Llave) sin darse cuenta: las dos quedan "de pie" en el cuadro
+// público, pero el cuadro solo puede mostrar UNA por número de llave, así que
+// la otra desaparece silenciosamente y encima la Final nunca se completa
+// (le falta el segundo ganador). Mostrar acá qué llaves ya están ocupadas —
+// y avisar si la que estás por guardar choca con una — corta el problema
+// antes de publicar, en vez de tener que diagnosticarlo después con el
+// cuadro ya mal armado.
+function PlayoffFields({ values, onChange, compact=false, equipos=[], crucesExistentes=[] }) {
+  const nombreEq = id => equipos.find(e => e.id === id)?.nombre ?? id;
+  const llaveActual = values.llave ? Number(values.llave) : null;
+  const choca = llaveActual != null && crucesExistentes.some(c => Number(c.llave) === llaveActual);
   return (
     <div style={{
       background: values.es_playoff ? 'rgba(240,180,41,.06)' : 'transparent',
@@ -127,7 +140,22 @@ function PlayoffFields({ values, onChange, compact=false }) {
           <input type="number" min="1" placeholder="Llave (1, 2...)" value={values.llave}
             onChange={e => onChange({ ...values, llave:e.target.value })}
             title="Posición del cruce dentro de esa copa+instancia — ej: Cuartos tiene 4 cruces (llave 1 a 4), Semifinal tiene 2 (llave 1 y 2), Final y Tercer Puesto tienen 1."
-            style={{ ...F.input, flex: compact?'0 0 130px':1, minWidth:110 }}/>
+            style={{ ...F.input, flex: compact?'0 0 130px':1, minWidth:110, borderColor: choca ? '#F04060' : undefined }}/>
+        </div>
+      )}
+      {values.es_playoff && values.copa && values.instancia && crucesExistentes.length > 0 && (
+        <div style={{ marginTop:8, fontSize:11.5, lineHeight:1.6 }}>
+          <div style={{ color:'#8899BB' }}>Ya cargados con esta Copa + Instancia:</div>
+          {crucesExistentes.map(c => (
+            <div key={c.id} style={{ color: Number(c.llave) === llaveActual ? '#F04060' : '#6B7A99' }}>
+              Llave {c.llave ?? '—'}: {nombreEq(c.equipo_local_id)} vs {nombreEq(c.equipo_visit_id)}
+            </div>
+          ))}
+          {choca && (
+            <div style={{ color:'#F04060', fontWeight:700, marginTop:2 }}>
+              ⚠️ Ya hay otro cruce con la Llave {llaveActual} — usá un número distinto o el cuadro público no va a poder mostrar los dos (y la ronda siguiente se va a quedar esperando para siempre).
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -159,7 +187,7 @@ function EstadoBadge({ estado }) {
 }
 
 // ── Formulario de partido ─────────────────────────────────────────────────────
-function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId, crearEncuesta, setCrearEncuesta }) {
+function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId, crearEncuesta, setCrearEncuesta, crucesExistentes=[] }) {
   const n = v => v === '' ? '' : Number(v);
 
   // Calcular totales desde cuartos
@@ -290,7 +318,7 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
           playoffs y en el chip "Playoffs" de Resultados en vez de mezclarse
           con la fecha regular. */}
       <div style={{ marginBottom:16 }}>
-        <PlayoffFields values={form} onChange={setForm}/>
+        <PlayoffFields values={form} onChange={setForm} equipos={equipos} crucesExistentes={crucesExistentes}/>
       </div>
 
       {/* Sugerir encuesta */}
@@ -664,6 +692,15 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   const [filtroFecha, setFiltroFecha] = useState('');
   const [filtroEstado,setFiltroEstado]= useState('');
   const [crearEncuesta, setCrearEncuesta] = useState(true);
+
+  // Otros partidos ya cargados con la misma Copa+Instancia que se está
+  // completando en el formulario — se lo pasa a PlayoffFields para que
+  // avise si la Llave elegida ya está en uso (ver comentario ahí).
+  const crucesExistentesForm = useMemo(() => {
+    if (!form.es_playoff || !form.copa || !form.instancia) return [];
+    return partidos.filter(p =>
+      p.es_playoff && p.copa === form.copa && p.instancia === form.instancia && p.id !== editId);
+  }, [partidos, form.es_playoff, form.copa, form.instancia, editId]);
   const { confirm, ConfirmDialog } = useConfirm();
   // Edición de una fecha existente (número/descripción/día) — antes no había
   // forma de corregir el día de un fixture ya cargado si se aplazaba o
@@ -950,6 +987,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           onSave={handleSave} onCancel={cancelForm}
           loading={loading} editId={editId}
           crearEncuesta={crearEncuesta} setCrearEncuesta={setCrearEncuesta}
+          crucesExistentes={crucesExistentesForm}
         />
       )}
 

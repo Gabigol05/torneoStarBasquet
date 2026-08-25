@@ -5868,3 +5868,55 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 @media (prefers-reduced-motion: reduce) {
   .wave-bg .wv { animation: none; }
 }
+
+/* ── Resumen (Dashboard admin) ──────────────────────────────────────────── */
+/* Columna lateral (Alertas + Esta semana) al costado del avance del fixture
+   en desktop; en celular se apila abajo en vez de achicarse hasta ilegible. */
+.dash-side-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+.dash-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .dash-side-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.dash-tabs-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+  scrollbar-width: thin;
+}
+.dash-tabs-scroll::-webkit-scrollbar { height: 4px; }
+.dash-podio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (max-width: 560px) {
+  .dash-podio-grid { grid-template-columns: 1fr; }
+}
+.dash-table-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 40px 64px 52px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 4px;
+  border-bottom: 1px solid #141C2A;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12.5px;
+}
+@media (max-width: 480px) {
+  .dash-table-row { grid-template-columns: 20px 1fr 34px 56px; font-size: 11.5px; }
+  .dash-table-row .dash-col-prom { display: none; }
+}

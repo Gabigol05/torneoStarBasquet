@@ -124,7 +124,7 @@ export default function AdminSearch({ setSec, setCategoria, setFoco }) {
           value={q}
           onChange={e => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Buscar jugadora, equipo, fecha..."
+          placeholder="Buscar por nombre, equipo o fecha..."
           style={{
             width:'100%', padding:'8px 12px 8px 32px', borderRadius:9, border:'1px solid #1C2535',
             background:'#0E1420', color:'#EEF2F8', fontSize:13, outline:'none', boxSizing:'border-box',

@@ -1,10 +1,30 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { labelFecha, esPartidoPlayoff, labelInstanciaCorta } from '../lib/fechaLabel';
 import { useTemporada } from '../context/TemporadaContext';
+
+// ── Íconos ──────────────────────────────────────────────────────────────────
+// Set de íconos de líneas (mismo trazo/tamaño) en vez de emoji sueltos —
+// un emoji por tarjeta nunca termina de leerse "prolijo" porque cada uno
+// tiene su propio estilo y grosor. Los mismos íconos se usan en KpiCard,
+// en Alertas y en el podio de Líderes para que todo el panel comparta un
+// solo lenguaje visual.
+function Ic({ children, size = 14, color = 'currentColor', sw = 1.9 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+  );
+}
+const IconBall      = p => <Ic {...p}><path d="M3 12h18M12 3v18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/><circle cx="12" cy="12" r="9"/></Ic>;
+const IconClock     = p => <Ic {...p}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></Ic>;
+const IconTrend     = p => <Ic {...p}><path d="M4 8h6l3 4 3-4h4"/><path d="M17 6.5 21 8l-1.5 4"/></Ic>;
+const IconCalendar  = p => <Ic {...p}><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></Ic>;
+const IconPoll      = p => <Ic {...p}><path d="M4 10.5 12 4l8 6.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M12 12v5M9.5 14.5h5"/></Ic>;
+const IconAlert     = p => <Ic {...p}><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></Ic>;
+const IconTrophy    = p => <Ic {...p}><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4a1 1 0 0 0-1 1V8a3 3 0 0 0 3 3M17 5.5h3a1 1 0 0 1 1 1V8a3 3 0 0 1-3 3M12 14v3.5M9 20.5h6M9.5 17.5h5l.6 3H8.9Z"/></Ic>;
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const STAT_COLS = [
@@ -101,7 +121,16 @@ function buildExtra(partidosCat, fechaMap) {
   })();
   const quedanSemana = conFecha.filter(p => p.estado === 'pendiente' && p.effDate >= lunesActual && p.effDate <= domingoActual).length;
 
-  return { pctTotal, jugados, total, porSemana, jugadosHoy, diaTop, quedanSemana };
+  // "Ritmo esta semana" (Resumen): cuántos partidos hay cargados con fecha
+  // esta semana vs. la semana pasada — mismo mapa `semanas` de arriba, solo
+  // hay que mirar las dos claves puntuales en vez de las últimas 8.
+  const lunesAnteriorD = new Date(`${lunesActual}T00:00:00`);
+  lunesAnteriorD.setDate(lunesAnteriorD.getDate() - 7);
+  const lunesAnterior = lunesAnteriorD.toISOString().slice(0, 10);
+  const semanaActualCount = semanas[lunesActual] ?? 0;
+  const semanaAnteriorCount = semanas[lunesAnterior] ?? 0;
+
+  return { pctTotal, jugados, total, porSemana, jugadosHoy, diaTop, quedanSemana, semanaActualCount, semanaAnteriorCount };
 }
 
 function fmtSemana(wk) {
@@ -303,71 +332,205 @@ function AvanceSection({ puntos, extra }) {
   );
 }
 
-function LeaderRow({ rank, nombre, equipo, value, unit }) {
+
+function iniciales(nombre) {
+  return (nombre || '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+}
+
+// "Esta semana" ahora es una mini-calendario Lun–Dom (en vez de un banner de
+// dos números) — de un vistazo se ve QUÉ día tiene partidos programados o
+// jugados, no solo el total de la semana entera.
+const DIA_CORTA = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+function EstaSemanaCard({ resumen, onNavigate }) {
+  if (!resumen) return null;
+  const { dias = [], jugados, pendientes, lider } = resumen;
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 4px' }}>
-      <div style={{
-        width:20, height:20, borderRadius:6, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:10, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif",
-        background: rank===1 ? 'rgba(240,180,41,.18)' : 'rgba(255,255,255,.04)',
-        color: rank===1 ? '#F0B429' : '#6B7A99',
-      }}>{rank}</div>
-      {equipo.logo && <img src={equipo.logo} alt="" width={18} height={18} style={{ borderRadius:'50%', objectFit:'cover', border:`1px solid ${equipo.color}55`, flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
-      <div style={{ flex:1, minWidth:0, fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-        {nombre}
+    <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:12, padding:'14px 14px 16px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10 }}>
+        <IconCalendar size={13} color="#F0B429"/>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:1, color:'#F0B429', fontFamily:"'Barlow Condensed',sans-serif", textTransform:'uppercase' }}>Esta semana</div>
       </div>
-      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, color:'#EEF2F8', flexShrink:0 }}>{value}<span style={{ fontSize:9, color:'#4A566E', marginLeft:2 }}>{unit}</span></div>
+      <div style={{ display:'flex', gap:5, marginBottom:10 }}>
+        {dias.map((d, i) => {
+          const finde = i >= 5;
+          return (
+            <div key={d.iso} title={`${d.programados} partido${d.programados===1?'':'s'}`} style={{
+              flex:1, aspectRatio:'1', borderRadius:7, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+              background: d.esHoy ? 'rgba(240,180,41,.16)' : finde ? 'rgba(96,165,250,.10)' : '#141C2A',
+              border: d.esHoy ? '1.5px solid #F0B429' : finde ? '1px solid rgba(96,165,250,.35)' : '1px solid #1C2535',
+            }}>
+              <div style={{ fontSize:8, color: d.esHoy ? '#F0B429' : '#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{DIA_CORTA[i]}</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:14, color: d.esHoy ? '#F0B429' : '#CBD5E8' }}>{d.numero}</div>
+              {d.programados > 0 && (
+                <div style={{ width:4, height:4, borderRadius:'50%', background: d.jugados===d.programados ? '#22D07A' : '#60A5FA', marginTop:1 }}/>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display:'flex', gap:12, fontSize:10, color:'#6B7A99', marginBottom:10 }}>
+        <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:6, height:6, borderRadius:'50%', background:'#22D07A', display:'inline-block' }}/>jugado</span>
+        <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:6, height:6, borderRadius:'50%', background:'#60A5FA', display:'inline-block' }}/>programado</span>
+      </div>
+      <div style={{ borderTop:'1px solid #1C2535', paddingTop:10, fontSize:12, color:'#8899BB' }}>
+        <button onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{ background:'none', border:'none', padding:0, cursor: onNavigate ? 'pointer' : 'default', color:'inherit', textAlign:'left', font:'inherit' }}>
+          <span style={{ color:'#22D07A', fontWeight:700 }}>{jugados}</span> jugado{jugados===1?'':'s'} · <span style={{ color:'#60A5FA', fontWeight:700 }}>{pendientes}</span> pendiente{pendientes===1?'':'s'}
+        </button>
+        {lider && (
+          <div style={{ marginTop:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            🔥 Lidera {lider.categoria === 'femenino' ? '♀' : '♂'} <span style={{ color:'#F0B429' }}>{lider.nombre}</span> con {lider.pts} pts
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function fmtDiaCorto(iso) {
-  try { return new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { day:'2-digit', month:'short' }); }
-  catch { return iso; }
+// Alertas: solo lo calculable con certeza a partir de los datos ya traídos
+// (ver buildAlertas más arriba en el fetch) — nunca alertas especulativas.
+function AlertasCard({ alertas, onNavigate }) {
+  return (
+    <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:12, padding:'14px 14px 16px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10 }}>
+        <IconAlert size={13} color="#E8187A"/>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:1, color:'#E8187A', fontFamily:"'Barlow Condensed',sans-serif", textTransform:'uppercase' }}>Alertas</div>
+      </div>
+      {alertas.length === 0 ? (
+        <div style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ color:'#22D07A' }}>✓</span> Todo en orden
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {alertas.map(a => (
+            <button key={a.id} onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{
+              display:'flex', alignItems:'flex-start', gap:8, textAlign:'left', background:'rgba(232,24,122,.06)',
+              border:'1px solid rgba(232,24,122,.25)', borderRadius:8, padding:'8px 10px', cursor: onNavigate ? 'pointer' : 'default',
+              fontSize:11.5, color:'#CBD5E8', lineHeight:1.4, fontFamily:"'Barlow Condensed',sans-serif",
+            }}>
+              <span style={{ color:'#E8187A', flexShrink:0 }}>●</span>{a.texto}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-// "Esta semana: 4 partidos jugados, 2 pendientes, lidera X en puntos" — de un
-// vistazo apenas se entra al panel, sin tener que armar ese resumen mental
-// mirando el fixture completo cada vez.
-function ResumenSemanalBanner({ resumen, onNavigate }) {
-  if (!resumen) return null;
-  const { jugados, pendientes, lider, lunes, domingo } = resumen;
-  return (
-    <div style={{
-      background:'linear-gradient(115deg,rgba(240,180,41,.10),#0E1420 55%,rgba(96,165,250,.08))',
-      border:'1px solid rgba(240,180,41,.25)', borderRadius:14, padding:'16px 20px',
-      display:'flex', alignItems:'center', gap:20, flexWrap:'wrap',
-    }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
-        <div style={{ width:38, height:38, borderRadius:10, background:'rgba(240,180,41,.15)', border:'1px solid rgba(240,180,41,.35)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>📆</div>
-        <div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, letterSpacing:.5, color:'#EEF2F8' }}>ESTA SEMANA</div>
-          <div style={{ fontSize:11, color:'#4A566E' }}>{fmtDiaCorto(lunes)} — {fmtDiaCorto(domingo)}</div>
+// "Próximo partido" como mini match-card (dos círculos con iniciales + VS) en
+// vez de una línea de texto — se lee de un vistazo, no hay que "parsear" el
+// nombre de dos equipos concatenados adentro de un KpiCard genérico.
+function ProximoCard({ proximo, onClick }) {
+  const clickable = !!onClick;
+  if (!proximo) {
+    return (
+      <div onClick={onClick} style={{
+        background:'linear-gradient(160deg,#22D07A16,#0B111C 55%)', border:'1px solid #22D07A40', borderTop:'3px solid #22D07A',
+        borderRadius:14, padding:'15px 18px 16px', display:'flex', flexDirection:'column', gap:6, cursor: clickable ? 'pointer' : 'default', minWidth:0,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:'#22D07A33', border:'1px solid #22D07A77', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><IconCalendar size={15} color="#22D07A"/></div>
+          <div style={{ fontSize:11, color:'#22D07A', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>Próximo partido</div>
         </div>
+        <div style={{ fontSize:13, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Sin fecha cargada</div>
       </div>
-      <div style={{ display:'flex', gap:22, flexWrap:'wrap', flex:1, minWidth:0 }}>
-        <button onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{ background:'none', border:'none', cursor: onNavigate ? 'pointer' : 'default', padding:0, textAlign:'left' }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:22, color:'#22D07A' }}>{jugados}</div>
-          <div style={{ fontSize:11, color:'#8899BB' }}>partido{jugados===1?'':'s'} jugado{jugados===1?'':'s'}</div>
-        </button>
-        <button onClick={onNavigate ? () => onNavigate('partidos') : undefined} style={{ background:'none', border:'none', cursor: onNavigate ? 'pointer' : 'default', padding:0, textAlign:'left' }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:22, color:'#60A5FA' }}>{pendientes}</div>
-          <div style={{ fontSize:11, color:'#8899BB' }}>pendiente{pendientes===1?'':'s'} de resultado</div>
-        </button>
-        {lider ? (
-          <div style={{ minWidth:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              {lider.equipo.logo && <img src={lider.equipo.logo} alt="" width={18} height={18} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, color:'#F0B429', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:220 }}>
-                {lider.categoria === 'femenino' ? '♀' : '♂'} {lider.nombre}
-              </div>
-            </div>
-            <div style={{ fontSize:11, color:'#8899BB' }}>lidera la semana con {lider.pts} pts</div>
-          </div>
-        ) : (
-          <div style={{ fontSize:12, color:'#4A566E', alignSelf:'center' }}>Todavía nadie anotó esta semana.</div>
+    );
+  }
+  const eqL = equipoInfo(proximo.categoria, proximo.equipo_local_id);
+  const eqV = equipoInfo(proximo.categoria, proximo.equipo_visit_id);
+  const fecha = fmtFecha(proximo.fecha_partido);
+  const hora = fmtHora(proximo.hora_inicio);
+  return (
+    <div onClick={onClick} style={{
+      background:'linear-gradient(160deg,#22D07A16,#0B111C 55%)', border:'1px solid #22D07A40', borderTop:'3px solid #22D07A',
+      borderRadius:14, padding:'13px 16px 14px', display:'flex', flexDirection:'column', gap:8, cursor: clickable ? 'pointer' : 'default', minWidth:0,
+    }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#22D07A', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>
+          <IconCalendar size={13} color="#22D07A"/>Próximo
+        </div>
+        {fecha && (
+          <span style={{ fontSize:10, color:'#8899BB', background:'#141C2A', border:'1px solid #1C2535', borderRadius:100, padding:'2px 8px', flexShrink:0 }}>
+            {fecha}{hora ? ` · ${hora}hs` : ''}
+          </span>
         )}
       </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:0, flex:1 }}>
+          <div style={{ width:30, height:30, borderRadius:'50%', background:`${eqL.color}33`, border:`1.5px solid ${eqL.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#EEF2F8', fontFamily:"'Barlow Condensed',sans-serif" }}>{iniciales(eqL.nombre)}</div>
+          <div style={{ fontSize:10.5, color:'#CBD5E8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%' }}>{eqL.nombre}</div>
+        </div>
+        <div style={{ fontSize:10, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0 }}>VS</div>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:0, flex:1 }}>
+          <div style={{ width:30, height:30, borderRadius:'50%', background:`${eqV.color}33`, border:`1.5px solid ${eqV.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#EEF2F8', fontFamily:"'Barlow Condensed',sans-serif" }}>{iniciales(eqV.nombre)}</div>
+          <div style={{ fontSize:10.5, color:'#CBD5E8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%' }}>{eqV.nombre}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// "Ritmo esta semana": partidos con fecha cargada esta semana vs. la semana
+// pasada — una tendencia real (▲/▼), no solo un número suelto.
+function RitmoCard({ actual, anterior, onClick }) {
+  const diff = actual - anterior;
+  const clickable = !!onClick;
+  return (
+    <div onClick={onClick} style={{
+      background:'linear-gradient(160deg,#A78BFA16,#0B111C 55%)', border:'1px solid #A78BFA40', borderTop:'3px solid #A78BFA',
+      borderRadius:14, padding:'15px 18px 16px', display:'flex', flexDirection:'column', gap:6, cursor: clickable ? 'pointer' : 'default', minWidth:0,
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <div style={{ width:32, height:32, borderRadius:9, background:'#A78BFA33', border:'1px solid #A78BFA77', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><IconTrend size={15} color="#A78BFA"/></div>
+        <div style={{ fontSize:11, color:'#A78BFA', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>Ritmo esta semana</div>
+      </div>
+      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:30, lineHeight:1, color:'#EEF2F8', letterSpacing:.5 }}>{actual}</div>
+      <div style={{ fontSize:12, color: diff > 0 ? '#22D07A' : diff < 0 ? '#E8187A' : '#8899BB', fontFamily:"'Barlow Condensed',sans-serif" }}>
+        {diff === 0 ? 'igual que la semana pasada' : `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)} vs. semana pasada (${anterior})`}
+      </div>
+    </div>
+  );
+}
+
+// Podio de Líderes: top 3 en tarjetas, con acumulado siempre visible al lado
+// del promedio — esto es lo que resuelve la confusión original (alguien con
+// igual o menor promedio pero más partidos jugados puede tener más puntos
+// TOTALES, que es como ordena la página pública).
+const PODIO_ESTILO = [
+  { medalla:'🥇', color:'#F0B429', bg:'rgba(240,180,41,.10)', border:'rgba(240,180,41,.4)' },
+  { medalla:'🥈', color:'#C7CDD8', bg:'rgba(199,205,216,.08)', border:'rgba(199,205,216,.3)' },
+  { medalla:'🥉', color:'#D08A50', bg:'rgba(208,138,80,.08)', border:'rgba(208,138,80,.3)' },
+];
+function PodioCard({ leader, rank, unit }) {
+  const st = PODIO_ESTILO[rank - 1];
+  return (
+    <div style={{
+      background: st.bg, border:`1px solid ${st.border}`, borderTop:`3px solid ${st.color}`, borderRadius:12,
+      padding:'14px 14px 12px', display:'flex', flexDirection:'column', alignItems:'center', gap:6, minWidth:0,
+    }}>
+      <div style={{ fontSize:18 }}>{st.medalla}</div>
+      {leader.equipo.logo
+        ? <img src={leader.equipo.logo} alt="" width={36} height={36} style={{ borderRadius:'50%', objectFit:'cover', border:`1.5px solid ${st.color}` }} onError={e=>{e.currentTarget.style.display='none';}}/>
+        : <div style={{ width:36, height:36, borderRadius:'50%', background:`${leader.equipo.color}44`, border:`1.5px solid ${st.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#EEF2F8' }}>{iniciales(leader.nombre)}</div>}
+      <div style={{ fontSize:12.5, color:'#EEF2F8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%', fontFamily:"'Barlow Condensed',sans-serif" }}>{leader.nombre}</div>
+      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:26, color: st.color, lineHeight:1 }}>
+        {leader.value}<span style={{ fontSize:11, marginLeft:3, color:'#8899BB' }}>{unit}</span>
+      </div>
+      <div style={{ fontSize:10, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif" }}>PROM · {leader.pj} PJ</div>
+      <div style={{ fontSize:9.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{leader.total} pts totales</div>
+    </div>
+  );
+}
+function LeaderTableRow({ leader, rank }) {
+  return (
+    <div className="dash-table-row">
+      <div style={{ color:'#4A566E' }}>{rank}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0, color:'#CBD5E8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+        {leader.equipo.logo && <img src={leader.equipo.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
+        {leader.nombre}
+      </div>
+      <div style={{ color:'#6B7A99', textAlign:'right' }}>{leader.pj}</div>
+      <div style={{ color:'#8899BB', textAlign:'right' }}>{leader.total}</div>
+      <div className="dash-col-prom" style={{ color:'#EEF2F8', textAlign:'right', fontFamily:"'Bebas Neue',sans-serif", fontSize:14 }}>{leader.value}</div>
     </div>
   );
 }
@@ -399,6 +562,12 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
   // consulta chica extra a stats_partido para sacar quién más anotó en los
   // partidos finalizados de esta semana puntual.
   const [resumenSemanal, setResumenSemanal] = useState(null);
+  // Alertas calculadas de datos reales (nunca especulativas) y estado de la
+  // sección Líderes rediseñada: una categoría de stat a la vez (antes eran 5
+  // columnas juntas) + un toggle para ordenar por promedio o por acumulado.
+  const [alertas, setAlertas] = useState([]);
+  const [statTab, setStatTab] = useState('pts_prom');
+  const [sortBy, setSortBy] = useState('prom');
   const { temporadaActivaId, temporadas, loading: temporadaLoading } = useTemporada();
   const temporadaActiva = temporadas.find(t => t.id === temporadaActivaId);
   // Qué temporada está mirando el resumen — arranca en la activa, pero el
@@ -530,12 +699,31 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           ].filter(Boolean).sort((a, b) => b.pts - a.pts);
           liderSemana = candidatos[0] ?? null;
         }
+        // Desglose día por día (Lun–Dom) de esta semana puntual, para la
+        // mini-calendario del panel — cuántos partidos hay programados y
+        // cuántos ya se jugaron en cada día exacto.
+        const diasSemana = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(`${lunesActual}T00:00:00`);
+          d.setDate(d.getDate() + i);
+          const iso = d.toISOString().slice(0, 10);
+          const deEseDia = partidosSemana.filter(p => {
+            const fm2 = p.categoria === 'femenino' ? fechaMapFem : fechaMapMasc;
+            return fechaEfectiva(p, fm2) === iso;
+          });
+          return {
+            iso, numero: d.getDate(), esHoy: iso === hoy,
+            programados: deEseDia.length,
+            jugados: deEseDia.filter(p => p.estado === 'finalizado').length,
+          };
+        });
+
         if (!cancelado) {
           setResumenSemanal({
             jugados: jugadosSemana.length,
             pendientes: pendientesSemana,
             lider: liderSemana,
             lunes: lunesActual, domingo: domingoActual,
+            dias: diasSemana,
           });
         }
 
@@ -549,7 +737,17 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
                 const info = jugadorMap[jugId];
                 if (!info) return null;
                 const eq = equipoInfo(categoria, info.equipoId);
-                return { id: jugId, nombre: info.nombre, equipo: eq, value: Number(r[col.key]).toFixed(1) };
+                // pj + total (acumulado) además del promedio: la página pública
+                // ordena por total acumulado, no por promedio, así que el panel
+                // necesita mostrar ambos para que se entienda por qué alguien
+                // puede aparecer primero ahí aunque acá tenga menor promedio.
+                const totalKey = col.key.replace('_prom', '_total');
+                return {
+                  id: jugId, nombre: info.nombre, equipo: eq,
+                  value: Number(r[col.key]).toFixed(1),
+                  pj: Number(r.pj || 0),
+                  total: Number(r[totalKey] ?? 0),
+                };
               })
               .filter(Boolean)
               .sort((a, b) => Number(b.value) - Number(a.value));
@@ -584,16 +782,45 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           const deLaFecha = partidosCat.filter(p => p.fecha_id === f.id);
           return { id: f.id, numero: f.numero, label: labelFecha(f), total: deLaFecha.length, finalizados: deLaFecha.filter(p => p.estado === 'finalizado').length };
         }).filter(p => p.total > 0);
-        setChart({
-          femenino: buildChart(ff, partidos.filter(p => p.categoria === 'femenino')),
-          masculino: buildChart(fm, partidos.filter(p => p.categoria === 'masculino')),
-        });
+        const chartFem = buildChart(ff, partidos.filter(p => p.categoria === 'femenino'));
+        const chartMasc = buildChart(fm, partidos.filter(p => p.categoria === 'masculino'));
+        setChart({ femenino: chartFem, masculino: chartMasc });
 
         // ── Extra para mini-graficos (avance total, partidos/semana, dia top) ──
         setExtra({
           femenino: buildExtra(partidos.filter(p => p.categoria === 'femenino'), buildFechaMap(ff)),
           masculino: buildExtra(partidos.filter(p => p.categoria === 'masculino'), buildFechaMap(fm)),
         });
+
+        // ── Alertas: solo lo que se puede calcular con certeza a partir de
+        // los datos ya traídos (nada especulativo) — pendientes viejos sin
+        // cargar y fechas cargadas "a medias" (algunos resultados sí, otros
+        // no todavía). ──
+        const diezDiasAtras = new Date();
+        diezDiasAtras.setDate(diezDiasAtras.getDate() - 10);
+        const diezDiasAtrasStr = diezDiasAtras.toISOString().slice(0, 10);
+        const pendientesViejos = partidos.filter(p => p.estado === 'pendiente' && p.fecha_partido && p.fecha_partido < diezDiasAtrasStr);
+        const fechasIncompletas = [
+          ...chartFem.map(f => ({ ...f, categoria:'femenino' })),
+          ...chartMasc.map(f => ({ ...f, categoria:'masculino' })),
+        ].filter(f => f.finalizados > 0 && f.finalizados < f.total);
+
+        const nuevasAlertas = [];
+        if (pendientesViejos.length > 0) {
+          nuevasAlertas.push({
+            id: 'pendientes-viejos', tipo: 'warning',
+            texto: `${pendientesViejos.length} partido${pendientesViejos.length === 1 ? '' : 's'} pendiente${pendientesViejos.length === 1 ? '' : 's'} con fecha de hace más de 10 días sin resultado cargado`,
+            categoria: null,
+          });
+        }
+        if (fechasIncompletas.length > 0) {
+          nuevasAlertas.push({
+            id: 'fechas-incompletas', tipo: 'info',
+            texto: `${fechasIncompletas.length} fecha${fechasIncompletas.length === 1 ? '' : 's'} con partidos cargados a medias (algunos resultados sí, otros todavía no)`,
+            categoria: null,
+          });
+        }
+        if (!cancelado) setAlertas(nuevasAlertas);
       } catch (err) {
         if (!cancelado) setFetchError(err.message);
       } finally {
@@ -605,14 +832,6 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
 
   const totalPartidos = kpis.jugados + kpis.pendientes;
   const avancePct = totalPartidos ? Math.round((kpis.jugados / totalPartidos) * 100) : 0;
-
-  const proximoLabel = useMemo(() => {
-    if (!kpis.proximo) return null;
-    const p = kpis.proximo;
-    const eqL = equipoInfo(p.categoria, p.equipo_local_id);
-    const eqV = equipoInfo(p.categoria, p.equipo_visit_id);
-    return `${eqL.nombre} vs ${eqV.nombre}`;
-  }, [kpis.proximo]);
 
   if (temporadaLoading || (loading && temporadaVerId)) {
     return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando resumen…</div>;
@@ -636,7 +855,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           separada (la en curso u otra archivada), así nunca se mezclan
           números de una con otra. */}
       <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <span style={{ fontSize:12, color:'#4A566E' }}>🏆 Viendo resumen de:</span>
+        <span style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}><IconTrophy size={13} color="#4A566E"/>Viendo resumen de:</span>
         <select
           value={temporadaVerId ?? ''}
           onChange={e => setTemporadaVerId(Number(e.target.value))}
@@ -661,62 +880,96 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
         )}
       </div>
 
-      {/* Resumen semanal */}
-      <ResumenSemanalBanner resumen={resumenSemanal} onNavigate={onNavigate}/>
-
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12 }}>
-        <KpiCard icon="🏀" label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
+        <KpiCard icon={<IconBall size={16} color="#F0B429"/>} label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
           onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <KpiCard icon="⏳" label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"
+        <KpiCard icon={<IconClock size={16} color="#60A5FA"/>} label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"
           onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <KpiCard icon="📅" label="Próximo partido" value={proximoLabel ?? '—'}
-          sub={kpis.proximo ? `${fmtFecha(kpis.proximo.fecha_partido)}${fmtHora(kpis.proximo.hora_inicio) ? ' · '+fmtHora(kpis.proximo.hora_inicio)+'hs' : ''}` : 'sin fecha cargada'}
-          accent="#22D07A" onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <KpiCard icon="🗳️" label="Encuesta activa" value={kpis.encuesta ? `${kpis.encuesta.votos} votos` : 'ninguna'}
+        <ProximoCard proximo={kpis.proximo} onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
+        <RitmoCard actual={extra[categoria]?.semanaActualCount ?? 0} anterior={extra[categoria]?.semanaAnteriorCount ?? 0}
+          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
+        <KpiCard icon={<IconPoll size={16} color="#E8187A"/>} label="Encuesta activa" value={kpis.encuesta ? `${kpis.encuesta.votos} votos` : 'ninguna'}
           sub={kpis.encuesta?.pregunta ?? '—'} accent="#E8187A" onClick={onNavigate ? () => onNavigate('encuestas') : undefined}/>
       </div>
 
-      {/* Avance por fecha */}
-      <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Avance del fixture</div>
+      {/* Avance por fecha + columna lateral (Alertas / Esta semana) */}
+      <div className="dash-side-grid">
+        <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px', minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Avance del fixture</div>
+          </div>
+          <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
         </div>
-        <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
+        <div className="dash-side-col">
+          <AlertasCard alertas={alertas} onNavigate={onNavigate}/>
+          <EstaSemanaCard resumen={resumenSemanal} onNavigate={onNavigate}/>
+        </div>
       </div>
 
-      {/* Lideres */}
+      {/* Lideres — una categoría de stat a la vez (tabs) en vez de 5 columnas
+          juntas, con podio + tabla y un toggle promedio/acumulado: así se ve
+          de un vistazo por qué alguien puede ir primero en la página pública
+          (que ordena por acumulado) aunque acá tenga menor promedio. */}
       <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>
             Líderes {categoria === 'femenino' ? 'femenino' : 'masculino'}
           </div>
+          <div style={{ display:'flex', gap:6 }}>
+            {['prom','total'].map(s => (
+              <button key={s} onClick={() => setSortBy(s)} style={{
+                padding:'5px 12px', borderRadius:100, fontSize:10.5, fontWeight:700, letterSpacing:.5, textTransform:'uppercase',
+                cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif",
+                background: sortBy===s ? 'rgba(240,180,41,.18)' : 'transparent',
+                border: sortBy===s ? '1px solid rgba(240,180,41,.5)' : '1px solid #1C2535',
+                color: sortBy===s ? '#F0B429' : '#6B7A99',
+              }}>{s === 'prom' ? 'Promedio' : 'Acumulado'}</button>
+            ))}
+          </div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:16 }}>
-          {STAT_COLS.map(col => {
-            const key = `${categoria}-${col.key}`;
-            const lista = leaders[categoria][col.key] ?? [];
-            const abierto = !!expanded[key];
-            const visibles = abierto ? lista.slice(0, 20) : lista.slice(0, TOP_N_DEFAULT);
-            return (
-              <div key={col.key}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                  <div style={{ width:8, height:8, borderRadius:2, background:col.color }}/>
-                  <div style={{ fontSize:12, fontWeight:700, letterSpacing:1, color:col.color, fontFamily:"'Barlow Condensed',sans-serif" }} title={col.title}>{col.label}</div>
-                </div>
-                {visibles.length === 0
-                  ? <div style={{ fontSize:12, color:'#2C3A52', padding:'6px 4px' }}>Sin datos aún</div>
-                  : visibles.map((l, i) => <LeaderRow key={l.id} rank={i+1} nombre={l.nombre} equipo={l.equipo} value={l.value} unit={col.label}/>)}
-                {lista.length > TOP_N_DEFAULT && (
-                  <button onClick={() => setExpanded(e => ({ ...e, [key]: !abierto }))}
-                    style={{ marginTop:4, background:'none', border:'none', color:'#4A566E', fontSize:11, cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5, padding:'4px' }}>
-                    {abierto ? '▲ Ver menos' : lista.length > 20 ? `▼ Ver top 20 (de ${lista.length})` : `▼ Ver todos (${lista.length})`}
-                  </button>
-                )}
+
+        <div className="dash-tabs-scroll">
+          {STAT_COLS.map(col => (
+            <button key={col.key} onClick={() => setStatTab(col.key)} style={{
+              flexShrink:0, padding:'7px 14px', borderRadius:9, fontSize:12, fontWeight:700, letterSpacing:.5, whiteSpace:'nowrap',
+              cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif",
+              background: statTab===col.key ? `${col.color}22` : '#0B111C',
+              border: statTab===col.key ? `1px solid ${col.color}88` : '1px solid #1C2535',
+              color: statTab===col.key ? col.color : '#6B7A99',
+            }} title={col.title}>{col.label}</button>
+          ))}
+        </div>
+
+        {(() => {
+          const lista = leaders[categoria][statTab] ?? [];
+          const col = STAT_COLS.find(c => c.key === statTab);
+          if (lista.length === 0) return <div style={{ fontSize:13, color:'#2C3A52', padding:'12px 4px' }}>Sin datos aún</div>;
+          const ordenada = [...lista].sort((a, b) => sortBy === 'prom' ? Number(b.value) - Number(a.value) : b.total - a.total);
+          const expKey = `lideres-${statTab}-${sortBy}`;
+          const abierto = !!expanded[expKey];
+          const podio = ordenada.slice(0, 3);
+          const resto = ordenada.slice(3, abierto ? 20 : TOP_N_DEFAULT + 3);
+          return (
+            <div>
+              <div className="dash-podio-grid">
+                {podio.map((l, i) => <PodioCard key={l.id} leader={l} rank={i + 1} unit={col.label}/>)}
               </div>
-            );
-          })}
-        </div>
+              {ordenada.length > 3 && (
+                <>
+                  <div style={{ fontSize:10.5, color:'#4A566E', letterSpacing:.5, textTransform:'uppercase', marginBottom:2, fontFamily:"'Barlow Condensed',sans-serif" }}>Resto del ranking</div>
+                  {resto.map((l, i) => <LeaderTableRow key={l.id} leader={l} rank={i + 4}/>)}
+                  {ordenada.length > TOP_N_DEFAULT + 3 && (
+                    <button onClick={() => setExpanded(e => ({ ...e, [expKey]: !abierto }))}
+                      style={{ marginTop:8, background:'none', border:'none', color:'#4A566E', fontSize:11, cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5, padding:'4px' }}>
+                      {abierto ? '▲ Ver menos' : `▼ Ver más (${ordenada.length - (TOP_N_DEFAULT + 3)} más)`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Fixture completo */}

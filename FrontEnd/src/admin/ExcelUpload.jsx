@@ -24,6 +24,11 @@ const fuseEqMasc = new Fuse(equiposMasculino, { keys: [{ name:'name', weight:1 }
 // intentar el fuzzy match.
 const ALIAS_EQUIPOS_TEXTO = {
   'ene ene': 'nn',
+  // "La Reserva V.A" es como el excel de este partido escribió a Villa
+  // Azalais (reporte de Alvaro, 25/08) — mismo criterio que "Ene Ene"/"NN"
+  // arriba: no es un typo, es un nombre totalmente distinto al oficial.
+  'la reserva v.a': 'villa azalais',
+  'la reserva va':  'villa azalais',
 };
 const canonEquipo = texto => {
   const n = normStr(texto);

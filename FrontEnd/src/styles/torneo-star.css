@@ -5923,3 +5923,76 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
      "prom", así que en modo Acumulado desaparecía la columna que sí importaba. */
   .dash-table-row .dash-col-secondary { display: none; }
 }
+
+/* ══════════════════════════════
+   BOTONES SOCIALES DEL NAVBAR (YouTube / Instagram)
+   Círculo "glass" con brillo al pasar el mouse — mismo ícono, mismo tamaño
+   y comportamiento en celular y en compu (antes YouTube era una píldora con
+   texto/"YT" e Instagram se ocultaba o mostraba según el ancho con reglas
+   pisándose entre sí). Nota: el proyecto tiene tailwindcss en package.json
+   pero no está enchufado a Vite (no hay tailwind.config ni plugin de
+   postcss) — @tailwind utilities en index.css no genera nada, así que estos
+   botones se escriben en CSS plano en vez de clases de Tailwind.
+══════════════════════════════ */
+.social-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(0,0,0,.35));
+  border: 1px solid var(--social-ring, rgba(255,255,255,.14));
+  color: var(--social-color, #fff);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease, background .25s ease;
+}
+.social-btn svg {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+}
+.social-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--social-glow, rgba(255,255,255,.3)), transparent);
+  transform: translateX(-120%);
+  transition: transform .6s ease;
+}
+.social-btn:hover::before { transform: translateX(120%); }
+.social-btn:hover {
+  transform: scale(1.12) rotate(4deg);
+  border-color: var(--social-ring-hover, rgba(255,255,255,.45));
+  box-shadow: 0 8px 20px var(--social-shadow, rgba(255,255,255,.3));
+  background: linear-gradient(135deg, var(--social-hover-a, rgba(255,255,255,.14)), rgba(0,0,0,.4));
+}
+.social-btn:active { transform: scale(.94) rotate(0deg); }
+
+.social-btn--yt {
+  --social-ring: rgba(255,0,0,.35);
+  --social-ring-hover: rgba(255,0,0,.75);
+  --social-glow: rgba(255,90,90,.4);
+  --social-shadow: rgba(255,0,0,.4);
+  --social-hover-a: rgba(255,0,0,.18);
+  --social-color: #ff4d4d;
+}
+.social-btn--ig {
+  --social-ring: rgba(225,48,108,.35);
+  --social-ring-hover: rgba(225,48,108,.75);
+  --social-glow: rgba(240,110,170,.4);
+  --social-shadow: rgba(225,48,108,.4);
+  --social-hover-a: rgba(225,48,108,.18);
+  --social-color: #f0629a;
+}
+
+@media (max-width: 767px) {
+  .social-btn { width: 36px; height: 36px; }
+  .social-btn svg { width: 16px; height: 16px; }
+}

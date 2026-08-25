@@ -5175,6 +5175,19 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   border-radius: 16px;
   padding: 1px;
   transition: transform 0.15s;
+  /* BUG (reporte Alvaro, 25/08, cuadro de playoffs en celular): esta card
+     nunca tuvo ancho propio — vive perfecto en .fixture-grid (columna a lo
+     ancho) porque ahí el padre siempre es angosto. Pero PlayoffsBracket.jsx
+     reusa esta MISMA card adentro de .bracket-round, que es una columna
+     flex angosta (min-width ~140-180px, pensada para el cruce compacto
+     BracketMatch/TeamSeed, no para esta card completa). Sin un piso propio,
+     la card se achicaba a esos ~150px: los nombres se truncaban, los 4
+     cuartos (que van en fila) no entraban y se apilaban uno debajo del
+     otro, y sobraba espacio vacío a la derecha del cuadro. Con este
+     min-width, flexbox no deja encoger la columna del cuadro por debajo de
+     lo que la card necesita — la fila de arriba (Semifinal/Final/Campeón)
+     pasa a scrollear horizontal en vez de aplastar la card. */
+  min-width: min(320px, 92vw);
 }
 .result-card-v2:hover { transform: translateY(-1px); }
 .rc2-inner {
@@ -5276,6 +5289,10 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .fixture-card-v2 {
   border-radius: 16px;
   padding: 1px;
+  /* Mismo fix que .result-card-v2 — esta card también se reusa dentro de
+     .bracket-round (playoff pendiente sin resultado todavía) y sin piso
+     propio se aplastaba igual dentro de esa columna angosta. */
+  min-width: min(320px, 92vw);
 }
 .fc2v-inner {
   border-radius: 15px;

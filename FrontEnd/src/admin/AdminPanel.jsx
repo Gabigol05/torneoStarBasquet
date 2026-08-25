@@ -57,7 +57,13 @@ const NAV_RESET = {
   boxSizing:'border-box',
 };
 const NAV_TODO = [CARGAR, ...TABS, ...TOOLS];
-const SECCIONES_CON_CATEGORIA = ['excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar', 'plantel', 'playoffs'];
+// 'dashboard' se agregó acá — antes el Resumen tenía sus propios toggles
+// sueltos adentro de cada tarjeta (ver Dashboard.jsx) en vez de usar este de
+// arriba como el resto de las secciones. 'temporadas' queda afuera a
+// propósito (una temporada es global, no es "de femenino" ni "de
+// masculino"); 'encuestas' también, porque hoy EncuestasManager no separa
+// por categoría.
+const SECCIONES_CON_CATEGORIA = ['dashboard', 'excel', 'historial', 'partidos', 'stats', 'recalcular', 'alias', 'fusionar', 'plantel', 'playoffs'];
 
 // ── Indicador Realtime ────────────────────────────────────────────────────────
 function RealtimeDot({ status, compact = false }) {
@@ -405,7 +411,7 @@ export default function AdminPanel() {
       <main data-admin-main style={S.main}>
         <div data-admin-content style={S.content}>
           <SectionHeader nav={NAV_TODO} sec={sec}/>
-          {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} />}
+          {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'excel'      && <ExcelUpload categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'historial'  && <UploadHistory categoria={categoria} setCategoria={setCategoria} />}
           {sec === 'partidos'   && <PartidosManager categoria={categoria} setCategoria={setCategoria} foco={foco} />}

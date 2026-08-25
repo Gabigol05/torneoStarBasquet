@@ -670,6 +670,11 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   // cambiaba de fecha; solo se podía fijar al crearlo la primera vez.
   const [editandoFechaId, setEditandoFechaId] = useState(null);
   const [fechaEditForm, setFechaEditForm] = useState({ numero:'', descripcion:'', fecha_dia:'' });
+  // Mismo aviso que ya tiene UploadHistory.jsx tras borrar una carga — acá
+  // faltaba: borrar un partido desde esta pantalla deja los promedios
+  // agregados desactualizados hasta que alguien se acuerde de ir a
+  // "Recalcular Stats", y antes no había ningún recordatorio de eso.
+  const [justDeleted, setJustDeleted] = useState(false);
   // Historial de ediciones por partido — se carga bajo demanda (recién al
   // abrirlo la primera vez) para no pegarle una consulta extra a la base por
   // cada partido de la lista si nadie mira el historial.
@@ -737,13 +742,15 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   // temporada "pertenecen" — se muestran como pendientes de asignar.
   const loadAll = async () => {
     if (!temporadaActivaId) { setPartidos([]); setFechas([]); return; }
-    const { data: fs } = await supabase
+    const { data: fs, error: fsErr } = await supabase
       .from(tablas.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true });
+    if (fsErr) { flash(`❌ No se pudieron traer las fechas: ${fsErr.message}`, false); return; }
     const fechaIds = (fs ?? []).map(f => f.id);
-    const [{ data: psConFecha }, { data: psSinFecha }] = await Promise.all([
+    const [{ data: psConFecha, error: pErr1 }, { data: psSinFecha, error: pErr2 }] = await Promise.all([
       fechaIds.length ? supabase.from(tablas.partidos).select('*').in('fecha_id', fechaIds) : Promise.resolve({ data: [] }),
       supabase.from(tablas.partidos).select('*').is('fecha_id', null),
     ]);
+    if (pErr1 || pErr2) { flash(`❌ No se pudieron traer los partidos: ${(pErr1 ?? pErr2).message}`, false); return; }
     const ps = [...(psConFecha ?? []), ...(psSinFecha ?? [])].sort((a, b) => (a.fecha_id ?? Infinity) - (b.fecha_id ?? Infinity));
     setPartidos(ps);
     setFechas(fs ?? []);
@@ -850,11 +857,13 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
     if (statsErr) { flash(`Error borrando stats: ${statsErr.message}`, false); return; }
     const { error } = await supabase.from(tablas.partidos).delete().eq('id',id);
     if (error) { flash(`Error: ${error.message}`, false); return; }
+    setJustDeleted(true);
     await loadAll(); flash('✅ Eliminado');
   };
 
   const handleEstado = async (id, estado) => {
-    await supabase.from(tablas.partidos).update({ estado }).eq('id',id);
+    const { error } = await supabase.from(tablas.partidos).update({ estado }).eq('id',id);
+    if (error) { flash(`❌ No se pudo cambiar el estado: ${error.message}`, false); return; }
     await loadAll();
   };
 
@@ -892,6 +901,16 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           color:msg.ok?'#22D07A':'#F04060',
           border:`1px solid ${msg.ok?'rgba(34,208,122,.3)':'rgba(240,64,96,.3)'}` }}>
           {msg.text}
+        </div>
+      )}
+
+      {justDeleted && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, padding:'10px 14px',
+          borderRadius:8, background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.35)',
+          color:'#F0B429', fontSize:13 }}>
+          ⚠️ Borraste un partido — los promedios pueden haber quedado desactualizados.
+          Andá a <b>Recalcular Stats</b> para dejarlos al día.
+          <button onClick={() => setJustDeleted(false)} style={{ marginLeft:'auto', background:'transparent', border:'none', color:'#F0B429', cursor:'pointer', fontSize:14, flexShrink:0 }}>✕</button>
         </div>
       )}
 

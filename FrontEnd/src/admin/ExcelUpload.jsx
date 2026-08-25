@@ -93,7 +93,14 @@ const aliasesCache = { femenino: null, masculino: null };
 
 async function cargarAliases(categoria, tablas) {
   if (aliasesCache[categoria]) return aliasesCache[categoria];
-  const { data } = await supabase.from(tablas.aliases).select('*');
+  const { data, error } = await supabase.from(tablas.aliases).select('*');
+  if (error) {
+    // No cachear un fallo — si se cachea un [] acá, el resto de la sesión
+    // queda "sin aliases" sin ninguna pista de que en realidad la consulta
+    // falló (antes esto se ignoraba en silencio).
+    console.warn(`[cargarAliases] ${categoria}:`, error.message);
+    return [];
+  }
   aliasesCache[categoria] = data ?? [];
   return aliasesCache[categoria];
 }
@@ -186,14 +193,20 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
 }
 
 // ─── Guardar alias nuevo si es un match fuzzy confirmado ─────────────────────
+// Devuelve el error (o null) en vez de tragárselo — antes un fallo acá era
+// invisible: el partido se publicaba igual, pero el alias nunca quedaba
+// guardado y el mismo nombre volvía a pedir revisión cada semana sin ninguna
+// pista de por qué "no aprendía".
 async function guardarAlias(alias, jugadoraId, equipoId, ctx) {
   const { categoria, tablas } = ctx;
   const aliasNorm = normStr(alias);
-  await supabase.from(tablas.aliases).upsert({
+  const { error } = await supabase.from(tablas.aliases).upsert({
     alias, alias_norm: aliasNorm, [tablas.jugadorIdField]: jugadoraId,
     equipo_id: equipoId, confirmado: true,
   }, { onConflict: 'alias_norm,equipo_id', ignoreDuplicates: true });
+  if (error) return error;
   aliasesCache[categoria] = null; // invalidar cache
+  return null;
 }
 
 // ─── Índices exactos de columnas ──────────────────────────────────────────────
@@ -580,7 +593,8 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
       } else {
         const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
         if (dupe) {
-          await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
+          const { error: delErr } = await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
+          if (delErr) throw new Error(`No se pudo borrar el partido anterior (ID ${dupe.id}) antes de sobreescribir: ${delErr.message}`);
           addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
         }
       }
@@ -725,17 +739,21 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           const unaSolaPalabra = normStr(j.nombreRaw).split(' ').filter(Boolean).length <= 1;
           return !(j.wasAmbiguous && unaSolaPalabra);
         });
+        let aliasesFallidos = 0;
         for (const j of fuzzyMatches) {
-          await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
+          const errAlias = await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
+          if (errAlias) aliasesFallidos++;
         }
-        if (fuzzyMatches.length>0) addLog(`💾 ${fuzzyMatches.length} aliases guardados para futuras cargas`);
+        if (fuzzyMatches.length - aliasesFallidos > 0) addLog(`💾 ${fuzzyMatches.length - aliasesFallidos} aliases guardados para futuras cargas`);
+        if (aliasesFallidos > 0) addLog(`⚠️ ${aliasesFallidos} alias no se pudo guardar — esos nombres van a volver a pedir revisión la próxima carga.`);
 
         // MVP
         const mvp = statsRows.reduce((b,r) => !b||r.val>b.val?r:b, null);
         if (mvp) {
-          await supabase.from(tablas.partidos).update({ [tablas.mvpField]: mvp[tablas.jugadorIdField] }).eq('id',pd.id);
+          const { error: mvpErr } = await supabase.from(tablas.partidos).update({ [tablas.mvpField]: mvp[tablas.jugadorIdField] }).eq('id',pd.id);
           const mvpNombre = jugOk.find(j=>j.jugadora?.id===mvp[tablas.jugadorIdField])?.jugadora?.nombre??'';
-          addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
+          if (mvpErr) addLog(`⚠️ No se pudo guardar el MVP (${mvpNombre}): ${mvpErr.message}`);
+          else addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
         }
 
         addLog('🔄 Recalculando promedios...');
@@ -743,13 +761,23 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         addLog('✅ Promedios actualizados');
       }
 
-      // Log de carga
-      await supabase.from(tablas.uploadLog).insert({
+      // Log de carga — esto NO afecta el partido/stats ya publicados (esos ya
+      // están guardados y en vivo en el sitio), solo el registro que se ve en
+      // "Historial de cargas". Antes un fallo acá era invisible: el partido
+      // quedaba publicado bien pero jamás aparecía en el Historial, sin
+      // ningún aviso — exactamente el síntoma reportado con la fecha 1 de
+      // masculino.
+      const { error: logErr } = await supabase.from(tablas.uploadLog).insert({
         fecha_id:fd.id, partido_id:pd.id, archivo_nombre:fileName,
         equipo_local:parsed.equipoLocal, equipo_visit:parsed.equipoVisit,
         jugadoras_ok:jugOk.length, jugadoras_skip:jugSkip.length,
         warnings:[...(parsed.warnings??[]), ...jugSkip.map(j=>`Sin resolver: "${j.nombreRaw}"`)],
       });
+      if (logErr) {
+        addLog(`⚠️ El partido se publicó bien, pero no quedó registrado en "Historial de cargas": ${logErr.message}`);
+      } else {
+        addLog('📁 Carga registrada en Historial');
+      }
 
       addLog('🎉 ¡Publicado! El sitio ya está actualizado.');
       setStep('listo');

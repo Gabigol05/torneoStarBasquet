@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { TABLAS, CategoriaToggle } from './categoriaAdmin';
+import { TABLAS } from './categoriaAdmin';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { labelFecha, esPartidoPlayoff, labelInstanciaCorta } from '../lib/fechaLabel';
@@ -373,10 +373,20 @@ function ResumenSemanalBanner({ resumen, onNavigate }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ irACargarPartido, onNavigate }) {
+// El selector femenino/masculino ahora es UNO SOLO, compartido con el resto
+// del panel (lo maneja AdminPanel y se recibe acá por prop, igual que en
+// StatsEditor/PartidosManager/etc.) — antes Resumen tenía TRES toggles
+// sueltos y parcialmente redundantes (uno para "Avance", otro para
+// "Líderes" — que en realidad ya compartían el mismo estado — y otro más
+// para "Fixture completo"), lo que hacía fácil terminar mirando datos de
+// una categoría en una tarjeta y de la otra en la de al lado sin darse
+// cuenta. Con un solo selector arriba de todo, las tres secciones siempre
+// muestran la misma categoría entre sí.
+export default function Dashboard({ irACargarPartido, onNavigate, categoria: categoriaProp, setCategoria: setCategoriaProp }) {
   const [loading, setLoading] = useState(true);
-  const [categoriaLeaders, setCategoriaLeaders] = useState('femenino');
-  const [categoriaFixture, setCategoriaFixture] = useState('femenino');
+  const [categoriaLocal, setCategoriaLocal] = useState('femenino');
+  const categoria    = categoriaProp ?? categoriaLocal;
+  const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const [expanded, setExpanded] = useState({});
 
   const [kpis, setKpis] = useState({ jugados:0, pendientes:0, proximo:null, encuesta:null });
@@ -391,42 +401,69 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
   const [resumenSemanal, setResumenSemanal] = useState(null);
   const { temporadaActivaId, temporadas, loading: temporadaLoading } = useTemporada();
   const temporadaActiva = temporadas.find(t => t.id === temporadaActivaId);
+  // Qué temporada está mirando el resumen — arranca en la activa, pero el
+  // dueño puede elegir ver el resumen de una temporada archivada sin que eso
+  // mezcle nada (todo el fetch de abajo se re-scopea a esta, no a la activa).
+  // Si por algún motivo no hay ninguna marcada como activa, cae en la más
+  // reciente en vez de bloquear todo el resumen.
+  const [temporadaVerId, setTemporadaVerId] = useState(null);
+  // Si alguna de las consultas de este resumen falla (RLS, red, lo que sea),
+  // se muestra acá en vez de dejar todo en cero sin explicación.
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
-    // Todavía no resolvió cuál es la temporada activa (TemporadaContext
-    // sigue cargando) — esperar antes de pedir datos, para no traer "todo"
-    // sin filtro por un instante y mezclar temporadas en la primera pintada.
-    if (!temporadaActivaId) return;
+    if (temporadaVerId != null) return;
+    if (temporadaActivaId != null) { setTemporadaVerId(temporadaActivaId); return; }
+    if (temporadas.length > 0) {
+      const masReciente = [...temporadas].sort((a, b) => b.id - a.id)[0];
+      setTemporadaVerId(masReciente.id);
+    }
+  }, [temporadaActivaId, temporadas, temporadaVerId]);
+
+  useEffect(() => {
+    // Todavía no se resolvió qué temporada mirar — esperar antes de pedir
+    // datos, para no traer "todo" sin filtro por un instante y mezclar
+    // temporadas en la primera pintada.
+    if (!temporadaVerId) return;
     let cancelado = false;
     (async () => {
       setLoading(true);
+      setFetchError(null);
       try {
         // 1. Fechas de la temporada ACTIVA únicamente — todo lo demás se
         // filtra a partir de estos ids, porque partidos_X no tiene
         // temporada_id propio (solo lo tiene fechas_X).
-        const [{ data: ff }, { data: fm }] = await Promise.all([
-          supabase.from(TABLAS.femenino.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true }),
-          supabase.from(TABLAS.masculino.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true }),
+        const [{ data: ff, error: ffErr }, { data: fm, error: fmErr }] = await Promise.all([
+          supabase.from(TABLAS.femenino.fechas).select('*').eq('temporada_id', temporadaVerId).order('numero', { ascending:true }),
+          supabase.from(TABLAS.masculino.fechas).select('*').eq('temporada_id', temporadaVerId).order('numero', { ascending:true }),
         ]);
         if (cancelado) return;
+        // Acá antes se ignoraba `error` por completo — si cualquiera de las
+        // ~15 consultas de este resumen fallaba (ej: falta de permiso RLS,
+        // como pasó hoy con "temporadas"), el resumen entero se quedaba
+        // "quieto" mostrando ceros en todo, sin ninguna pista de que en
+        // realidad no se pudo traer nada.
+        if (ffErr || fmErr) throw new Error((ffErr ?? fmErr).message);
         const fechaIdsFem = (ff ?? []).map(f => f.id);
         const fechaIdsMasc = (fm ?? []).map(f => f.id);
 
         const [
-          { data: pf }, { data: pm },
-          { data: sf }, { data: sm },
-          { data: jf }, { data: jm },
+          { data: pf, error: pfErr }, { data: pm, error: pmErr },
+          { data: sf, error: sfErr }, { data: sm, error: smErr },
+          { data: jf, error: jfErr }, { data: jm, error: jmErr },
           { data: encAct },
         ] = await Promise.all([
           fechaIdsFem.length  ? supabase.from(TABLAS.femenino.partidos).select('*').in('fecha_id', fechaIdsFem)   : Promise.resolve({ data: [] }),
           fechaIdsMasc.length ? supabase.from(TABLAS.masculino.partidos).select('*').in('fecha_id', fechaIdsMasc) : Promise.resolve({ data: [] }),
-          supabase.from(TABLAS.femenino.estadisticas).select('*').eq('temporada_id', temporadaActivaId),
-          supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaActivaId),
+          supabase.from(TABLAS.femenino.estadisticas).select('*').eq('temporada_id', temporadaVerId),
+          supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaVerId),
           supabase.from(TABLAS.femenino.jugadores).select('id,nombre,equipo_id'),
           supabase.from(TABLAS.masculino.jugadores).select('id,nombre,equipo_id'),
           supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending:false }).limit(1),
         ]);
         if (cancelado) return;
+        const primerError = pfErr ?? pmErr ?? sfErr ?? smErr ?? jfErr ?? jmErr;
+        if (primerError) throw new Error(primerError.message);
 
         const partidos = [
           ...(pf ?? []).map(p => ({ ...p, categoria:'femenino' })),
@@ -557,12 +594,14 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
           femenino: buildExtra(partidos.filter(p => p.categoria === 'femenino'), buildFechaMap(ff)),
           masculino: buildExtra(partidos.filter(p => p.categoria === 'masculino'), buildFechaMap(fm)),
         });
+      } catch (err) {
+        if (!cancelado) setFetchError(err.message);
       } finally {
         if (!cancelado) setLoading(false);
       }
     })();
     return () => { cancelado = true; };
-  }, [temporadaActivaId]);
+  }, [temporadaVerId]);
 
   const totalPartidos = kpis.jugados + kpis.pendientes;
   const avancePct = totalPartidos ? Math.round((kpis.jugados / totalPartidos) * 100) : 0;
@@ -575,20 +614,52 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
     return `${eqL.nombre} vs ${eqV.nombre}`;
   }, [kpis.proximo]);
 
-  if (temporadaLoading || (loading && temporadaActivaId)) {
+  if (temporadaLoading || (loading && temporadaVerId)) {
     return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando resumen…</div>;
   }
-  if (!temporadaActivaId) {
-    return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>No hay ninguna temporada activa todavía — creá una desde "Temporadas" en Herramientas.</div>;
+  if (temporadas.length === 0) {
+    return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Todavía no hay ninguna temporada creada — creá una desde "Temporadas" en Herramientas.</div>;
   }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
-      {temporadaActiva && (
-        <div style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}>
-          🏆 Mostrando <strong style={{ color:'#8899BB' }}>{temporadaActiva.nombre}</strong> (temporada activa)
+      {fetchError && (
+        <div style={{
+          padding:'12px 16px', borderRadius:10, background:'rgba(240,64,96,.08)',
+          border:'1px solid rgba(240,64,96,.3)', color:'#F04060', fontSize:13, lineHeight:1.5,
+        }}>
+          ⚠️ No se pudo traer parte de la información del resumen: {fetchError}
+          <br/>Los números de abajo pueden estar incompletos — refrescá la página o avisá si sigue pasando.
         </div>
       )}
+      {/* Selector de temporada — el resumen se puede mirar por temporada
+          separada (la en curso u otra archivada), así nunca se mezclan
+          números de una con otra. */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <span style={{ fontSize:12, color:'#4A566E' }}>🏆 Viendo resumen de:</span>
+        <select
+          value={temporadaVerId ?? ''}
+          onChange={e => setTemporadaVerId(Number(e.target.value))}
+          style={{
+            padding:'7px 12px', borderRadius:9, border:'1px solid #1C2535', background:'#0E1420',
+            color:'#EEF2F8', fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", outline:'none', cursor:'pointer',
+          }}>
+          {[...temporadas].sort((a, b) => b.id - a.id).map(t => (
+            <option key={t.id} value={t.id}>
+              {t.nombre}{t.id === temporadaActivaId ? ' · en curso' : ' · archivada'}
+            </option>
+          ))}
+        </select>
+        {temporadaVerId != null && temporadaVerId !== temporadaActivaId && (
+          <span style={{
+            fontSize:10.5, fontWeight:700, letterSpacing:.5, color:'#8899BB',
+            background:'rgba(136,153,187,.1)', border:'1px solid #1C2535',
+            padding:'4px 10px', borderRadius:100, textTransform:'uppercase',
+          }}>
+            📁 Archivada — solo consulta
+          </span>
+        )}
+      </div>
 
       {/* Resumen semanal */}
       <ResumenSemanalBanner resumen={resumenSemanal} onNavigate={onNavigate}/>
@@ -610,23 +681,21 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
       <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Avance del fixture</div>
-          <CategoriaToggle categoria={categoriaLeaders} setCategoria={setCategoriaLeaders} />
         </div>
-        <AvanceSection puntos={chart[categoriaLeaders]} extra={extra[categoriaLeaders]} />
+        <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
       </div>
 
       {/* Lideres */}
       <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>
-            Líderes {categoriaLeaders === 'femenino' ? 'femenino' : 'masculino'}
+            Líderes {categoria === 'femenino' ? 'femenino' : 'masculino'}
           </div>
-          <CategoriaToggle categoria={categoriaLeaders} setCategoria={setCategoriaLeaders} />
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:16 }}>
           {STAT_COLS.map(col => {
-            const key = `${categoriaLeaders}-${col.key}`;
-            const lista = leaders[categoriaLeaders][col.key] ?? [];
+            const key = `${categoria}-${col.key}`;
+            const lista = leaders[categoria][col.key] ?? [];
             const abierto = !!expanded[key];
             const visibles = abierto ? lista.slice(0, 20) : lista.slice(0, TOP_N_DEFAULT);
             return (
@@ -655,7 +724,6 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Fixture completo</div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <CategoriaToggle categoria={categoriaFixture} setCategoria={setCategoriaFixture} />
             {irACargarPartido && (
               <button onClick={irACargarPartido} style={{
                 display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:8, cursor:'pointer',
@@ -668,10 +736,10 @@ export default function Dashboard({ irACargarPartido, onNavigate }) {
           </div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:18, maxHeight:520, overflowY:'auto', paddingRight:4 }}>
-          {fixture[categoriaFixture].length === 0 && (
+          {fixture[categoria].length === 0 && (
             <div style={{ color:'#2C3A52', fontSize:13, textAlign:'center', padding:'20px 0' }}>Todavía no hay fechas cargadas.</div>
           )}
-          {fixture[categoriaFixture].map(f => (
+          {fixture[categoria].map(f => (
             <div key={f.id}>
               <div style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, color:'#F0B429', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8, textTransform:'uppercase' }}>
                 {f.label}

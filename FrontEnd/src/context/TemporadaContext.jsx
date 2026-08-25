@@ -15,6 +15,7 @@ const FALLBACK = {
   temporadaSeleccionada: null,
   esTemporadaActiva: true,
   crearTemporada: async () => { throw new Error('TemporadaProvider no está montado'); },
+  activarTemporada: async () => { throw new Error('TemporadaProvider no está montado'); },
   loading: false,
   refetch: async () => {},
 };
@@ -83,6 +84,19 @@ export function TemporadaProvider({ children }) {
     return nuevaId;
   }, [cargar]);
 
+  // Reactiva una temporada ya existente (por ejemplo una archivada por error,
+  // o para "volver" a una temporada anterior). Antes la ÚNICA forma de dejar
+  // algo como activo era crear una temporada nueva — no había vuelta atrás
+  // si alguien archivaba la que no era. Usa fn_activar_temporada, que en un
+  // solo paso desactiva la que estaba activa y activa la elegida (ver
+  // fn_activar_temporada.sql).
+  const activarTemporada = useCallback(async (id) => {
+    if (!isConfigured) throw new Error('Supabase no está configurado');
+    const { error } = await supabase.rpc('fn_activar_temporada', { p_id: id });
+    if (error) throw error;
+    await cargar();
+  }, [cargar]);
+
   const temporadaSeleccionada = temporadas.find(t => t.id === temporadaSeleccionadaId) ?? null;
   const esTemporadaActiva = temporadaActivaId == null || temporadaSeleccionadaId === temporadaActivaId;
 
@@ -95,6 +109,7 @@ export function TemporadaProvider({ children }) {
       temporadaSeleccionada,
       esTemporadaActiva,
       crearTemporada,
+      activarTemporada,
       loading,
       refetch: cargar,
     }}>

@@ -7,12 +7,16 @@ import { useTemporada } from '../context/TemporadaContext';
 // caer en la temporada nueva, dejando la anterior tal cual quedó, visible
 // pero congelada. Por eso pide confirmación explícita antes de crearla.
 export default function TemporadasManager() {
-  const { temporadas, temporadaActivaId, crearTemporada, loading, refetch } = useTemporada();
+  const { temporadas, temporadaActivaId, crearTemporada, activarTemporada, loading, refetch } = useTemporada();
   const [creando,  setCreando]  = useState(false);
   const [nombre,   setNombre]   = useState('');
   const [confirmando, setConfirmando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState(null);
+  // Reactivar una temporada archivada — pide confirmación (mismo criterio que
+  // crear: es un cambio grande, deja la que estaba activa como archivada).
+  const [activandoId, setActivandoId] = useState(null);
+  const [guardandoActivar, setGuardandoActivar] = useState(false);
 
   const flash = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 4000); };
 
@@ -40,6 +44,20 @@ export default function TemporadasManager() {
   };
 
   const activa = temporadas.find(t => t.id === temporadaActivaId);
+
+  const handleActivar = async (t) => {
+    if (activandoId !== t.id) { setActivandoId(t.id); return; }
+    setGuardandoActivar(true);
+    try {
+      await activarTemporada(t.id);
+      flash(`✅ "${t.nombre}" reactivada — ahora es la temporada en curso`);
+      setActivandoId(null);
+    } catch (err) {
+      flash(`❌ ${err.message}`, false);
+    } finally {
+      setGuardandoActivar(false);
+    }
+  };
 
   return (
     <div>
@@ -150,14 +168,41 @@ export default function TemporadasManager() {
                 }}>
                   ● En curso — acá cae lo que cargues
                 </span>
+              ) : activandoId === t.id ? (
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                  <span style={{ fontSize:11.5, color:'#F04060', maxWidth:260, textAlign:'right' }}>
+                    ⚠️ "{activa?.nombre ?? 'la actual'}" queda archivada. ¿Confirmás?
+                  </span>
+                  <button onClick={() => handleActivar(t)} disabled={guardandoActivar} style={{
+                    padding:'6px 14px', borderRadius:100, border:'none', cursor:'pointer',
+                    background:'#F04060', color:'#fff', fontSize:11, fontWeight:700, letterSpacing:.5,
+                    opacity: guardandoActivar ? 0.6 : 1,
+                  }}>
+                    {guardandoActivar ? 'Activando...' : 'SÍ, ACTIVAR'}
+                  </button>
+                  <button onClick={() => setActivandoId(null)} style={{
+                    padding:'6px 12px', borderRadius:100, border:'1px solid #1C2535', cursor:'pointer',
+                    background:'transparent', color:'#8899BB', fontSize:11,
+                  }}>
+                    Cancelar
+                  </button>
+                </div>
               ) : (
-                <span style={{
-                  fontSize:11, fontWeight:700, letterSpacing:1, color:'#8899BB',
-                  background:'rgba(136,153,187,.1)', border:'1px solid #1C2535',
-                  padding:'4px 12px', borderRadius:100, textTransform:'uppercase',
-                }}>
-                  📁 Archivada
-                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{
+                    fontSize:11, fontWeight:700, letterSpacing:1, color:'#8899BB',
+                    background:'rgba(136,153,187,.1)', border:'1px solid #1C2535',
+                    padding:'4px 12px', borderRadius:100, textTransform:'uppercase',
+                  }}>
+                    📁 Archivada
+                  </span>
+                  <button onClick={() => handleActivar(t)} title="Volver a activar esta temporada" style={{
+                    padding:'4px 12px', borderRadius:100, border:'1px solid rgba(240,180,41,.35)', cursor:'pointer',
+                    background:'rgba(240,180,41,.08)', color:'#F0B429', fontSize:11, fontWeight:700, letterSpacing:.5,
+                  }}>
+                    ▶ Activar
+                  </button>
+                </div>
               )}
             </div>
           ))}

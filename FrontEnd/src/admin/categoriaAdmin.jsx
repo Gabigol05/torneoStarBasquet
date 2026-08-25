@@ -60,22 +60,36 @@ export async function sugerirEncuestaQuienGana({ categoria, partidoId, equipoLoc
   return enc.id;
 }
 
+// Selector femenino/masculino compartido por TODO el panel — un solo lugar
+// para tocar el estilo en vez de que cada sección tenga el suyo (antes
+// Resumen tenía tres sueltos, ver Dashboard.jsx). El resaltado con sombra en
+// la opción activa es a propósito: con los dos colores tan parecidos en
+// tamaño/forma, de un vistazo rápido hay que poder distinguir cuál está
+// elegida sin tener que leer el texto.
 export function CategoriaToggle({ categoria, setCategoria }) {
+  const COLOR = { femenino: '#E8187A', masculino: '#1878E8' };
   return (
-    <div style={{ display: 'flex', gap: 6, marginBottom: 20, background: '#0E1420', border: '1px solid #1C2535', borderRadius: 10, padding: 4, width: 'fit-content' }}>
-      {['femenino', 'masculino'].map(c => (
-        <button key={c} onClick={() => setCategoria(c)}
-          style={{
-            padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 1,
-            textTransform: 'uppercase',
-            background: categoria === c ? (c === 'femenino' ? '#E8187A' : '#1878E8') : 'transparent',
-            color: categoria === c ? '#fff' : '#6B7A99',
-            transition: 'all .15s',
-          }}>
-          {c === 'femenino' ? '♀ Femenino' : '♂ Masculino'}
-        </button>
-      ))}
+    <div style={{ display: 'flex', gap: 5, background: '#0E1420', border: '1px solid #1C2535', borderRadius: 11, padding: 4, width: 'fit-content' }}>
+      {['femenino', 'masculino'].map(c => {
+        const activo = categoria === c;
+        return (
+          <button key={c} onClick={() => setCategoria(c)} aria-pressed={activo}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+              border: activo ? `1px solid ${COLOR[c]}` : '1px solid transparent',
+              fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 1,
+              textTransform: 'uppercase',
+              background: activo ? COLOR[c] : 'transparent',
+              color: activo ? '#fff' : '#6B7A99',
+              boxShadow: activo ? `0 2px 12px ${COLOR[c]}55` : 'none',
+              transition: 'background .15s, box-shadow .15s, color .15s',
+            }}>
+            <span style={{ fontSize: 14 }}>{c === 'femenino' ? '♀' : '♂'}</span>
+            {c === 'femenino' ? 'Femenino' : 'Masculino'}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -195,7 +195,8 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
     if (!equipoId || !temporadaActivaId) return;
     setEdited({});
     (async () => {
-      const { data } = await supabase.from(tablas.jugadores).select('*').eq('equipo_id', equipoId);
+      const { data, error } = await supabase.from(tablas.jugadores).select('*').eq('equipo_id', equipoId);
+      if (error) { flash(`❌ No se pudo traer el plantel: ${error.message}`, false); setRosterDb([]); return; }
       const jugadoras = (data ?? []).map(j => ({ id: j.id, nombre: j.nombre, fechaNac: j.fecha_nac, numero: j.numero }));
       setRosterDb(jugadoras);
       await loadStats(jugadoras);
@@ -213,7 +214,12 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
       .select('*')
       .in(tablas.jugadorIdField, ids)
       .eq('temporada_id', temporadaActivaId);
-    if (!error) {
+    if (error) {
+      // Antes esto quedaba en silencio total (ni siquiera un console.log) —
+      // la tabla se veía "sin estadísticas" para todo el equipo, igual que
+      // si de verdad nadie tuviera stats cargadas todavía.
+      flash(`❌ No se pudieron traer las estadísticas: ${error.message}`, false);
+    } else {
       const map = {};
       for (const row of data ?? []) map[row[tablas.jugadorIdField]] = row;
       setStatsMap(map);
@@ -261,8 +267,9 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
   const handleReset = async (jugId) => {
     if (!(await confirm('¿Borrar las estadísticas de esta jugadora en la temporada actual? (No toca temporadas anteriores)'))) return;
-    await supabase.from(tablas.estadisticas).delete()
+    const { error } = await supabase.from(tablas.estadisticas).delete()
       .eq(tablas.jugadorIdField, jugId).eq('temporada_id', temporadaActivaId);
+    if (error) { flash(`❌ No se pudo resetear: ${error.message}`, false); return; }
     await loadStats();
     flash('✅ Stats reseteadas');
   };

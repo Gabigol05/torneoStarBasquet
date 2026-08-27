@@ -98,12 +98,20 @@ function buildExtra(partidosCat, fechaMap) {
   const jugados = partidosCat.filter(p => p.estado === 'finalizado').length;
   const pctTotal = total ? (jugados / total) * 100 : 0;
 
+  // `total`/`jugados` por semana (antes solo se guardaba un conteo único,
+  // que además nunca se llegó a usar en ningún lado) — ahora alimenta el
+  // gráfico de tendencia semanal de más abajo, con las dos series que
+  // importan: cuánto había programado vs. cuánto se terminó jugando.
   const semanas = {};
   for (const p of conFecha) {
     const wk = lunesDeSemana(p.effDate);
-    semanas[wk] = (semanas[wk] ?? 0) + 1;
+    if (!semanas[wk]) semanas[wk] = { total: 0, jugados: 0 };
+    semanas[wk].total++;
+    if (p.estado === 'finalizado') semanas[wk].jugados++;
   }
-  const porSemana = Object.keys(semanas).sort().map(wk => ({ wk, count: semanas[wk] })).slice(-8);
+  const porSemana = Object.keys(semanas).sort()
+    .map(wk => ({ wk, total: semanas[wk].total, jugados: semanas[wk].jugados }))
+    .slice(-8);
 
   const porDia = new Array(7).fill(0);
   for (const p of conFecha) porDia[new Date(`${p.effDate}T00:00:00`).getDay()]++;
@@ -375,6 +383,76 @@ function MiniMultiChart({ extra }) {
         </div>
       </div>
       <PunchCard matriz={matrizActividad}/>
+    </div>
+  );
+}
+
+// Gráfico de tendencia semanal (línea con resplandor dorado + área debajo) —
+// pieza pedida como referencia directa de un dashboard que le gustó a
+// Alvaro. Usa `porSemana` (ya calculado en buildExtra, ver arriba) que hasta
+// ahora se calculaba pero no se mostraba en ningún lado: cuántos partidos
+// hubo programados vs. cuántos se terminaron jugando, semana a semana.
+// Solo se muestra en desktop (ver .dash-trend-panel en torneo-star.css) —
+// no es parte del celular, que ya estaba bien como estaba.
+function TrendChart({ data }) {
+  const [hover, setHover] = useState(null);
+  if (!data || data.length < 2) {
+    return <div style={{ color:'#4A566E', fontSize:13, padding:'30px 0', textAlign:'center' }}>Todavía no hay suficientes semanas cargadas para ver una tendencia.</div>;
+  }
+  const W = 640, H = 190, PAD_L = 6, PAD_R = 6, PAD_T = 18, PAD_B = 24;
+  const innerW = W - PAD_L - PAD_R, innerH = H - PAD_T - PAD_B;
+  const maxVal = Math.max(1, ...data.map(d => d.total));
+  const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
+  const xFor = i => PAD_L + i * stepX;
+  const yFor = v => PAD_T + (1 - v / maxVal) * innerH;
+  const pathFor = key => data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(d[key]).toFixed(1)}`).join(' ');
+  const lineTotal = pathFor('total');
+  const lineJugados = pathFor('jugados');
+  const areaJugados = `${lineJugados} L ${xFor(data.length - 1).toFixed(1)} ${(H - PAD_B).toFixed(1)} L ${xFor(0).toFixed(1)} ${(H - PAD_B).toFixed(1)} Z`;
+
+  return (
+    <div style={{ position:'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display:'block', overflow:'visible' }}>
+        <defs>
+          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#F0B429" stopOpacity=".35"/>
+            <stop offset="100%" stopColor="#F0B429" stopOpacity="0"/>
+          </linearGradient>
+          <filter id="trendGlow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="3.2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        {[0.25, 0.5, 0.75].map(f => (
+          <line key={f} x1={PAD_L} x2={W - PAD_R} y1={PAD_T + f * innerH} y2={PAD_T + f * innerH} stroke="#1C2535" strokeWidth="1"/>
+        ))}
+        <path d={areaJugados} fill="url(#trendFill)" stroke="none"/>
+        <path d={lineTotal} fill="none" stroke="#2C3A52" strokeWidth="1.5" strokeDasharray="4 4" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d={lineJugados} fill="none" stroke="#F0B429" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#trendGlow)"/>
+        {data.map((d, i) => (
+          <g key={d.wk} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor:'pointer' }}>
+            <rect x={xFor(i) - stepX / 2} y={0} width={stepX || W} height={H} fill="transparent"/>
+            <circle cx={xFor(i)} cy={yFor(d.jugados)} r={hover === i ? 5.5 : 3.5} fill={hover === i ? '#FFD166' : '#F0B429'} stroke="#0B111C" strokeWidth="1.5"/>
+            <text x={xFor(i)} y={H - 6} textAnchor="middle" fontSize="9.5" fill="#4A566E" fontFamily="'Barlow Condensed',sans-serif">{fmtSemana(d.wk)}</text>
+          </g>
+        ))}
+      </svg>
+      {hover != null && (
+        <div style={{ position:'absolute', left:`${(xFor(hover) / W) * 100}%`, top:0, transform:'translate(-50%,-8px)', pointerEvents:'none' }}>
+          <ChartTooltip left="50%">
+            <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>Semana del {fmtSemana(data[hover].wk)}</div>
+            <div style={{ color:'#8899BB' }}>{data[hover].jugados} jugados · {data[hover].total} programados</div>
+          </ChartTooltip>
+        </div>
+      )}
+      <div style={{ display:'flex', gap:14, marginTop:6, fontSize:10.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif" }}>
+        <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:14, height:3, borderRadius:2, background:'#F0B429', display:'inline-block', boxShadow:'0 0 6px #F0B429' }}/>Jugados
+        </span>
+        <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:14, height:0, borderTop:'2px dashed #3A4A66', display:'inline-block' }}/>Programados
+        </span>
+      </div>
     </div>
   );
 }
@@ -987,6 +1065,15 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           sub={kpis.encuesta?.pregunta ?? '—'} accent="#E8187A" onClick={onNavigate ? () => onNavigate('encuestas') : undefined}/>
       </div>
 
+      {/* Tendencia semanal — solo desktop (ver .dash-trend-panel), pantalla
+          angosta ya tiene suficiente información con el resto de arriba. */}
+      <div className="dash-panel dash-trend-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
+        <div className="dash-section-title" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8', marginBottom:14 }}>
+          Partidos por semana
+        </div>
+        <TrendChart data={extra[categoria]?.porSemana}/>
+      </div>
+
       {/* Avance por fecha + columna lateral (Alertas / Esta semana) */}
       <div className="dash-side-grid">
         <div className="dash-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px', minWidth:0 }}>
@@ -1115,11 +1202,11 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
               <div style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, color:'#F0B429', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8, textTransform:'uppercase' }}>
                 {f.label}
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div className="dash-fixture-partidos" style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {f.partidos.map(p => {
                   const jugado = p.estado === 'finalizado';
                   return (
-                    <div key={p.id} style={{
+                    <div key={p.id} className="dash-match-row" style={{
                       display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:9,
                       background:`linear-gradient(115deg, ${p.local.color}22, #0E1420 45%, ${p.visit.color}22)`, border:'1px solid #1C2535',
                     }}>

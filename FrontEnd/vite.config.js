@@ -34,6 +34,7 @@ export default defineConfig({
         // cada vez que cambia código de la app (mejor cacheo entre deploys).
         manualChunks: {
           xlsx: ['xlsx'],
+          three: ['three'],
         },
       },
     },

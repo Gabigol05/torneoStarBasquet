@@ -336,6 +336,18 @@ export default function AdminPanel() {
         @media(min-width:821px){
           [data-admin-mobilebar]{display:none!important}
         }
+        /* El panel quedaba clavado en 1200px de ancho incluso en un monitor
+           de escritorio grande — ahí es donde termina sobrando un montón de
+           espacio vacío a los costados por más que las tarjetas de adentro
+           se agranden (ver torneo-star.css). Esto libera ese ancho a partir
+           de pantallas grandes; el celular no se toca (sigue con el mismo
+           padding/ancho de siempre). */
+        @media(min-width:1300px){
+          [data-admin-content]{max-width:1650px!important}
+        }
+        @media(min-width:1700px){
+          [data-admin-content]{max-width:min(1950px,94vw)!important}
+        }
       `}</style>
 
       {/* Top bar desktop */}

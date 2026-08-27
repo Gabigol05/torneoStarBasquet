@@ -135,8 +135,10 @@ function buildExtra(partidosCat, fechaMap) {
   const lunesAnteriorD = new Date(`${lunesActual}T00:00:00`);
   lunesAnteriorD.setDate(lunesAnteriorD.getDate() - 7);
   const lunesAnterior = lunesAnteriorD.toISOString().slice(0, 10);
-  const semanaActualCount = semanas[lunesActual] ?? 0;
-  const semanaAnteriorCount = semanas[lunesAnterior] ?? 0;
+  // `semanas[wk]` ahora es un objeto { total, jugados } (antes era un número
+  // suelto) — hay que sacar `.total` en vez de usar el objeto entero acá.
+  const semanaActualCount = semanas[lunesActual]?.total ?? 0;
+  const semanaAnteriorCount = semanas[lunesAnterior]?.total ?? 0;
 
   // Mapa de actividad (Lun–Dom × últimas N semanas) para el "punch card" del
   // panel. A propósito NO asume que solo se juega sábado/domingo — el

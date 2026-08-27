@@ -5878,12 +5878,6 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   gap: 16px;
   align-items: start;
 }
-/* Gráfico de tendencia semanal — pieza nueva, solo para desktop (se activa
-   junto con el resto del mosaico grande a partir de 1300px, ver más abajo).
-   En celular no se pierde nada porque nunca estuvo ahí. */
-.dash-trend-panel {
-  display: none;
-}
 .dash-side-col {
   display: flex;
   flex-direction: column;
@@ -5893,6 +5887,109 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .dash-side-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Mosaico de KPIs del Resumen ──────────────────────────────────────────
+   Reemplaza las 5 tarjetas iguales de antes por 6/7 piezas de forma distinta
+   (aprobado por Alvaro sobre una vista previa). A diferencia del resto del
+   Resumen, ESTE bloque es mobile-first de verdad — tiene su propia versión
+   pensada para celular en vez de ocultarse hasta desktop. */
+.mosaic-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.mosaic-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.mosaic-tile {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #101826, #0B111C);
+  border: 1px solid #1C2535;
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px -30px rgba(240, 180, 41, .3);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.mosaic-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 60px -26px rgba(240, 180, 41, .4);
+}
+.mosaic-tile::before {
+  content: '';
+  position: absolute;
+  top: -50px; right: -50px;
+  width: 180px; height: 180px;
+  background: radial-gradient(circle, rgba(240, 180, 41, .14), transparent 70%);
+  pointer-events: none;
+}
+.mosaic-tile > * { position: relative; z-index: 1; }
+.mosaic-tile-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.mosaic-tile-ic { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
+.mosaic-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+
+.mosaic-hero  { border-top: 3px solid #F0B429; min-height: 230px; }
+.mosaic-gauge { border-top: 3px solid #60A5FA; flex-direction: row; align-items: center; gap: 16px; }
+.mosaic-number{ border-top: 3px solid #F0B429; }
+.mosaic-delta { border-top: 3px solid #A78BFA; }
+.mosaic-donut { border-top: 3px solid #E8187A; flex-direction: row; align-items: center; gap: 16px; }
+.mosaic-check { border-top: 3px solid #22D07A; }
+.mosaic-encuesta { border-top: 3px solid #E8187A; }
+
+.mosaic-hero-value { font-family: 'Bebas Neue', sans-serif; font-size: 14px; color: #8899BB; margin-left: auto; }
+.mosaic-hero-chart { flex: 1; min-height: 150px; }
+
+.mosaic-gauge-svg { flex-shrink: 0; width: 92px; height: 92px; }
+.mosaic-gauge-cap { font-size: 11.5px; color: #8899BB; margin-top: 2px; }
+.mosaic-gauge-sub { font-size: 10px; color: #4A566E; margin-top: 1px; }
+
+.mosaic-bignum {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(32px, 7vw, 42px); line-height: 1; margin-top: 4px;
+  background: linear-gradient(100deg, #FFD166 0%, #F0B429 55%, #FFB44D 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.mosaic-spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-top: 8px; }
+.mosaic-spark i { flex: 1; background: linear-gradient(180deg, #FFD166, #F0B429); border-radius: 2px 2px 0 0; opacity: .85; display: block; }
+.mosaic-foot { font-size: 11px; color: #8899BB; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mosaic-deltanum { font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 6vw, 34px); line-height: 1; margin-top: 4px; color: #EEF2F8; }
+.mosaic-deltatag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+.mosaic-minibars { display: flex; align-items: flex-end; gap: 4px; height: 20px; margin-top: 8px; }
+.mosaic-minibars i { flex: 1; background: #A78BFA; opacity: .35; border-radius: 2px; display: block; }
+.mosaic-minibars i.on { opacity: 1; box-shadow: 0 0 8px #A78BFA; }
+
+.mosaic-donut-svg { flex-shrink: 0; width: 88px; height: 88px; }
+.mosaic-donut-legend { font-size: 11.5px; color: #8899BB; flex: 1; }
+.mosaic-donut-legend div { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.mosaic-donut-legend b { color: #EEF2F8; font-family: 'Bebas Neue', sans-serif; font-size: 13px; margin-left: auto; }
+.mosaic-sw { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+
+.mosaic-checknum { font-family: 'Bebas Neue', sans-serif; font-size: 30px; }
+.mosaic-checkrow { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+.mosaic-checkrow span { width: 13px; height: 13px; border-radius: 3px; background: #1C2535; display: block; }
+.mosaic-checkrow span.done { background: #22D07A; box-shadow: 0 0 6px #22D07A; }
+
+/* Tablet: 2 columnas, hero/gauge ocupan las dos; los pares se "desarman"
+   (display:contents) para que cada tile chico sea su propia columna. */
+@media (min-width: 700px) {
+  .mosaic-grid { grid-template-columns: repeat(2, 1fr); }
+  .mosaic-hero, .mosaic-gauge { grid-column: span 2; }
+  .mosaic-pair { display: contents; }
+}
+
+/* Escritorio grande: el mosaico completo de piezas variadas. */
+@media (min-width: 1300px) {
+  .mosaic-grid { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 168px; gap: 16px; }
+  .mosaic-hero { grid-column: span 3; grid-row: span 2; }
+  .mosaic-gauge { grid-column: span 2; grid-row: span 2; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0; }
+  .mosaic-number, .mosaic-delta, .mosaic-check, .mosaic-encuesta { grid-column: span 1; grid-row: span 1; }
+  .mosaic-donut { grid-column: span 2; grid-row: span 1; }
 }
 .dash-tabs-scroll {
   display: flex;
@@ -5994,9 +6091,11 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
     box-shadow: 0 0 10px rgba(240,180,41,.65);
   }
 
-  /* Avance del fixture (más ancho) + Alertas + Esta semana, los tres lado a
-     lado en vez de una columna angosta apilada al costado. */
-  .dash-side-grid { grid-template-columns: 1.6fr 1fr 1fr; gap: 20px; }
+  /* Avance del fixture (más ancho) + Próximo partido + Alertas + Esta semana,
+     los cuatro lado a lado en vez de una columna angosta apilada al costado.
+     (antes eran 3 columnas — se sumó "Próximo partido" acá al mover ese tile
+     fuera del mosaico de KPIs de arriba). */
+  .dash-side-grid { grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 18px; }
   .dash-side-col { display: contents; }
 
   .dash-gauge-svg { width: 82px; height: 82px; }

@@ -97,6 +97,12 @@ function buildExtra(partidosCat, fechaMap) {
   const total = partidosCat.length;
   const jugados = partidosCat.filter(p => p.estado === 'finalizado').length;
   const pctTotal = total ? (jugados / total) * 100 : 0;
+  // Distribución para la nueva dona del mosaico: jugados / con fecha pero
+  // pendiente / sin fecha asignada todavía. `sinFecha` sale por diferencia
+  // (total - conFecha.length) para no duplicar el filtro de effDate de
+  // arriba; el resto se reparte entre jugados y pendientesConFecha.
+  const sinFecha = total - conFecha.length;
+  const distribucion = { jugados, pendientesConFecha: Math.max(0, total - jugados - sinFecha), sinFecha };
 
   // `total`/`jugados` por semana (antes solo se guardaba un conteo único,
   // que además nunca se llegó a usar en ningún lado) — ahora alimenta el
@@ -166,7 +172,7 @@ function buildExtra(partidosCat, fechaMap) {
     return { lunes, dias };
   });
 
-  return { pctTotal, jugados, total, porSemana, jugadosHoy, diaTop, quedanSemana, semanaActualCount, semanaAnteriorCount, matrizActividad };
+  return { pctTotal, jugados, total, distribucion, porSemana, jugadosHoy, diaTop, quedanSemana, semanaActualCount, semanaAnteriorCount, matrizActividad };
 }
 
 function fmtSemana(wk) {
@@ -455,6 +461,146 @@ function TrendChart({ data }) {
           <span style={{ width:14, height:0, borderTop:'2px dashed #3A4A66', display:'inline-block' }}/>Programados
         </span>
       </div>
+    </div>
+  );
+}
+
+// ── Mosaico de KPIs (reemplaza las 5 tarjetas iguales de antes) ─────────────
+// Aprobado por Alvaro a partir de una vista previa con datos de ejemplo —
+// acá van las piezas reales conectadas a los datos que ya se calculaban
+// arriba (extra[categoria], chart[categoria]). Pensado mobile-first: en
+// celular se apila en una columna (con algunos pares de a dos, ver
+// .mosaic-pair en torneo-star.css) y recién arma el mosaico grande de 6/7
+// piezas a partir de escritorio — a diferencia del resto de los cambios de
+// esta ronda, ESTE sí tiene una versión pensada para celular, porque
+// reemplaza a las tarjetas viejas en vez de sumarse al lado.
+function GaugeTile({ pctTotal, jugados, total, pendientes }) {
+  const r = 44, C = 2 * Math.PI * r;
+  const offset = C - (Math.min(100, pctTotal) / 100) * C;
+  return (
+    <div className="mosaic-tile mosaic-gauge">
+      <svg className="mosaic-gauge-svg" viewBox="0 0 108 108">
+        <circle cx="54" cy="54" r={r} fill="none" stroke="#141C2A" strokeWidth="10"/>
+        <circle cx="54" cy="54" r={r} fill="none" stroke="url(#mosaicGaugeGrad)" strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={offset} transform="rotate(-90 54 54)"/>
+        <defs><linearGradient id="mosaicGaugeGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#60A5FA"/><stop offset="100%" stopColor="#8FB9E8"/></linearGradient></defs>
+        <text x="54" y="61" textAnchor="middle" fill="#EEF2F8" fontFamily="'Bebas Neue',sans-serif" fontSize="26">{Math.round(pctTotal)}%</text>
+      </svg>
+      <div>
+        <div className="mosaic-label" style={{ color:'#60A5FA' }}>Avance del torneo</div>
+        <div className="mosaic-gauge-cap">{jugados} / {total} partidos jugados</div>
+        <div className="mosaic-gauge-sub">{pendientes} pendientes</div>
+      </div>
+    </div>
+  );
+}
+
+function NumberSparkTile({ value, weekly, thisWeek, onClick }) {
+  const max = Math.max(1, ...weekly);
+  return (
+    <div className="mosaic-tile mosaic-number" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <div className="mosaic-tile-head">
+        <div className="mosaic-tile-ic" style={{ background:'rgba(240,180,41,.18)', color:'#F0B429' }}><IconBall size={13} color="#F0B429"/></div>
+        <div className="mosaic-label" style={{ color:'#F0B429' }}>Jugados</div>
+      </div>
+      <div className="mosaic-bignum">{value}</div>
+      {weekly.length > 1 && (
+        <div className="mosaic-spark">
+          {weekly.map((v, i) => <i key={i} style={{ height:`${Math.max(8, (v / max) * 100)}%` }}/>)}
+        </div>
+      )}
+      {thisWeek != null && <div className="mosaic-foot">+{thisWeek} esta semana</div>}
+    </div>
+  );
+}
+
+function DeltaTile({ actual, anterior, weekly, onClick }) {
+  const diff = actual - anterior;
+  const max = Math.max(1, ...weekly);
+  return (
+    <div className="mosaic-tile mosaic-delta" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <div className="mosaic-tile-head">
+        <div className="mosaic-tile-ic" style={{ background:'rgba(167,139,250,.18)', color:'#A78BFA' }}><IconTrend size={13} color="#A78BFA"/></div>
+        <div className="mosaic-label" style={{ color:'#A78BFA' }}>Ritmo semanal</div>
+      </div>
+      <div className="mosaic-deltanum">{actual}</div>
+      <div className="mosaic-deltatag" style={{ color: diff === 0 ? '#8899BB' : diff > 0 ? '#22D07A' : '#E8187A' }}>
+        {diff === 0 ? 'igual que la semana pasada' : `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)} vs. semana pasada`}
+      </div>
+      {weekly.length > 1 && (
+        <div className="mosaic-minibars">
+          {weekly.map((v, i) => <i key={i} className={i === weekly.length - 1 ? 'on' : ''} style={{ height:`${Math.max(10, (v / max) * 100)}%` }}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DonutTile({ distribucion }) {
+  const total = (distribucion?.jugados ?? 0) + (distribucion?.pendientesConFecha ?? 0) + (distribucion?.sinFecha ?? 0);
+  if (!distribucion || total === 0) {
+    return (
+      <div className="mosaic-tile mosaic-donut">
+        <div>
+          <div className="mosaic-label" style={{ color:'#E8187A' }}>Distribución</div>
+          <div style={{ color:'#4A566E', fontSize:12, marginTop:6 }}>Sin partidos cargados todavía</div>
+        </div>
+      </div>
+    );
+  }
+  // Redondeo con el último segmento por diferencia — así los tres % siempre
+  // suman exactamente 100 y el trazo del donut cierra bien (sin espacios ni
+  // superposiciones raras entre segmentos).
+  const pJugados = Math.round((distribucion.jugados / total) * 100);
+  const pPend = Math.round((distribucion.pendientesConFecha / total) * 100);
+  const pSin = Math.max(0, 100 - pJugados - pPend);
+  const r = 15.9155;
+  return (
+    <div className="mosaic-tile mosaic-donut">
+      <svg className="mosaic-donut-svg" viewBox="0 0 42 42">
+        <circle cx="21" cy="21" r={r} fill="transparent" stroke="#141C2A" strokeWidth="6"/>
+        <circle cx="21" cy="21" r={r} fill="transparent" stroke="#22D07A" strokeWidth="6"
+          strokeDasharray={`${pJugados} ${100 - pJugados}`} strokeDashoffset="0" transform="rotate(-90 21 21)"/>
+        <circle cx="21" cy="21" r={r} fill="transparent" stroke="#60A5FA" strokeWidth="6"
+          strokeDasharray={`${pPend} ${100 - pPend}`} strokeDashoffset={-pJugados} transform="rotate(-90 21 21)"/>
+        <circle cx="21" cy="21" r={r} fill="transparent" stroke="#4A566E" strokeWidth="6"
+          strokeDasharray={`${pSin} ${100 - pSin}`} strokeDashoffset={-(pJugados + pPend)} transform="rotate(-90 21 21)"/>
+      </svg>
+      <div className="mosaic-donut-legend">
+        <div className="mosaic-label" style={{ color:'#E8187A', marginBottom:8 }}>Distribución</div>
+        <div><span className="mosaic-sw" style={{ background:'#22D07A' }}/>Jugados <b>{pJugados}%</b></div>
+        <div><span className="mosaic-sw" style={{ background:'#60A5FA' }}/>Con fecha <b>{pPend}%</b></div>
+        <div><span className="mosaic-sw" style={{ background:'#4A566E' }}/>Sin fecha <b>{pSin}%</b></div>
+      </div>
+    </div>
+  );
+}
+
+function ChecklistTile({ hechas, totalFechas }) {
+  const dots = Array.from({ length: Math.max(totalFechas, 1) }, (_, i) => i < hechas);
+  return (
+    <div className="mosaic-tile mosaic-check">
+      <div className="mosaic-tile-head">
+        <div className="mosaic-tile-ic" style={{ background:'rgba(34,208,122,.18)', color:'#22D07A' }}>✓</div>
+        <div className="mosaic-label" style={{ color:'#22D07A' }}>Fixture</div>
+      </div>
+      <div className="mosaic-checknum">{hechas}<span style={{ fontSize:16, color:'#4A566E' }}>/{totalFechas} fechas</span></div>
+      <div className="mosaic-checkrow">
+        {dots.map((done, i) => <span key={i} className={done ? 'done' : ''}/>)}
+      </div>
+    </div>
+  );
+}
+
+function EncuestaMiniTile({ encuesta, onClick }) {
+  return (
+    <div className="mosaic-tile mosaic-encuesta" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <div className="mosaic-tile-head">
+        <div className="mosaic-tile-ic" style={{ background:'rgba(232,24,122,.18)', color:'#E8187A' }}><IconPoll size={13} color="#E8187A"/></div>
+        <div className="mosaic-label" style={{ color:'#E8187A' }}>Encuesta activa</div>
+      </div>
+      <div className="mosaic-bignum" style={{ fontSize:28 }}>{encuesta ? encuesta.votos : '—'}</div>
+      <div className="mosaic-foot">{encuesta ? (encuesta.pregunta ?? 'votos') : 'ninguna activa'}</div>
     </div>
   );
 }
@@ -1004,9 +1150,6 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
     return () => { cancelado = true; };
   }, [temporadaVerId]);
 
-  const totalPartidos = kpis.jugados + kpis.pendientes;
-  const avancePct = totalPartidos ? Math.round((kpis.jugados / totalPartidos) * 100) : 0;
-
   if (temporadaLoading || (loading && temporadaVerId)) {
     return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando resumen…</div>;
   }
@@ -1054,29 +1197,56 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
         )}
       </div>
 
-      {/* KPIs */}
-      <div className="dash-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
-        <KpiCard icon={<IconBall size={16} color="#F0B429"/>} label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
-          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <KpiCard icon={<IconClock size={16} color="#60A5FA"/>} label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"
-          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <ProximoCard proximo={kpis.proximo} onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <RitmoCard actual={extra[categoria]?.semanaActualCount ?? 0} anterior={extra[categoria]?.semanaAnteriorCount ?? 0}
-          onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
-        <KpiCard icon={<IconPoll size={16} color="#E8187A"/>} label="Encuesta activa" value={kpis.encuesta ? `${kpis.encuesta.votos} votos` : 'ninguna'}
-          sub={kpis.encuesta?.pregunta ?? '—'} accent="#E8187A" onClick={onNavigate ? () => onNavigate('encuestas') : undefined}/>
-      </div>
-
-      {/* Tendencia semanal — solo desktop (ver .dash-trend-panel), pantalla
-          angosta ya tiene suficiente información con el resto de arriba. */}
-      <div className="dash-panel dash-trend-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
-        <div className="dash-section-title" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8', marginBottom:14 }}>
-          Partidos por semana
+      {/* Mosaico de KPIs — reemplaza las 5 tarjetas iguales de antes. Pensado
+          mobile-first: en celular se apila en una columna con algunos pares
+          de a dos; el mosaico grande de piezas variadas recién arma a partir
+          de tablet/escritorio (ver .mosaic-* en torneo-star.css). */}
+      <div className="mosaic-grid">
+        <div className="mosaic-tile mosaic-hero">
+          <div className="mosaic-tile-head">
+            <div className="mosaic-tile-ic" style={{ background:'rgba(240,180,41,.18)', color:'#F0B429' }}>📈</div>
+            <div className="mosaic-label" style={{ color:'#F0B429' }}>Partidos por semana</div>
+            <div className="mosaic-hero-value">{extra[categoria]?.jugados ?? 0} jugados · {extra[categoria]?.total ?? 0} totales</div>
+          </div>
+          <div className="mosaic-hero-chart">
+            <TrendChart data={extra[categoria]?.porSemana}/>
+          </div>
         </div>
-        <TrendChart data={extra[categoria]?.porSemana}/>
+
+        <GaugeTile
+          pctTotal={extra[categoria]?.pctTotal ?? 0}
+          jugados={extra[categoria]?.jugados ?? 0}
+          total={extra[categoria]?.total ?? 0}
+          pendientes={(extra[categoria]?.total ?? 0) - (extra[categoria]?.jugados ?? 0)}
+        />
+
+        <div className="mosaic-pair">
+          <NumberSparkTile
+            value={extra[categoria]?.jugados ?? 0}
+            weekly={(extra[categoria]?.porSemana ?? []).map(s => s.jugados)}
+            thisWeek={(extra[categoria]?.porSemana ?? []).slice(-1)[0]?.jugados ?? null}
+            onClick={onNavigate ? () => onNavigate('partidos') : undefined}
+          />
+          <DeltaTile
+            actual={extra[categoria]?.semanaActualCount ?? 0}
+            anterior={extra[categoria]?.semanaAnteriorCount ?? 0}
+            weekly={(extra[categoria]?.porSemana ?? []).map(s => s.total)}
+            onClick={onNavigate ? () => onNavigate('partidos') : undefined}
+          />
+        </div>
+
+        <DonutTile distribucion={extra[categoria]?.distribucion}/>
+
+        <div className="mosaic-pair">
+          <ChecklistTile
+            hechas={chart[categoria].filter(f => f.finalizados === f.total).length}
+            totalFechas={chart[categoria].length}
+          />
+          <EncuestaMiniTile encuesta={kpis.encuesta} onClick={onNavigate ? () => onNavigate('encuestas') : undefined}/>
+        </div>
       </div>
 
-      {/* Avance por fecha + columna lateral (Alertas / Esta semana) */}
+      {/* Avance por fecha + columna lateral (Próximo partido / Alertas / Esta semana) */}
       <div className="dash-side-grid">
         <div className="dash-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px', minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
@@ -1085,6 +1255,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
         </div>
         <div className="dash-side-col">
+          <ProximoCard proximo={kpis.proximo} onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
           <AlertasCard alertas={alertas} onNavigate={onNavigate}/>
           <EstaSemanaCard resumen={resumenSemanal} onNavigate={onNavigate}/>
         </div>

@@ -171,7 +171,7 @@ function KpiCard({ icon, label, value, sub, accent, onClick }) {
   const [hover, setHover] = useState(false);
   const clickable = !!onClick;
   return (
-    <div onClick={onClick}
+    <div className="dash-kpi-card" onClick={onClick}
       onMouseEnter={() => clickable && setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
         background: hover ? `linear-gradient(160deg,${accent}2E,#0B111C 65%)` : `linear-gradient(160deg,${accent}16,#0B111C 55%)`,
@@ -181,20 +181,20 @@ function KpiCard({ icon, label, value, sub, accent, onClick }) {
         boxShadow: hover ? `0 8px 22px ${accent}22` : 'none', position:'relative',
       }}>
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <div style={{ width:32, height:32, borderRadius:9, background:`${accent}33`, border:`1px solid ${accent}77`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+        <div className="dash-kpi-icon" style={{ width:32, height:32, borderRadius:9, background:`${accent}33`, border:`1px solid ${accent}77`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
           {icon}
         </div>
-        <div style={{ fontSize:11, color:accent, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>
+        <div className="dash-kpi-label" style={{ fontSize:11, color:accent, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>
           {label}
         </div>
         {clickable && (
           <span style={{ marginLeft:'auto', fontSize:13, color: hover ? accent : '#4A566E', transition:'color .15s' }}>→</span>
         )}
       </div>
-      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:30, lineHeight:1, color:'#EEF2F8', letterSpacing:.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+      <div className="dash-kpi-value" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:30, lineHeight:1, color:'#EEF2F8', letterSpacing:.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize:12, color:'#8899BB', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub}</div>}
+      {sub && <div className="dash-kpi-sub" style={{ fontSize:12, color:'#8899BB', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub}</div>}
     </div>
   );
 }
@@ -263,9 +263,9 @@ function SegmentedTrack({ puntos }) {
 
 function MiniStat({ value, label, color }) {
   return (
-    <div style={{ textAlign:'center' }}>
-      <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:19, color, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:110 }}>{value}</div>
-      <div style={{ fontSize:9, color:'#4A566E', marginTop:2 }}>{label}</div>
+    <div className="dash-ministat" style={{ textAlign:'center' }}>
+      <div className="dash-ministat-value" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:19, color, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:110 }}>{value}</div>
+      <div className="dash-ministat-label" style={{ fontSize:9, color:'#4A566E', marginTop:2 }}>{label}</div>
     </div>
   );
 }
@@ -292,21 +292,21 @@ function PunchCard({ matriz }) {
   const activo = hover ? matriz[hover.wi]?.dias[hover.di] : null;
 
   return (
-    <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'12px 10px 10px' }}>
-      <div style={{ fontSize:9, color:'#4A566E', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>
+    <div className="dash-punchcard" style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'12px 10px 10px' }}>
+      <div className="dash-punchcard-title" style={{ fontSize:9, color:'#4A566E', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>
         Mapa de actividad · últimas {matriz.length} semanas
       </div>
       <div style={{ overflowX:'auto' }}>
-        <div style={{ minWidth:340 }}>
+        <div className="dash-punchcard-grid" style={{ minWidth:340 }}>
           <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', gap:3, marginBottom:3 }}>
             <div/>
             {DIA_PUNCH.map(d => (
-              <div key={d} style={{ textAlign:'center', fontSize:8.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{d}</div>
+              <div key={d} className="dash-punchcard-daylabel" style={{ textAlign:'center', fontSize:8.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{d}</div>
             ))}
           </div>
           {matriz.map((semana, wi) => (
             <div key={semana.lunes} style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', gap:3, marginBottom:3, alignItems:'center' }}>
-              <div style={{ fontSize:8.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{fmtSemana(semana.lunes)}</div>
+              <div className="dash-punchcard-weeklabel" style={{ fontSize:8.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{fmtSemana(semana.lunes)}</div>
               {semana.dias.map((d, di) => {
                 const esActivo = hover && hover.wi === wi && hover.di === di;
                 const frac = d.total / maxTotal;
@@ -319,7 +319,7 @@ function PunchCard({ matriz }) {
                 return (
                   <div key={d.iso} onMouseEnter={() => setHover({ wi, di })} onMouseLeave={() => setHover(null)}
                     style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', height:22, cursor:'pointer' }}>
-                    <div style={{
+                    <div className="dash-punchcard-dot" style={{
                       width:r * 2, height:r * 2, borderRadius:'50%', background:color,
                       border: d.total === 0 ? '1px solid #1C2535' : 'none',
                       boxShadow: esActivo ? `0 0 0 2px ${d.total === 0 ? '#2C3A52' : color}66` : 'none',
@@ -338,7 +338,7 @@ function PunchCard({ matriz }) {
           ))}
         </div>
       </div>
-      <div style={{ display:'flex', gap:12, marginTop:8, fontSize:9, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", flexWrap:'wrap' }}>
+      <div className="dash-punchcard-legend" style={{ display:'flex', gap:12, marginTop:8, fontSize:9, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", flexWrap:'wrap' }}>
         <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:8, borderRadius:'50%', background:'#F0B429', display:'inline-block' }}/>jugados</span>
         <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:8, borderRadius:'50%', background:'#60A5FA', display:'inline-block' }}/>pendientes</span>
         <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:8, height:8, borderRadius:'50%', border:'1px solid #1C2535', display:'inline-block' }}/>sin partidos</span>
@@ -355,20 +355,20 @@ function MiniMultiChart({ extra }) {
   const offset = C - (Math.min(100, pctTotal) / 100) * C;
 
   return (
-    <div style={{ marginTop:18 }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
-        <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <svg width="64" height="64" viewBox="0 0 64 64">
+    <div className="dash-mini-multi" style={{ marginTop:18 }}>
+      <div className="dash-mini-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+        <div className="dash-mini-cell dash-gauge-cell" style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+          <svg className="dash-gauge-svg" width="64" height="64" viewBox="0 0 64 64">
             <circle cx="32" cy="32" r={r} fill="none" stroke="#141C2A" strokeWidth="7"/>
             <circle cx="32" cy="32" r={r} fill="none" stroke="url(#miniAvanceGrad)" strokeWidth="7" strokeLinecap="round"
               strokeDasharray={C} strokeDashoffset={offset} transform="rotate(-90 32 32)"/>
             <defs><linearGradient id="miniAvanceGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#FFD166"/><stop offset="100%" stopColor="#F0B429"/></linearGradient></defs>
-            <text x="32" y="37" textAnchor="middle" fill="#EEF2F8" fontFamily="'Bebas Neue',sans-serif" fontSize="16">{Math.round(pctTotal)}%</text>
+            <text className="dash-gauge-pct" x="32" y="37" textAnchor="middle" fill="#EEF2F8" fontFamily="'Bebas Neue',sans-serif" fontSize="16">{Math.round(pctTotal)}%</text>
           </svg>
-          <div style={{ fontSize:9, color:'#4A566E', marginTop:4 }}>Avance total</div>
-          <div style={{ fontSize:9, color:'#6B7A99', marginTop:1 }}>{jugados}/{total} partidos</div>
+          <div className="dash-mini-caption" style={{ fontSize:9, color:'#4A566E', marginTop:4 }}>Avance total</div>
+          <div className="dash-mini-caption" style={{ fontSize:9, color:'#6B7A99', marginTop:1 }}>{jugados}/{total} partidos</div>
         </div>
-        <div style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-around', gap:6 }}>
+        <div className="dash-mini-cell" style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-around', gap:6 }}>
           <MiniStat value={jugadosHoy} label="jugados hoy" color="#22D07A"/>
           <MiniStat value={diaTop ?? '—'} label="día con más partidos" color="#F0B429"/>
           <MiniStat value={quedanSemana} label="quedan esta semana" color="#E8187A"/>
@@ -475,6 +475,28 @@ function AlertasCard({ alertas, onNavigate }) {
 // "Próximo partido" como mini match-card (dos círculos con iniciales + VS) en
 // vez de una línea de texto — se lee de un vistazo, no hay que "parsear" el
 // nombre de dos equipos concatenados adentro de un KpiCard genérico.
+// Avatar de equipo: muestra el logo real si existe; si no carga (o el
+// equipo no tiene uno cargado), cae al círculo de iniciales de siempre —
+// nunca se queda vacío.
+function TeamAvatar({ equipo, size = 30 }) {
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:'50%', flexShrink:0, position:'relative', overflow:'hidden',
+      background:`${equipo.color}33`, border:`1.5px solid ${equipo.color}`,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:size*0.37, fontWeight:700, color:'#EEF2F8', fontFamily:"'Barlow Condensed',sans-serif",
+    }}>
+      {/* Iniciales de fondo — quedan como fallback si no hay logo o si la
+          imagen no carga (el <img> de arriba se oculta solo en ese caso). */}
+      {iniciales(equipo.nombre)}
+      {equipo.logo && (
+        <img src={equipo.logo} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}
+          onError={e => { e.target.style.display = 'none'; }}/>
+      )}
+    </div>
+  );
+}
+
 function ProximoCard({ proximo, onClick }) {
   const clickable = !!onClick;
   if (!proximo) {
@@ -512,12 +534,12 @@ function ProximoCard({ proximo, onClick }) {
       </div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:0, flex:1 }}>
-          <div style={{ width:30, height:30, borderRadius:'50%', background:`${eqL.color}33`, border:`1.5px solid ${eqL.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#EEF2F8', fontFamily:"'Barlow Condensed',sans-serif" }}>{iniciales(eqL.nombre)}</div>
+          <TeamAvatar equipo={eqL}/>
           <div style={{ fontSize:10.5, color:'#CBD5E8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%' }}>{eqL.nombre}</div>
         </div>
         <div style={{ fontSize:10, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0 }}>VS</div>
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:0, flex:1 }}>
-          <div style={{ width:30, height:30, borderRadius:'50%', background:`${eqV.color}33`, border:`1.5px solid ${eqV.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#EEF2F8', fontFamily:"'Barlow Condensed',sans-serif" }}>{iniciales(eqV.nombre)}</div>
+          <TeamAvatar equipo={eqV}/>
           <div style={{ fontSize:10.5, color:'#CBD5E8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%' }}>{eqV.nombre}</div>
         </div>
       </div>
@@ -913,7 +935,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+    <div className="dash-resumen" style={{ display:'flex', flexDirection:'column', gap:24 }}>
       {fetchError && (
         <div style={{
           padding:'12px 16px', borderRadius:10, background:'rgba(240,64,96,.08)',
@@ -953,7 +975,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
       </div>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
+      <div className="dash-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
         <KpiCard icon={<IconBall size={16} color="#F0B429"/>} label="Partidos jugados" value={kpis.jugados} sub={`${avancePct}% del fixture`} accent="#F0B429"
           onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
         <KpiCard icon={<IconClock size={16} color="#60A5FA"/>} label="Pendientes" value={kpis.pendientes} sub="por jugarse" accent="#60A5FA"
@@ -967,9 +989,9 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
 
       {/* Avance por fecha + columna lateral (Alertas / Esta semana) */}
       <div className="dash-side-grid">
-        <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px', minWidth:0 }}>
+        <div className="dash-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px', minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Avance del fixture</div>
+            <div className="dash-section-title" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Avance del fixture</div>
           </div>
           <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
         </div>
@@ -983,9 +1005,9 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           juntas, con podio + tabla y un toggle promedio/acumulado: así se ve
           de un vistazo por qué alguien puede ir primero en la página pública
           (que ordena por acumulado) aunque acá tenga menor promedio. */}
-      <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
+      <div className="dash-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>
+          <div className="dash-section-title" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>
             Líderes {categoria === 'femenino' ? 'femenino' : 'masculino'}
           </div>
           <div style={{ display:'flex', gap:6 }}>
@@ -1052,9 +1074,9 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
       </div>
 
       {/* Fixture completo */}
-      <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
+      <div className="dash-panel" style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:14, padding:'18px 20px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Fixture completo</div>
+          <div className="dash-section-title" style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, color:'#EEF2F8' }}>Fixture completo</div>
           <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
             {fixture[categoria].length > 0 && (
               <select value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)} style={{

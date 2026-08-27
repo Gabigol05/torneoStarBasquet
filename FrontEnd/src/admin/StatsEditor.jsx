@@ -9,6 +9,12 @@ import { useTemporada } from '../context/TemporadaContext';
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
 // ─── Columnas de stats con categorías ────────────────────────────────────────
+// `totalKey`: campo con el acumulado real de la temporada (ya lo calcula el
+// trigger de la base junto con el promedio — no es una cuenta aproximada).
+// `madeKey`/`missKey`: para los porcentajes de tiro, en vez de un "total"
+// suelto se muestra el desglose convertidos/intentados, igual que en el
+// perfil público del jugador (PlayerProfileModal) — así el admin ve de un
+// vistazo si un % raro sale de pocos intentos o de muchos.
 const GRUPOS = [
   {
     label: 'General',
@@ -20,10 +26,10 @@ const GRUPOS = [
     label: 'Anotación',
     color: '#F0B429',
     cols: [
-      { key:'pts_prom',    label:'PTS',  title:'Puntos por partido' },
-      { key:'pct_simples', label:'TL%',  title:'% Tiros libres' },
-      { key:'pct_dobles',  label:'2P%',  title:'% Dobles' },
-      { key:'pct_triples', label:'3P%',  title:'% Triples' },
+      { key:'pts_prom',    label:'PTS',  title:'Puntos por partido', totalKey:'pts_total', totalLabel:'Acumulado' },
+      { key:'pct_simples', label:'TL%',  title:'% Tiros libres', madeKey:'sc_total', missKey:'sf_total' },
+      { key:'pct_dobles',  label:'2P%',  title:'% Dobles',       madeKey:'dc_total', missKey:'df_total' },
+      { key:'pct_triples', label:'3P%',  title:'% Triples',      madeKey:'tc_total', missKey:'tf_total' },
       { key:'mejor_pts',   label:'MAX',  title:'Mejor partido en PTS', integer:true },
     ]
   },
@@ -31,26 +37,85 @@ const GRUPOS = [
     label: 'Juego',
     color: '#60A5FA',
     cols: [
-      { key:'reb_prom', label:'REB', title:'Rebotes por partido' },
-      { key:'ast_prom', label:'AST', title:'Asistencias por partido' },
-      { key:'rob_prom', label:'ROB', title:'Robos por partido' },
-      { key:'tap_prom', label:'TAP', title:'Tapones por partido' },
-      { key:'per_prom', label:'PÉR', title:'Pérdidas por partido' },
+      { key:'reb_prom', label:'REB', title:'Rebotes por partido', totalKey:'reb_total', totalLabel:'Acumulado' },
+      { key:'ast_prom', label:'AST', title:'Asistencias por partido', totalKey:'ast_total', totalLabel:'Acumulado' },
+      { key:'rob_prom', label:'ROB', title:'Robos por partido', totalKey:'rob_total', totalLabel:'Acumulado' },
+      { key:'tap_prom', label:'TAP', title:'Tapones por partido', totalKey:'tap_total', totalLabel:'Acumulado' },
+      { key:'per_prom', label:'PÉR', title:'Pérdidas por partido', totalKey:'per_total', totalLabel:'Acumulado' },
     ]
   },
   {
     label: 'Valoración',
     color: '#22D07A',
     cols: [
-      { key:'val_prom', label:'VAL', title:'Valoración promedio' },
+      { key:'val_prom', label:'VAL', title:'Valoración promedio', totalKey:'val_total', totalLabel:'Acumulado' },
     ]
   },
 ];
 
-const ALL_COLS = GRUPOS.flatMap(g => g.cols);
+// ─── Bloque de una stat (label + valor grande + dato secundario) ─────────────
+// `mostrar` decide qué número queda como PRINCIPAL: 'acum' pone el acumulado
+// real de la temporada grande y el promedio abajo (chico, pero siempre
+// editable ahí mismo); 'prom' hace lo de siempre — el promedio grande y
+// editable, con el acumulado como dato de referencia abajo. Los porcentajes
+// de tiro (TL%/2P%/3P%) no tienen un "acumulado" propio — siempre muestran
+// el % arriba y el desglose convertidos/intentados abajo, sin importar el modo.
+function StatBlock({ col, stats, editado, mostrar, jugId, onEdit, groupColor, width = 72 }) {
+  const promVal = editado?.[col.key] !== undefined ? editado[col.key] : (stats?.[col.key] ?? 0);
+  const editedAqui = editado?.[col.key] !== undefined;
+  const total = col.totalKey ? stats?.[col.totalKey] : undefined;
+  const hasTotal = total !== undefined && total !== null;
+  const showAcum = mostrar === 'acum' && hasTotal;
+  const made = col.madeKey ? stats?.[col.madeKey] : undefined;
+  const miss = col.madeKey ? stats?.[col.missKey] : undefined;
+  const hasMade = made !== undefined && made !== null;
+
+  const bigColor = editedAqui ? '#F0B429' : (groupColor ?? '#EEF2F8');
+  const borderColor = editedAqui ? 'rgba(240,180,41,.5)' : (groupColor ? `${groupColor}35` : '#1C2535');
+
+  const inputProps = {
+    type: 'number', step: col.integer ? 1 : 0.1, min: '0', value: promVal,
+    onChange: e => onEdit(jugId, col.key, e.target.value),
+    onClick: e => e.stopPropagation(),
+  };
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <label style={{ fontSize:12, color:'#8899BB', flex:1 }} title={col.title}>{col.title}</label>
+        {showAcum ? (
+          <span style={{ width, textAlign:'center', fontFamily:"'Bebas Neue',sans-serif", fontSize:18, color:bigColor }}>{total}</span>
+        ) : (
+          <input {...inputProps} style={{
+            width, padding:'6px 8px', background:'#141C2A', border:`1px solid ${borderColor}`,
+            borderRadius:6, color:bigColor, fontSize:14, textAlign:'center', outline:'none',
+            fontFamily:"'Bebas Neue',sans-serif",
+          }}/>
+        )}
+      </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:5, marginTop:3 }}>
+        {showAcum ? (
+          <>
+            <span style={{ fontSize:9.5, color:'#4A566E' }}>Prom.:</span>
+            <input {...inputProps} style={{
+              width:44, padding:'2px 4px', background:'#141C2A',
+              border:`1px solid ${editedAqui ? 'rgba(240,180,41,.5)' : '#1C2535'}`,
+              borderRadius:4, color: editedAqui ? '#F0B429' : '#8899BB', fontSize:11,
+              textAlign:'center', outline:'none', fontFamily:"'Bebas Neue',sans-serif",
+            }}/>
+          </>
+        ) : hasTotal ? (
+          <span style={{ fontSize:9.5, color:'#4A566E' }}>Acumulado: {total}</span>
+        ) : hasMade ? (
+          <span style={{ fontSize:9.5, color:'#4A566E' }}>{made}/{(made ?? 0) + (miss ?? 0)} convertidos</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 // ─── Componente de stats de una jugadora (fila expandible) ────────────────────
-function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
+function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx, mostrar }) {
   const [expanded, setExpanded] = useState(false);
   const hayStats = stats !== undefined;
   const tieneEdits = Boolean(editado);
@@ -58,6 +123,17 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
   const val = (key) => {
     if (editado?.[key] !== undefined) return editado[key];
     return stats?.[key] ?? 0;
+  };
+
+  // Para el resumen de la fila colapsada: si el modo es "acumulado" y la
+  // columna tiene un total real cargado, se muestra ese; si no, cae al
+  // promedio de siempre (nunca se queda en blanco).
+  const valResumen = (key, totalKey) => {
+    if (mostrar === 'acum') {
+      const t = stats?.[totalKey];
+      if (t !== undefined && t !== null) return t;
+    }
+    return val(key);
   };
 
   const getBg = () => {
@@ -69,7 +145,7 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
     <>
       {/* Fila principal */}
       <tr style={{ background: getBg(), cursor:'pointer' }} onClick={() => setExpanded(e => !e)}>
-        <td style={{ padding:'10px 12px 10px 9px', minWidth:180, position:'sticky', left:0, zIndex:1, background:getBg(), borderLeft:`3px solid ${equipo.color}`, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>
+        <td style={{ padding:'10px 12px 10px 9px', minWidth:200, position:'sticky', left:0, zIndex:1, background:getBg(), borderLeft:`3px solid ${equipo.color}`, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {/* Avatar */}
             <div style={{
@@ -81,22 +157,31 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
             }}>
               {jugadora.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
             </div>
-            <div>
-              <div style={{ color: tieneEdits?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:13 }}>
+            <div style={{ minWidth:0 }}>
+              <div style={{ color: tieneEdits?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {jugadora.nombre}
                 {tieneEdits && <span style={{ marginLeft:6, fontSize:9, color:'#F0B429', verticalAlign:'middle' }}>● editado</span>}
               </div>
-              <div style={{ fontSize:10, color:'#4A566E' }}>
-                {hayStats ? `${val('pj')} PJ` : 'Sin estadísticas'}
-              </div>
+              {hayStats ? (
+                <span style={{
+                  display:'inline-flex', alignItems:'baseline', gap:3, marginTop:2,
+                  background:'rgba(240,180,41,.12)', border:'1px solid rgba(240,180,41,.3)',
+                  borderRadius:5, padding:'1px 6px',
+                }}>
+                  <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:13, color:'#F0B429', lineHeight:1.3 }}>{val('pj')}</span>
+                  <span style={{ fontSize:9, color:'#F0B429', letterSpacing:.5 }}>PJ</span>
+                </span>
+              ) : (
+                <div style={{ fontSize:10, color:'#4A566E', marginTop:2 }}>Sin estadísticas</div>
+              )}
             </div>
           </div>
         </td>
         {/* Stats resumidas */}
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{val('pts_prom')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#60A5FA', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{val('reb_prom')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#22D07A', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{val('ast_prom')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#6B7A99', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{val('val_prom')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('pts_prom','pts_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#60A5FA', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('reb_prom','reb_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#22D07A', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('ast_prom','ast_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#6B7A99', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('val_prom','val_total')}</td>
         <td style={{ padding:'10px 8px', textAlign:'center', color:'#4A566E', fontSize:12 }}>
           {expanded ? '▲' : '▼'}
         </td>
@@ -106,45 +191,40 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx }) {
       {expanded && (
         <tr style={{ background:'rgba(240,180,41,.03)' }}>
           <td colSpan={6} style={{ padding:'16px 12px', borderBottom:'2px solid rgba(240,180,41,.15)' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:16 }}>
-              {GRUPOS.map(grupo => (
-                <div key={grupo.label} style={{
-                  background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10, padding:'12px 14px',
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))', gap:16 }}>
+              {GRUPOS.map(grupo => {
+                const gc = grupo.color ?? '#8899BB';
+                return (
+                <div key={grupo.label} style={{ padding:1, borderRadius:13, background:`linear-gradient(160deg, ${gc}45, #1C2535 65%)` }}>
+                <div style={{
+                  background:`linear-gradient(160deg, ${gc}12, #0B111C 60%)`, borderRadius:12, padding:'12px 14px', height:'100%', boxSizing:'border-box',
                 }}>
                   <div style={{
-                    fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase',
-                    color: grupo.color ?? '#6B7A99', marginBottom:10,
+                    fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase',
+                    color: gc, marginBottom:10,
                     display:'flex', alignItems:'center', gap:6,
                   }}>
-                    <div style={{ width:6, height:6, borderRadius:'50%', background:grupo.color??'#6B7A99', flexShrink:0 }}/>
+                    <div style={{ width:6, height:6, borderRadius:'50%', background:gc, flexShrink:0, boxShadow:`0 0 6px ${gc}` }}/>
                     {grupo.label}
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }} onClick={e => e.stopPropagation()}>
                     {grupo.cols.map(col => (
-                      <div key={col.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-                        <label style={{ fontSize:12, color:'#8899BB', flex:1 }} title={col.title}>
-                          {col.title}
-                        </label>
-                        <input
-                          type="number"
-                          step={col.integer ? 1 : 0.1}
-                          min="0"
-                          value={val(col.key)}
-                          onChange={e => onEdit(jugadora.id, col.key, e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          style={{
-                            width:72, padding:'6px 8px',
-                            background:'#141C2A', border:`1px solid ${tieneEdits&&editado?.[col.key]!==undefined?'rgba(240,180,41,.5)':'#1C2535'}`,
-                            borderRadius:6, color: tieneEdits&&editado?.[col.key]!==undefined?'#F0B429':'#EEF2F8',
-                            fontSize:14, textAlign:'center', outline:'none',
-                            fontFamily:"'Bebas Neue',sans-serif",
-                          }}
-                        />
-                      </div>
+                      <StatBlock
+                        key={col.key}
+                        col={col}
+                        stats={stats}
+                        editado={editado}
+                        mostrar={mostrar}
+                        jugId={jugadora.id}
+                        onEdit={onEdit}
+                        groupColor={gc}
+                      />
                     ))}
                   </div>
                 </div>
-              ))}
+                </div>
+                );
+              })}
             </div>
           </td>
         </tr>
@@ -179,6 +259,10 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   const [viewMode,  setViewMode]  = useState(() =>
     (typeof window !== 'undefined' && window.innerWidth <= 640) ? 'cards' : 'tabla'
   ); // 'tabla' | 'cards'
+  // Qué número se muestra grande: el acumulado real de la temporada (por
+  // defecto — así se ve de un vistazo cuánto lleva jugado cada jugadora) o el
+  // promedio por partido, con el otro siempre visible como dato secundario.
+  const [mostrar,   setMostrar]   = useState('acum'); // 'acum' | 'prom'
   // Ninguna de las dos categorías tiene roster estático — jugadores_masculino
   // y jugadoras_femenino viven las dos en la base, así que el plantel de cada
   // equipo se trae siempre en vivo.
@@ -324,12 +408,27 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
         {equipo && (
           <div style={{ flex:1, minWidth:160 }}>
-            <label style={S.label}>BUSCAR JUGADORA</label>
+            <label style={S.label}>{categoria === 'femenino' ? 'BUSCAR JUGADORA' : 'BUSCAR JUGADOR'}</label>
             <input
               type="text" placeholder="Nombre..." value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               style={S.input}
             />
+          </div>
+        )}
+
+        {equipo && (
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => setMostrar('acum')}
+              title="Mostrar el acumulado de la temporada como número principal"
+              style={{ ...S.viewBtn, ...(mostrar==='acum'?S.viewBtnActive:{}) }}>
+              Σ Acumulado
+            </button>
+            <button onClick={() => setMostrar('prom')}
+              title="Mostrar el promedio por partido como número principal"
+              style={{ ...S.viewBtn, ...(mostrar==='prom'?S.viewBtnActive:{}) }}>
+              ø Promedio
+            </button>
           </div>
         )}
 
@@ -408,6 +507,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
                   stats={statsMap[j.id]}
                   editado={edited[j.id]}
                   onEdit={handleEdit}
+                  mostrar={mostrar}
                 />
               ))}
             </tbody>
@@ -422,7 +522,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
       {/* ── VISTA CARDS ── */}
       {equipo && !loading && viewMode === 'cards' && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:14, marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:14, marginBottom:20 }}>
           {jugadorasFiltradas.map((j) => {
             const st = statsMap[j.id];
             const ed = edited[j.id];
@@ -430,59 +530,75 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
             const hasEdit = Boolean(ed);
             return (
               <div key={j.id} style={{
+                padding:1, borderRadius:13,
+                background: hasEdit ? 'linear-gradient(160deg,#F0B429,#1C2535 70%)' : `linear-gradient(160deg,${equipo.color}70,#1C2535 70%)`,
+              }}>
+              <div style={{
                 background: hasEdit ? `linear-gradient(160deg,${equipo.color}22,rgba(240,180,41,.08) 55%,#0B111C)` : `linear-gradient(160deg,${equipo.color}1E,#0B111C 60%)`,
-                border:`1px solid ${hasEdit?'rgba(240,180,41,.35)':equipo.color+'40'}`,
-                borderTop:`2px solid ${hasEdit?'#F0B429':equipo.color}`,
-                borderRadius:12, padding:'16px',
-                transition:'border-color .2s',
+                borderRadius:12, padding:'16px', height:'100%', boxSizing:'border-box',
               }}>
                 {/* Header */}
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
                   <div style={{ width:40, height:40, borderRadius:'50%', background:`${equipo.color}20`, color:equipo.color, border:`1.5px solid ${equipo.color}50`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, flexShrink:0 }}>
                     {j.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
                   </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ color: hasEdit?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:14 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color: hasEdit?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                       {j.nombre}
                       {hasEdit && <span style={{ marginLeft:6, fontSize:9, color:'#F0B429' }}>● editado</span>}
                     </div>
-                    <div style={{ fontSize:11, color:'#4A566E' }}>
-                      {st ? `${val('pj')} partidos jugados` : 'Sin estadísticas aún'}
-                    </div>
+                    {st ? (
+                      <span style={{
+                        display:'inline-flex', alignItems:'baseline', gap:3, marginTop:3,
+                        background:'rgba(240,180,41,.12)', border:'1px solid rgba(240,180,41,.3)',
+                        borderRadius:5, padding:'1px 6px',
+                      }}>
+                        <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:14, color:'#F0B429', lineHeight:1.3 }}>{val('pj')}</span>
+                        <span style={{ fontSize:9, color:'#F0B429', letterSpacing:.5 }}>PARTIDOS JUGADOS</span>
+                      </span>
+                    ) : (
+                      <div style={{ fontSize:11, color:'#4A566E', marginTop:3 }}>Sin estadísticas aún</div>
+                    )}
                   </div>
                   {st && (
                     <button onClick={() => handleReset(j.id)}
                       title="Resetear stats"
-                      style={{ background:'transparent', border:'1px solid rgba(240,64,96,.2)', borderRadius:6, color:'#F04060', cursor:'pointer', padding:'4px 8px', fontSize:11 }}>
+                      style={{ background:'transparent', border:'1px solid rgba(240,64,96,.2)', borderRadius:6, color:'#F04060', cursor:'pointer', padding:'4px 8px', fontSize:11, flexShrink:0 }}>
                       ✕
                     </button>
                   )}
                 </div>
 
-                {/* Stats en grid */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
-                  {ALL_COLS.map(col => (
-                    <div key={col.key}>
-                      <label style={{ fontSize:10, color:'#6B7A99', display:'block', marginBottom:3, letterSpacing:.5 }}>
-                        {col.title}
-                      </label>
-                      <input
-                        type="number"
-                        step={col.integer?1:0.1}
-                        min="0"
-                        value={val(col.key)}
-                        onChange={e => handleEdit(j.id, col.key, e.target.value)}
-                        style={{
-                          width:'100%', padding:'7px 8px', boxSizing:'border-box',
-                          background:'#141C2A',
-                          border:`1px solid ${ed?.[col.key]!==undefined?'rgba(240,180,41,.4)':'#1C2535'}`,
-                          borderRadius:6, color: ed?.[col.key]!==undefined?'#F0B429':'#EEF2F8',
-                          fontSize:14, outline:'none', fontFamily:"'Bebas Neue',sans-serif",
-                        }}
-                      />
+                {/* Stats agrupadas por categoría, con acumulado/desglose real */}
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {GRUPOS.filter(g => g.color).map(grupo => (
+                    <div key={grupo.label}>
+                      <div style={{
+                        fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase',
+                        color: grupo.color, marginBottom:6, display:'flex', alignItems:'center', gap:5,
+                      }}>
+                        <div style={{ width:5, height:5, borderRadius:'50%', background:grupo.color, flexShrink:0 }}/>
+                        {grupo.label}
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:8 }}>
+                        {grupo.cols.map(col => (
+                          <StatBlock
+                            key={col.key}
+                            col={col}
+                            stats={st}
+                            editado={ed}
+                            mostrar={mostrar}
+                            jugId={j.id}
+                            onEdit={handleEdit}
+                            groupColor={grupo.color}
+                            width="100%"
+                          />
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
+              </div>
               </div>
             );
           })}

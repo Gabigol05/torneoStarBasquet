@@ -5924,6 +5924,45 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .dash-table-row .dash-col-secondary { display: none; }
 }
 
+/* Pantallas grandes: el layout de arriba está pensado para que no se rompa
+   en celular, pero en un monitor de escritorio eso deja las tarjetas chicas
+   y un margen enorme sin usar a los costados. A partir de acá se aprovecha
+   ese ancho: tarjetas y letra más grandes, y Alertas + Esta semana pasan a
+   estar al lado del avance del fixture en vez de apiladas debajo. El celular
+   no cambia en nada — estas reglas recién entran a partir de 1300px. */
+@media (min-width: 1300px) {
+  .dash-resumen { gap: 30px; }
+
+  .dash-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 16px; }
+  .dash-kpi-card { padding: 18px 22px 20px; }
+  .dash-kpi-icon { width: 38px; height: 38px; font-size: 18px; }
+  .dash-kpi-label { font-size: 12px; }
+  .dash-kpi-value { font-size: 36px; }
+  .dash-kpi-sub { font-size: 13px; }
+
+  .dash-panel { padding: 24px 28px; }
+  .dash-section-title { font-size: 21px; }
+
+  /* Avance del fixture (más ancho) + Alertas + Esta semana, los tres lado a
+     lado en vez de una columna angosta apilada al costado. */
+  .dash-side-grid { grid-template-columns: 1.6fr 1fr 1fr; gap: 20px; }
+  .dash-side-col { display: contents; }
+
+  .dash-gauge-svg { width: 82px; height: 82px; }
+  .dash-mini-cell { padding: 16px 12px; }
+  .dash-ministat-value { font-size: 23px; }
+  .dash-ministat-label { font-size: 10.5px; }
+  .dash-mini-caption { font-size: 10.5px; }
+
+  .dash-punchcard { padding: 16px 14px 14px; }
+  .dash-punchcard-title { font-size: 11px; }
+  .dash-punchcard-daylabel, .dash-punchcard-weeklabel { font-size: 10px; }
+  .dash-punchcard-legend { font-size: 10.5px; }
+
+  .dash-podio-grid { gap: 16px; }
+  .dash-tabs-scroll { gap: 8px; }
+}
+
 /* ══════════════════════════════
    BOTONES SOCIALES DEL NAVBAR (YouTube / Instagram)
    Círculo "glass" con brillo al pasar el mouse — mismo ícono, mismo tamaño

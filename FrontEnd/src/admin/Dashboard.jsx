@@ -215,10 +215,17 @@ function KpiCard({ icon, label, value, sub, accent, onClick }) {
   );
 }
 
-function ChartTooltip({ left, children }) {
+// `below`: por default el cartel aparece ARRIBA del punto (bottom:100%+8px).
+// Se necesita poder invertirlo a "abajo" para puntos que están pegados al
+// borde superior de su contenedor (ej: TrendChart cuando el valor está cerca
+// del máximo) — si no, el cartel se dibuja por fuera del contenedor y en
+// cualquier tile con `overflow:hidden` (como .mosaic-tile, por el brillo
+// dorado en la esquina) queda cortado a la mitad (reporte de Alvaro, 28/08).
+function ChartTooltip({ left, below, children }) {
   return (
     <div style={{
-      position:'absolute', bottom:'calc(100% + 8px)', left, transform:'translateX(-50%)',
+      position:'absolute', left, transform:'translateX(-50%)',
+      ...(below ? { top:'calc(100% + 8px)' } : { bottom:'calc(100% + 8px)' }),
       background:'#0E1420', border:'1px solid #F0B42955', borderRadius:8, padding:'7px 11px',
       fontSize:11, whiteSpace:'nowrap', zIndex:5, boxShadow:'0 4px 16px rgba(0,0,0,.5)',
       fontFamily:"'Barlow Condensed',sans-serif", pointerEvents:'none',
@@ -321,12 +328,18 @@ function PunchCard({ matriz }) {
             ))}
           </div>
           {matriz.map((semana, wi) => (
-            <div key={semana.lunes} style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', gap:3, marginBottom:3, alignItems:'center' }}>
+            <div key={semana.lunes} style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', gap:3, marginBottom:6, alignItems:'center' }}>
               <div className="dash-punchcard-weeklabel" style={{ fontSize:8.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{fmtSemana(semana.lunes)}</div>
               {semana.dias.map((d, di) => {
                 const esActivo = hover && hover.wi === wi && hover.di === di;
                 const frac = d.total / maxTotal;
-                const r = d.total === 0 ? 3 : 5 + frac * 8;
+                // Radio tope 10.5 (diámetro 21) para que el círculo más grande
+                // entre cómodo dentro de la fila de 26px sin pisar la fila de
+                // arriba/abajo — con el radio viejo (hasta 13, diámetro 26)
+                // en una fila de 22px, varias semanas seguidas con partidos
+                // el mismo día (típicamente domingo) se fusionaban en un
+                // bloque sólido — reporte de Alvaro, 28/08.
+                const r = d.total === 0 ? 3 : 5 + frac * 5.5;
                 const pctJugado = d.total ? d.jugados / d.total : 0;
                 const color = d.total === 0 ? 'transparent'
                   : pctJugado === 1 ? '#F0B429'
@@ -334,7 +347,7 @@ function PunchCard({ matriz }) {
                   : '#8FB9E8';
                 return (
                   <div key={d.iso} onMouseEnter={() => setHover({ wi, di })} onMouseLeave={() => setHover(null)}
-                    style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', height:22, cursor:'pointer' }}>
+                    style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', height:26, cursor:'pointer' }}>
                     <div className="dash-punchcard-dot" style={{
                       width:r * 2, height:r * 2, borderRadius:'50%', background:color,
                       border: d.total === 0 ? '1px solid #1C2535' : 'none',
@@ -364,11 +377,26 @@ function PunchCard({ matriz }) {
   );
 }
 
+// Racha: semanas seguidas (contando desde la más reciente hacia atrás) con
+// el 100% de lo programado jugado. Una semana sin partidos programados
+// (total===0) no corta la racha — jugados===total trivialmente (0===0).
+function calcRacha(porSemana) {
+  if (!porSemana?.length) return 0;
+  let racha = 0;
+  for (let i = porSemana.length - 1; i >= 0; i--) {
+    if (porSemana[i].jugados === porSemana[i].total) racha++;
+    else break;
+  }
+  return racha;
+}
+
 function MiniMultiChart({ extra }) {
   if (!extra) return null;
-  const { pctTotal, jugados, total, jugadosHoy, diaTop, quedanSemana, matrizActividad } = extra;
+  const { pctTotal, jugados, total, jugadosHoy, diaTop, quedanSemana, matrizActividad, porSemana } = extra;
   const r = 24, C = 2 * Math.PI * r;
   const offset = C - (Math.min(100, pctTotal) / 100) * C;
+  const racha = calcRacha(porSemana);
+  const promedioSemana = porSemana?.length ? (porSemana.reduce((s, w) => s + w.total, 0) / porSemana.length).toFixed(1) : null;
 
   return (
     <div className="dash-mini-multi" style={{ marginTop:18 }}>
@@ -384,12 +412,21 @@ function MiniMultiChart({ extra }) {
           <div className="dash-mini-caption" style={{ fontSize:9, color:'#4A566E', marginTop:4 }}>Avance total</div>
           <div className="dash-mini-caption" style={{ fontSize:9, color:'#6B7A99', marginTop:1 }}>{jugados}/{total} partidos</div>
         </div>
-        <div className="dash-mini-cell" style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-around', gap:6 }}>
+        <div className="dash-mini-cell" style={{ background:'#0B111C', border:'1px solid #1C2535', borderRadius:10, padding:'10px 8px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <MiniStat value={jugadosHoy} label="jugados hoy" color="#22D07A"/>
           <MiniStat value={diaTop ?? '—'} label="día con más partidos" color="#F0B429"/>
           <MiniStat value={quedanSemana} label="quedan esta semana" color="#E8187A"/>
+          <MiniStat value={promedioSemana ?? '—'} label="promedio x semana" color="#60A5FA"/>
         </div>
       </div>
+      {racha >= 2 && (
+        <div style={{
+          display:'flex', alignItems:'center', gap:8, background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.25)',
+          borderRadius:10, padding:'9px 12px', fontSize:12, color:'#F0B429', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:600, marginBottom:10,
+        }}>
+          🔥 Racha: {racha} semanas seguidas con el 100% de los partidos jugados
+        </div>
+      )}
       <PunchCard matriz={matrizActividad}/>
     </div>
   );
@@ -409,10 +446,18 @@ function TrendChart({ data }) {
   }
   const W = 640, H = 190, PAD_L = 6, PAD_R = 6, PAD_T = 18, PAD_B = 24;
   const innerW = W - PAD_L - PAD_R, innerH = H - PAD_T - PAD_B;
-  const maxVal = Math.max(1, ...data.map(d => d.total));
+  // Eje Y con "zoom": en vez de arrancar siempre en 0, arranca un poco por
+  // debajo del mínimo real de la serie. Con semanas parecidas entre sí (ej:
+  // 6, 7, 6, 7, 7, 8, 3 partidos) arrancar en 0 aplasta toda la variación
+  // arriba del todo y la línea queda prácticamente recta — reporte de
+  // Alvaro, 28/08, aprobó esta variante ("Variante A") sobre la de barras.
+  const vals = data.map(d => d.total);
+  const dataMin = Math.min(...vals), dataMax = Math.max(1, ...vals);
+  const rango = Math.max(1, (dataMax - dataMin) * 0.35);
+  const axisMin = Math.max(0, dataMin - rango), axisMax = dataMax + rango * 0.4;
   const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
   const xFor = i => PAD_L + i * stepX;
-  const yFor = v => PAD_T + (1 - v / maxVal) * innerH;
+  const yFor = v => PAD_T + (1 - (v - axisMin) / (axisMax - axisMin)) * innerH;
   const pathFor = key => data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(d[key]).toFixed(1)}`).join(' ');
   const lineTotal = pathFor('total');
   const lineJugados = pathFor('jugados');
@@ -446,8 +491,12 @@ function TrendChart({ data }) {
         ))}
       </svg>
       {hover != null && (
-        <div style={{ position:'absolute', left:`${(xFor(hover) / W) * 100}%`, top:0, transform:'translate(-50%,-8px)', pointerEvents:'none' }}>
-          <ChartTooltip left="50%">
+        // Anclado al punto real (x,y) en vez de siempre "arriba de todo" —
+        // así, si el valor está pegado al techo del gráfico (poco espacio
+        // arriba), el cartel se muestra hacia ABAJO del punto y nunca queda
+        // cortado por el `overflow:hidden` del tile que lo contiene.
+        <div style={{ position:'absolute', left:`${(xFor(hover) / W) * 100}%`, top:yFor(data[hover].jugados), pointerEvents:'none' }}>
+          <ChartTooltip left="50%" below={yFor(data[hover].jugados) < 60}>
             <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>Semana del {fmtSemana(data[hover].wk)}</div>
             <div style={{ color:'#8899BB' }}>{data[hover].jugados} jugados · {data[hover].total} programados</div>
           </ChartTooltip>
@@ -723,9 +772,16 @@ function TeamAvatar({ equipo, size = 30 }) {
   );
 }
 
-function ProximoCard({ proximo, onClick }) {
+// "Próximo partido" → "Próximos partidos": antes mostraba un solo partido y
+// dejaba una franja vacía abajo cuando compartía fila con Alertas/Esta
+// semana (que suelen tener más contenido) — reporte de Alvaro, 28/08
+// ("agregá más fechas ahí donde queda el espacio"). Ahora lista hasta 4,
+// el más próximo destacado con fondo/borde propio, el resto como filas
+// compactas — así el espacio de sobra se usa para adelantar el fin de
+// semana completo en vez de quedar en negro.
+function ProximosCard({ proximos, onClick }) {
   const clickable = !!onClick;
-  if (!proximo) {
+  if (!proximos || proximos.length === 0) {
     return (
       <div onClick={onClick} style={{
         background:'linear-gradient(160deg,#22D07A16,#0B111C 55%)', border:'1px solid #22D07A40', borderTop:'3px solid #22D07A',
@@ -733,16 +789,17 @@ function ProximoCard({ proximo, onClick }) {
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <div style={{ width:32, height:32, borderRadius:9, background:'#22D07A33', border:'1px solid #22D07A77', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><IconCalendar size={15} color="#22D07A"/></div>
-          <div style={{ fontSize:11, color:'#22D07A', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>Próximo partido</div>
+          <div style={{ fontSize:11, color:'#22D07A', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>Próximos partidos</div>
         </div>
-        <div style={{ fontSize:13, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Sin fecha cargada</div>
+        <div style={{ fontSize:13, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Sin fechas cargadas</div>
       </div>
     );
   }
-  const eqL = equipoInfo(proximo.categoria, proximo.equipo_local_id);
-  const eqV = equipoInfo(proximo.categoria, proximo.equipo_visit_id);
-  const fecha = fmtFecha(proximo.fecha_partido);
-  const hora = fmtHora(proximo.hora_inicio);
+  const [destacado, ...resto] = proximos;
+  const eqL = equipoInfo(destacado.categoria, destacado.equipo_local_id);
+  const eqV = equipoInfo(destacado.categoria, destacado.equipo_visit_id);
+  const fecha = fmtFecha(destacado.fecha_partido);
+  const hora = fmtHora(destacado.hora_inicio);
   return (
     <div onClick={onClick} style={{
       background:'linear-gradient(160deg,#22D07A16,#0B111C 55%)', border:'1px solid #22D07A40', borderTop:'3px solid #22D07A',
@@ -750,7 +807,7 @@ function ProximoCard({ proximo, onClick }) {
     }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#22D07A', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.8, textTransform:'uppercase' }}>
-          <IconCalendar size={13} color="#22D07A"/>Próximo
+          <IconCalendar size={13} color="#22D07A"/>Próximos
         </div>
         {fecha && (
           <span style={{ fontSize:10, color:'#8899BB', background:'#141C2A', border:'1px solid #1C2535', borderRadius:100, padding:'2px 8px', flexShrink:0 }}>
@@ -769,6 +826,26 @@ function ProximoCard({ proximo, onClick }) {
           <div style={{ fontSize:10.5, color:'#CBD5E8', textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'100%' }}>{eqV.nombre}</div>
         </div>
       </div>
+      {resto.length > 0 && (
+        <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:2, paddingTop:8, borderTop:'1px solid rgba(34,208,122,.18)' }}>
+          {resto.map(p => {
+            const l = equipoInfo(p.categoria, p.equipo_local_id);
+            const v = equipoInfo(p.categoria, p.equipo_visit_id);
+            const f = fmtFecha(p.fecha_partido);
+            const h = fmtHora(p.hora_inicio);
+            return (
+              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, fontSize:11.5, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif" }}>
+                <TeamAvatar equipo={l} size={18}/>
+                <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{l.nombre}</span>
+                <span style={{ color:'#4A566E', flexShrink:0, fontSize:10 }}>vs</span>
+                <TeamAvatar equipo={v} size={18}/>
+                <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0, flex:1 }}>{v.nombre}</span>
+                <span style={{ color:'#4A566E', flexShrink:0, fontSize:10 }}>{f}{h ? ` · ${h}hs` : ''}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -813,9 +890,10 @@ function PodioCard({ leader, rank, unit, sortBy }) {
   const principal = sortBy === 'total' ? leader.total : leader.value;
   const secundario = sortBy === 'total' ? leader.value : leader.total;
   return (
-    <div style={{
+    <div className={`dash-podio-card dash-podio-rank-${rank}`} style={{
       background: st.bg, border:`1px solid ${st.border}`, borderTop:`3px solid ${st.color}`, borderRadius:12,
       padding:'14px 14px 12px', display:'flex', flexDirection:'column', alignItems:'center', gap:6, minWidth:0,
+      position:'relative', overflow:'hidden',
     }}>
       <div style={{ fontSize:18 }}>{st.medalla}</div>
       {leader.equipo.logo
@@ -837,7 +915,13 @@ function LeaderTableRow({ leader, rank, sortBy }) {
     <div className="dash-table-row">
       <div style={{ color:'#4A566E' }}>{rank}</div>
       <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0, color:'#CBD5E8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-        {leader.equipo.logo && <img src={leader.equipo.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
+        {/* Antes, un equipo sin logo cargado (bastante común en masculino,
+            reporte de Alvaro 28/08 sobre "Líderes") no mostraba NADA en
+            lugar de la imagen — ahora cae al mismo círculo de iniciales que
+            ya usa el podio de arriba, nunca queda vacío. */}
+        {leader.equipo.logo
+          ? <img src={leader.equipo.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>
+          : <div style={{ width:16, height:16, borderRadius:'50%', background:`${leader.equipo.color}44`, border:'1px solid #24304A', display:'flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:700, color:'#EEF2F8', flexShrink:0 }}>{iniciales(leader.nombre)}</div>}
         {leader.nombre}
       </div>
       <div style={{ color:'#6B7A99', textAlign:'right' }}>{leader.pj}</div>
@@ -864,7 +948,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
   const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const [expanded, setExpanded] = useState({});
 
-  const [kpis, setKpis] = useState({ jugados:0, pendientes:0, proximo:null, encuesta:null });
+  const [kpis, setKpis] = useState({ jugados:0, pendientes:0, proximo:null, proximos:[], encuesta:null });
   const [leaders, setLeaders] = useState({ femenino:{}, masculino:{} });
   const [fixture, setFixture] = useState({ femenino:[], masculino:[] });
   const [chart, setChart] = useState({ femenino:[], masculino:[] });
@@ -966,6 +1050,9 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           .filter(p => p.estado === 'pendiente' && p.fecha_partido && p.fecha_partido >= hoy)
           .sort((a, b) => (a.fecha_partido + (a.hora_inicio ?? '')).localeCompare(b.fecha_partido + (b.hora_inicio ?? '')));
         const proximo = proximos[0] ?? null;
+        // Hasta 4 próximos para la nueva "Próximos partidos" (antes solo se
+        // guardaba el primero) — ver ProximosCard.
+        const proximosTop = proximos.slice(0, 4);
 
         let encuesta = null;
         if (encAct?.[0]) {
@@ -974,7 +1061,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           encuesta = { pregunta: encAct[0].pregunta, votos: totalVotos };
         }
 
-        setKpis({ jugados, pendientes, proximo, encuesta });
+        setKpis({ jugados, pendientes, proximo, proximos: proximosTop, encuesta });
 
         // ── Leaders ──
         const jugadorMapFem = buildJugadorMap(jf, 'id');
@@ -1255,7 +1342,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           <AvanceSection puntos={chart[categoria]} extra={extra[categoria]} />
         </div>
         <div className="dash-side-col">
-          <ProximoCard proximo={kpis.proximo} onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
+          <ProximosCard proximos={kpis.proximos} onClick={onNavigate ? () => onNavigate('partidos') : undefined}/>
           <AlertasCard alertas={alertas} onNavigate={onNavigate}/>
           <EstaSemanaCard resumen={resumenSemanal} onNavigate={onNavigate}/>
         </div>
@@ -1375,37 +1462,51 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
               <div style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, color:'#F0B429', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8, textTransform:'uppercase' }}>
                 {f.label}
               </div>
-              <div className="dash-fixture-partidos" style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div className="dash-fixture-partidos">
                 {f.partidos.map(p => {
                   const jugado = p.estado === 'finalizado';
+                  const totalL = jugado ? (Number(p.q1_local||0)+Number(p.q2_local||0)+Number(p.q3_local||0)+Number(p.q4_local||0)+Number(p.ot_local||0)) : null;
+                  const totalV = jugado ? (Number(p.q1_visit||0)+Number(p.q2_visit||0)+Number(p.q3_visit||0)+Number(p.q4_visit||0)+Number(p.ot_visit||0)) : null;
+                  const localGana = jugado && totalL > totalV;
+                  const visitGana = jugado && totalV > totalL;
                   return (
                     <div key={p.id} className="dash-match-row" style={{
-                      display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:9,
+                      display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:9,
                       background:`linear-gradient(115deg, ${p.local.color}22, #0E1420 45%, ${p.visit.color}22)`, border:'1px solid #1C2535',
                     }}>
-                      <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {esPartidoPlayoff(p) && (
-                          <span style={{ fontSize:9, fontWeight:700, letterSpacing:.5, padding:'1px 6px', borderRadius:4, background:'rgba(240,180,41,.15)', color:'#F0B429', border:'1px solid rgba(240,180,41,.35)', flexShrink:0 }}>
-                            🏆 {labelInstanciaCorta(p)}
-                          </span>
-                        )}
-                        {p.local.logo && <img src={p.local.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
-                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.local.nombre}</span>
-                        <span style={{ color:'#2C3A52', flexShrink:0 }}>vs</span>
-                        {p.visit.logo && <img src={p.visit.logo} alt="" width={16} height={16} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>}
-                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.visit.nombre}</span>
-                      </div>
-                      {jugado ? (
-                        <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16, color:'#F0B429', flexShrink:0 }}>
-                          {(Number(p.q1_local||0)+Number(p.q2_local||0)+Number(p.q3_local||0)+Number(p.q4_local||0)+Number(p.ot_local||0))}
-                          {' - '}
-                          {(Number(p.q1_visit||0)+Number(p.q2_visit||0)+Number(p.q3_visit||0)+Number(p.q4_visit||0)+Number(p.ot_visit||0))}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize:11, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0, textAlign:'right' }}>
-                          {fmtFecha(p.fecha_partido) ?? 'sin fecha'}{fmtHora(p.hora_inicio) ? ` · ${fmtHora(p.hora_inicio)}hs` : ''}
-                        </div>
+                      {esPartidoPlayoff(p) && (
+                        <span style={{ fontSize:9, fontWeight:700, letterSpacing:.5, padding:'1px 6px', borderRadius:4, background:'rgba(240,180,41,.15)', color:'#F0B429', border:'1px solid rgba(240,180,41,.35)', flexShrink:0 }}>
+                          🏆 {labelInstanciaCorta(p)}
+                        </span>
                       )}
+                      <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden' }}>
+                        {p.local.logo
+                          ? <img src={p.local.logo} alt="" width={18} height={18} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>
+                          : <div style={{ width:18, height:18, borderRadius:'50%', background:`${p.local.color}44`, border:'1px solid #24304A', display:'flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:700, color:'#EEF2F8', flexShrink:0 }}>{iniciales(p.local.nombre)}</div>}
+                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.local.nombre}</span>
+                      </div>
+                      <div style={{ flexShrink:0, textAlign:'center', minWidth:52 }}>
+                        {jugado ? (
+                          <div style={{ display:'flex', alignItems:'center', gap:4, justifyContent:'center' }}>
+                            <span className={`dash-fx-score ${localGana ? 'win' : 'lose'}`}>{totalL}</span>
+                            <span style={{ color:'#2C3A52', fontSize:10 }}>-</span>
+                            <span className={`dash-fx-score ${visitGana ? 'win' : 'lose'}`}>{totalV}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ color:'#2C3A52', fontSize:11, fontFamily:"'Barlow Condensed',sans-serif" }}>vs</div>
+                            <div style={{ fontSize:9.5, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", whiteSpace:'nowrap' }}>
+                              {fmtFecha(p.fecha_partido) ?? 'sin fecha'}{fmtHora(p.hora_inicio) ? ` · ${fmtHora(p.hora_inicio)}hs` : ''}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', justifyContent:'flex-end', gap:6, fontSize:12.5, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", overflow:'hidden' }}>
+                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.visit.nombre}</span>
+                        {p.visit.logo
+                          ? <img src={p.visit.logo} alt="" width={18} height={18} style={{ borderRadius:'50%', objectFit:'cover', flexShrink:0 }} onError={e=>{e.currentTarget.style.display='none';}}/>
+                          : <div style={{ width:18, height:18, borderRadius:'50%', background:`${p.visit.color}44`, border:'1px solid #24304A', display:'flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:700, color:'#EEF2F8', flexShrink:0 }}>{iniciales(p.visit.nombre)}</div>}
+                      </div>
                     </div>
                   );
                 })}

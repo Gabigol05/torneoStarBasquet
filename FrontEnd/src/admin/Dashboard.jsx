@@ -451,7 +451,13 @@ function TrendChart({ data }) {
   // 6, 7, 6, 7, 7, 8, 3 partidos) arrancar en 0 aplasta toda la variación
   // arriba del todo y la línea queda prácticamente recta — reporte de
   // Alvaro, 28/08, aprobó esta variante ("Variante A") sobre la de barras.
-  const vals = data.map(d => d.total);
+  // OJO: el rango del eje tiene que cubrir las DOS series que se dibujan con
+  // el mismo yFor (jugados Y total) — antes solo miraba "total", que suele
+  // ser parejo semana a semana. Si una semana (típicamente la última, en
+  // curso) tiene pocos jugados frente a su total programado, esa línea
+  // quedaba muy por debajo del piso del eje y el gráfico se veía "cortado"
+  // saliendo por abajo, como reportó Alvaro (semana del 24-ago).
+  const vals = data.flatMap(d => [d.total, d.jugados]);
   const dataMin = Math.min(...vals), dataMax = Math.max(1, ...vals);
   const rango = Math.max(1, (dataMax - dataMin) * 0.35);
   const axisMin = Math.max(0, dataMin - rango), axisMax = dataMax + rango * 0.4;

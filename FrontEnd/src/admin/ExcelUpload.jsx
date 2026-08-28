@@ -419,6 +419,76 @@ async function recalcularPromedios(jugadorIds, tablas, temporadaId) {
   }
 }
 
+// ─── UI: logo de equipo con fallback a iniciales (mismo criterio que
+// TeamAvatar en Dashboard.jsx — si el equipo no tiene logo cargado, o la
+// imagen no llega a bajar, nunca se queda vacío) ──────────────────────────────
+function LogoDot({ nombre, logo, color = '#4A566E', size = 32, radius = '50%' }) {
+  const iniciales = (nombre || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: radius, flexShrink: 0, position: 'relative', overflow: 'hidden',
+      background: `${color}33`, border: `1.5px solid ${color}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.37, fontWeight: 700, color: '#EEF2F8', fontFamily: "'Barlow Condensed',sans-serif",
+    }}>
+      {iniciales}
+      {logo && (
+        <img src={logo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={e => { e.target.style.display = 'none'; }} />
+      )}
+    </div>
+  );
+}
+
+// ─── UI: iconos inline (sin librería) ─────────────────────────────────────────
+const svgProps = size => ({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', width: size, height: size });
+function IcoCalendar({ size = 14 }) { return <svg {...svgProps(size)}><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>; }
+function IcoPin({ size = 14 }) { return <svg {...svgProps(size)}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z" /><circle cx="12" cy="10" r="3" /></svg>; }
+function IcoTrophy({ size = 17 }) { return <svg {...svgProps(size)}><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z" /><path d="M17 5h3a2 2 0 01-2 4M7 5H4a2 2 0 002 4" /></svg>; }
+function IcoUpload({ size = 32 }) { return <svg {...svgProps(size)}><path d="M12 15V3M7 8l5-5 5 5" /><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4" /></svg>; }
+function IcoHistory({ size = 13 }) { return <svg {...svgProps(size)}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>; }
+function IcoPlus({ size = 18 }) { return <svg {...svgProps(size)} strokeWidth={2.4}><path d="M12 5v14M5 12h14" /></svg>; }
+function IcoStar({ size = 18 }) { return <svg {...svgProps(size)} strokeWidth={2.4}><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" /></svg>; }
+
+// ─── UI: estilos que necesitan hover/focus-within/animaciones (imposibles con
+// solo `style` inline en React) — mismo criterio que el <style> de AdminPanel.jsx.
+const XLU_CSS = `
+.xlu-meta{ transition:border-color .18s, background .18s; }
+.xlu-meta:hover{ border-color:#24304A; background:#0E1524; }
+.xlu-meta:focus-within{ border-color:rgba(240,180,41,.55); box-shadow:0 0 0 3px rgba(240,180,41,.12); }
+.xlu-meta input::placeholder{ color:#4A566E; font-weight:500; }
+.xlu-meta input::-webkit-calendar-picker-indicator{ filter:invert(.6); cursor:pointer; }
+.xlu-switch i{ position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#4A566E; transition:.2s; display:block; }
+.xlu-po.on .xlu-switch{ background:linear-gradient(135deg,#F0B429,#FF6B2B); border-color:transparent; }
+.xlu-po.on .xlu-switch i{ left:20px; background:#241900; }
+.xlu-drop{ transition:transform .2s, box-shadow .2s; }
+.xlu-drop:hover{ transform:translateY(-2px); box-shadow:0 20px 50px -25px rgba(240,180,41,.35); }
+.xlu-drop.drag{
+  background:linear-gradient(rgba(240,180,41,.10),rgba(240,180,41,.10)) padding-box,
+    linear-gradient(120deg,#F0B429,#FFD166,#F0B429) border-box !important;
+  box-shadow:0 0 0 6px rgba(240,180,41,.10), 0 24px 60px -28px rgba(240,180,41,.55); transform:scale(1.01);
+}
+.xlu-drop-ic{ animation:xluFloat 3.2s ease-in-out infinite; }
+.xlu-drop.drag .xlu-drop-ic{ background:linear-gradient(135deg,#F0B429,#FF6B2B) !important; border-color:transparent !important; animation:none; }
+.xlu-drop.drag .xlu-drop-ic svg{ stroke:#241900 !important; }
+.xlu-drop.drag h3{ color:#F0B429 !important; }
+@keyframes xluFloat{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-6px);} }
+.xlu-spin{ animation:xluSpin .8s linear infinite; }
+@keyframes xluSpin{ to{ transform:rotate(360deg); } }
+.xlu-progress i{ animation:xluPulseW 1.4s ease-in-out infinite; }
+@keyframes xluPulseW{ 0%,100%{ width:35%;} 50%{ width:75%; } }
+.xlu-rec-row{ transition:border-color .15s, background .15s; }
+.xlu-rec-row:hover{ border-color:#24304A; background:#121A28; }
+.xlu-table tbody tr:hover{ background:#141F30 !important; }
+.xlu-table tbody tr:hover .xlu-edit{ opacity:1; }
+.xlu-edit{ opacity:0; transition:opacity .15s, background .15s, color .15s; }
+.xlu-edit:hover{ background:#141C2A; color:#F0B429 !important; }
+.xlu-btn-publish{ transition:transform .15s; }
+.xlu-btn-publish:hover{ transform:translateY(-1px); }
+.xlu-btn-cancel{ transition:border-color .15s, color .15s; }
+.xlu-btn-cancel:hover{ border-color:#4A566E; color:#EEF2F8; }
+`;
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ExcelUpload({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('femenino');
@@ -521,6 +591,8 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const [pendienteEncontrado, setPendienteEncontrado] = useState(null);
   // _rowId de la fila que se está reasignando a mano en el preview (ver ✏️).
   const [editando,  setEditando]  = useState(null);
+  // Solo visual — resalta el dropzone mientras se arrastra un archivo encima.
+  const [dragOver,  setDragOver]  = useState(false);
   const fileRef = useRef();
 
   // Plantel de un equipo puntual, para el selector manual del preview.
@@ -936,8 +1008,16 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const jugWarnCount = jugadoras.filter(j => j.jugadora && j.matchScore > 0.25).length;
   const jugNuevoCount = jugadoras.filter(j => j.matchMethod === 'nuevo').length;
 
+  // Equipos resueltos (con logo/color) para mostrar en el marcador y en la
+  // tarjeta de confirmación del paso 2 — mismo `buscarEquipo` que ya se usa
+  // para publicar, así que si el nombre del Excel tiene un alias cargado va
+  // a encontrar el logo igual.
+  const eqLocalDisp = parsed ? buscarEquipo(parsed.equipoLocal, fuseEq, roster, equipoAliasMap) : null;
+  const eqVisitDisp = parsed ? buscarEquipo(parsed.equipoVisit, fuseEq, roster, equipoAliasMap) : null;
+
   return (
-    <div>
+    <div className="xlu">
+      <style>{XLU_CSS}</style>
       {/* Stepper */}
       <div style={s.stepper}>
         {[['1','Archivo'],['2','Preview'],['3','Publicar'],['4','Listo']].map(([num,lbl],i)=>{
@@ -946,11 +1026,17 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           const done=i<cur, active=i===cur;
           return (
             <div key={num} style={s.stepWrap}>
-              <div style={{...s.stepDot,background:done?'#22D07A':active?'#F0B429':'#1C2535',color:done||active?'#080C12':'#4A566E'}}>
+              <div style={{
+                ...s.stepDot,
+                background: done ? '#22D07A' : active ? 'linear-gradient(135deg,#F0B429,#FFD166)' : '#141C2A',
+                color: done||active ? '#080C12' : '#4A566E',
+                border: !done && !active ? '1px solid #24304A' : 'none',
+                boxShadow: active ? '0 0 0 5px rgba(240,180,41,.16), 0 6px 18px -4px rgba(240,180,41,.6)' : 'none',
+              }}>
                 {done?'✓':num}
               </div>
-              <div style={{color:active?'#F0B429':done?'#22D07A':'#4A566E',fontSize:12,whiteSpace:'nowrap'}}>{lbl}</div>
-              {i<3&&<div style={{...s.stepLine,background:done?'#22D07A':'#1C2535'}}/>}
+              <div style={{color:active?'#F0B429':done?'#22D07A':'#4A566E',fontSize:12,fontWeight:active?700:400,whiteSpace:'nowrap'}}>{lbl}</div>
+              {i<3&&<div style={{...s.stepLine,background:done?'#22D07A':'#1C2535',overflow:'hidden'}}/>}
             </div>
           );
         })}
@@ -972,20 +1058,20 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             </div>
           )}
           <div style={s.metaRow}>
-            <div style={s.metaGroup}>
-              <label style={s.label}>N° DE FECHA *</label>
+            <div className="xlu-meta" style={s.metaCard}>
+              <div style={s.metaTop}><IcoCalendar/><label style={s.label}>N° de fecha <b style={{color:'#F0B429'}}>*</b></label></div>
               <input type="number" min="1" value={jornada}
-                onChange={e=>setJornada(e.target.value)} style={s.input} placeholder="1"/>
+                onChange={e=>setJornada(e.target.value)} style={s.metaInput} placeholder="1"/>
             </div>
-            <div style={s.metaGroup}>
-              <label style={s.label}>LUGAR (opcional)</label>
+            <div className="xlu-meta" style={s.metaCard}>
+              <div style={s.metaTop}><IcoPin/><label style={s.label}>Lugar (opcional)</label></div>
               <input type="text" value={lugar}
-                onChange={e=>setLugar(e.target.value)} style={s.input} placeholder="Club, cancha..."/>
+                onChange={e=>setLugar(e.target.value)} style={s.metaInput} placeholder="Club, cancha..."/>
             </div>
-            <div style={s.metaGroup}>
-              <label style={s.label}>FECHA DE ESTE PARTIDO (opcional)</label>
+            <div className="xlu-meta" style={s.metaCard}>
+              <div style={s.metaTop}><IcoCalendar/><label style={s.label}>Fecha del partido (opcional)</label></div>
               <input type="date" value={fechaPartido}
-                onChange={e=>setFechaPartido(e.target.value)} style={s.input}/>
+                onChange={e=>setFechaPartido(e.target.value)} style={s.metaInput}/>
             </div>
           </div>
           <p style={{ color:'#4A566E', fontSize:11, margin:'-8px 0 12px' }}>
@@ -998,20 +1084,23 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
               mezclarse con la fecha regular. Este es el flujo que se usa
               para cargar partidos ya jugados con planilla de stats, así que
               es el lugar más importante para marcarlo bien. */}
-          <div style={{
-            background: esPlayoff ? 'rgba(240,180,41,.06)' : 'transparent',
-            border: esPlayoff ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
-            borderRadius: 8, padding: esPlayoff ? '10px 12px' : '0', marginBottom: 16, transition: 'all .15s',
-          }}>
-            <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color: esPlayoff ? '#F0B429' : '#8899BB', cursor:'pointer', fontWeight: esPlayoff ? 700 : 400 }}>
-              <input type="checkbox" checked={esPlayoff} onChange={e => {
-                setEsPlayoff(e.target.checked);
-                if (!e.target.checked) { setCopaPO(''); setInstanciaPO(''); setLlavePO(''); }
-              }}/>
-              🏆 ¿Es Playoff?
-            </label>
+          <div className={`xlu-po${esPlayoff?' on':''}`} style={s.poCard(esPlayoff)}>
+            <div style={s.poHead} onClick={() => {
+              const next = !esPlayoff;
+              setEsPlayoff(next);
+              if (!next) { setCopaPO(''); setInstanciaPO(''); setLlavePO(''); }
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={s.poIcon(esPlayoff)}><IcoTrophy size={17}/></div>
+                <div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:15, color: esPlayoff ? '#F0B429' : '#8899BB' }}>¿Es Playoff?</div>
+                  <div style={{ fontSize:11.5, color:'#4A566E' }}>No cuenta para la tabla de posiciones</div>
+                </div>
+              </div>
+              <div className="xlu-switch" style={s.switchBase}><i/></div>
+            </div>
             {esPlayoff && (
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', padding:'0 16px 16px' }} onClick={e=>e.stopPropagation()}>
                 <select value={copaPO} onChange={e=>setCopaPO(e.target.value)} style={{ ...s.input, flex:'0 0 150px' }}>
                   <option value="">Copa —</option>
                   <option value="oro">Copa de Oro</option>
@@ -1032,7 +1121,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
               </div>
             )}
             {esPlayoff && copaPO && instanciaPO && crucesPO.length > 0 && (
-              <div style={{ marginTop:8, fontSize:11.5, lineHeight:1.6 }}>
+              <div style={{ padding:'0 16px 16px', fontSize:11.5, lineHeight:1.6 }}>
                 <div style={{ color:'#8899BB' }}>Ya cargados con esta Copa + Instancia:</div>
                 {crucesPO.map(c => {
                   const choca = llavePO && Number(c.llave) === Number(llavePO);
@@ -1051,15 +1140,33 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             )}
           </div>
 
-          <div style={s.dropZone} onClick={()=>fileRef.current.click()}
-            onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e);}}>
-            <div style={{fontSize:52,marginBottom:10}}>📁</div>
-            <p style={{color:'#EEF2F8',margin:'0 0 4px',fontSize:17,fontWeight:600}}>
-              {resolving ? 'Resolviendo jugadoras...' : fileName || 'Arrastrá el Excel o hacé click'}
-            </p>
-            <p style={{color:'#4A566E',fontSize:12,margin:0}}>
-              Planilla Torneo Live Basketball (.xlsx)
-            </p>
+          <div className={`xlu-drop${dragOver?' drag':''}`} style={s.dropZone(dragOver)}
+            onClick={()=>fileRef.current.click()}
+            onDragEnter={e=>{e.preventDefault(); setDragOver(true);}}
+            onDragOver={e=>e.preventDefault()}
+            onDragLeave={e=>{e.preventDefault(); setDragOver(false);}}
+            onDrop={e=>{e.preventDefault(); setDragOver(false); handleFile(e);}}>
+            {resolving ? (
+              <>
+                <div className="xlu-spin" style={s.spinner}/>
+                <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:.5,color:'#F0B429',margin:'0 0 6px'}}>Resolviendo jugadoras…</h3>
+                <p style={{color:'#4A566E',fontSize:12.5,margin:0}}>Cruzando nombres del Excel con el plantel</p>
+                <div style={s.progressTrack} className="xlu-progress"><i style={s.progressFill}/></div>
+              </>
+            ) : (
+              <>
+                <div className="xlu-drop-ic" style={s.dropIcon(dragOver)}><IcoUpload size={30}/></div>
+                <h3 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:.5,color:'#EEF2F8',margin:'0 0 6px'}}>
+                  {dragOver ? 'Soltá para cargar' : (fileName || 'Arrastrá el Excel acá')}
+                </h3>
+                <p style={{color:'#4A566E',fontSize:12.5,margin:0}}>
+                  {dragOver ? '' : 'o hacé click para elegirlo · Planilla Torneo Live Basketball (.xlsx)'}
+                </p>
+                {!dragOver && (
+                  <div style={s.dropCta}><IcoPlus size={14}/> Elegir archivo</div>
+                )}
+              </>
+            )}
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} style={{display:'none'}}/>
           </div>
           {parsed?.errores?.length>0 && (
@@ -1070,20 +1177,37 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
           {recientes.length > 0 && (
             <div style={s.recientesBox}>
-              <div style={s.recientesTitle}>Últimas cargas</div>
+              <div style={s.recientesTitle}><IcoHistory size={13}/> Últimas cargas</div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {recientes.map(r => {
                   const numFecha = r[tablas.fechas]?.numero ?? r.fecha_id ?? '?';
                   const conProblema = (r.jugadoras_skip ?? 0) > 0;
+                  const eqL = buscarEquipo(r.equipo_local, fuseEq, roster, equipoAliasMap);
+                  const eqV = buscarEquipo(r.equipo_visit, fuseEq, roster, equipoAliasMap);
                   return (
-                    <div key={r.id} style={s.recienteRow}>
-                      <div style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: conProblema ? '#F0B429' : '#22D07A' }}/>
-                      <div style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'#CBD5E8', fontSize:13 }}>
-                        Fecha {numFecha} · {r.equipo_local} vs {r.equipo_visit}
+                    <div key={r.id} className="xlu-rec-row" style={s.recienteRow}>
+                      <div style={{ width:4, alignSelf:'stretch', borderRadius:3, flexShrink:0, background: conProblema ? '#F0B429' : '#22D07A' }}/>
+                      <div style={{ display:'flex', flexShrink:0 }}>
+                        <LogoDot nombre={eqL?.name ?? r.equipo_local} logo={eqL?.logo} color={eqL?.color} size={26}/>
+                        <div style={{ marginLeft:-9 }}>
+                          <LogoDot nombre={eqV?.name ?? r.equipo_visit} logo={eqV?.logo} color={eqV?.color} size={26}/>
+                        </div>
                       </div>
-                      <div style={{ color:'#4A566E', fontSize:11, flexShrink:0 }}>
-                        {r.jugadoras_ok ?? 0}✓{conProblema ? ` ${r.jugadoras_skip}⚠️` : ''} · {tiempoRelativo(r.cargado_en)}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'#EEF2F8', fontSize:13.5, fontWeight:600 }}>
+                          {r.equipo_local} vs {r.equipo_visit}
+                        </div>
+                        <div style={{ color:'#4A566E', fontSize:11 }}>Fecha {numFecha}</div>
                       </div>
+                      <div style={{
+                        flexShrink:0, fontSize:11.5, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700,
+                        padding:'4px 10px', borderRadius:20,
+                        background: conProblema ? 'rgba(240,180,41,.12)' : 'rgba(34,208,122,.12)',
+                        color: conProblema ? '#F0B429' : '#22D07A',
+                      }}>
+                        {r.jugadoras_ok ?? 0}✓{conProblema ? ` ${r.jugadoras_skip}⚠️` : ''}
+                      </div>
+                      <div style={{ color:'#4A566E', fontSize:11, flexShrink:0, width:56, textAlign:'right' }}>{tiempoRelativo(r.cargado_en)}</div>
                     </div>
                   );
                 })}
@@ -1104,8 +1228,11 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           )}
           {/* Marcador */}
           <div style={s.marcadorCard}>
-            {[{lbl:parsed.equipoLocal,m:parsed.marcador.local},{lbl:parsed.equipoVisit,m:parsed.marcador.visit}].map(({lbl,m},i)=>(
+            {[{lbl:parsed.equipoLocal,m:parsed.marcador.local,eq:eqLocalDisp},{lbl:parsed.equipoVisit,m:parsed.marcador.visit,eq:eqVisitDisp}].map(({lbl,m,eq},i)=>(
               <div key={i} style={s.marcSide}>
+                <div style={{ marginBottom:8 }}>
+                  <LogoDot nombre={eq?.name ?? lbl} logo={eq?.logo} color={eq?.color} size={56} radius={16}/>
+                </div>
                 <div style={s.marcNombre}>{lbl}</div>
                 <div style={s.marcTotal}>{m.total}</div>
                 <div style={s.parciales}>
@@ -1123,16 +1250,23 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
           {/* % tiro */}
           <div style={s.pctRow}>
-            {[{l:'% TL',k:'simples',c:'#22D07A'},{l:'% 2P',k:'dobles',c:'#F0B429'},{l:'% 3P',k:'triples',c:'#60A5FA'}].map(t=>(
-              <div key={t.k} style={s.pctCard}>
-                <div style={{color:'#6B7A99',fontSize:10,marginBottom:4,textTransform:'uppercase',letterSpacing:.5}}>{t.l}</div>
-                <div style={{display:'flex',gap:8,justifyContent:'center',alignItems:'center',fontFamily:"'Bebas Neue',sans-serif",fontSize:20}}>
-                  <span style={{color:'#F04060'}}>{parsed.pct.local[t.k]}%</span>
-                  <span style={{color:'#4A566E',fontSize:10}}>vs</span>
-                  <span style={{color:'#60A5FA'}}>{parsed.pct.visit[t.k]}%</span>
+            {[{l:'% TL',k:'simples'},{l:'% 2P',k:'dobles'},{l:'% 3P',k:'triples'}].map(t=>{
+              const vL = parsed.pct.local[t.k], vV = parsed.pct.visit[t.k];
+              const suma = vL + vV || 1;
+              return (
+                <div key={t.k} style={s.pctCard}>
+                  <div style={{color:'#6B7A99',fontSize:10,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>{t.l}</div>
+                  <div style={{display:'flex',justifyContent:'space-between',fontFamily:"'Bebas Neue',sans-serif",fontSize:19,marginBottom:7}}>
+                    <span style={{color:'#F04060'}}>{vL}%</span>
+                    <span style={{color:'#60A5FA'}}>{vV}%</span>
+                  </div>
+                  <div style={s.pctBar}>
+                    <i style={{display:'block',height:'100%',width:`${(vL/suma)*100}%`,background:'#F04060'}}/>
+                    <i style={{display:'block',height:'100%',width:`${(vV/suma)*100}%`,background:'#60A5FA'}}/>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Warnings del parser */}
@@ -1145,47 +1279,33 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
           {/* Resumen de resolución */}
           <div style={s.resumenBar}>
-            <div style={s.resumenItem}>
-              <span style={s.resumenDot('#22D07A')}/>
-              <span style={{color:'#22D07A',fontWeight:700}}>{jugOkCount} resueltas</span>
-            </div>
+            <span style={s.chip('#22D07A')}><i style={s.chipDot('#22D07A')}/>{jugOkCount} resueltas</span>
             {jugNuevoCount>0 && (
-              <div style={s.resumenItem}>
-                <span style={s.resumenDot('#60A5FA')}/>
-                <span style={{color:'#60A5FA'}}>{jugNuevoCount} jugador(es) nuevo(s)</span>
-              </div>
+              <span style={s.chip('#60A5FA')}><i style={s.chipDot('#60A5FA')}/>{jugNuevoCount} jugador(es) nuevo(s)</span>
             )}
             {jugWarnCount>0 && (
-              <div style={s.resumenItem}>
-                <span style={s.resumenDot('#F0B429')}/>
-                <span style={{color:'#F0B429'}}>{jugWarnCount} confianza media</span>
-              </div>
+              <span style={s.chip('#F0B429')}><i style={s.chipDot('#F0B429')}/>{jugWarnCount} confianza media</span>
             )}
             {jugAmbiguoCount>0 && (
-              <div style={s.resumenItem}>
-                <span style={s.resumenDot('#C084FC')}/>
-                <span style={{color:'#C084FC',fontWeight:700}}>🤔 {jugAmbiguoCount} para resolver a mano (bloquea publicar)</span>
-              </div>
+              <span style={s.chip('#C084FC')}><i style={s.chipDot('#C084FC')}/>🤔 {jugAmbiguoCount} para resolver a mano (bloquea publicar)</span>
             )}
             {jugNoCount>0 && (
-              <div style={s.resumenItem}>
-                <span style={s.resumenDot('#F04060')}/>
-                <span style={{color:'#F04060'}}>{jugNoCount} no resuelt{categoria==='masculino'?'os':'as'} (se ignoran)</span>
-              </div>
+              <span style={s.chip('#F04060')}><i style={s.chipDot('#F04060')}/>{jugNoCount} no resuelt{categoria==='masculino'?'os':'as'} (se ignoran)</span>
             )}
           </div>
 
           {/* Tablas por equipo */}
-          {[{label:parsed.equipoLocal,jugs:localJugs},{label:parsed.equipoVisit,jugs:visitJugs}].map(({label,jugs})=>(
+          {[{label:parsed.equipoLocal,jugs:localJugs,eq:eqLocalDisp},{label:parsed.equipoVisit,jugs:visitJugs,eq:eqVisitDisp}].map(({label,jugs,eq})=>(
             <div key={label} style={{marginBottom:28}}>
-              <div style={s.teamLabel}>
-                {label}
-                <span style={{color:'#4A566E',fontSize:13,fontFamily:'Barlow Condensed',marginLeft:10}}>
+              <div style={s.teamHead}>
+                <LogoDot nombre={eq?.name ?? label} logo={eq?.logo} color={eq?.color} size={34} radius={10}/>
+                <div style={s.teamHeadName}>{label}</div>
+                <span style={s.teamHeadRatio}>
                   {jugs.filter(j=>j.jugadora||j.matchMethod==='nuevo').length}/{jugs.length} jugadoras
                 </span>
               </div>
-              <div style={{overflowX:'auto'}}>
-                <table style={s.table}>
+              <div style={{overflowX:'auto',borderRadius:14,border:'1px solid #1C2535'}}>
+                <table style={s.table} className="xlu-table">
                   <thead>
                     <tr>
                       {['#','Nombre plantel (Excel)','PTS','VAL','TL C/F','2P C/F','3P C/F','AS','RD','RO','ROB','TAP','PÉR','FP'].map((h,hi)=>(
@@ -1204,6 +1324,13 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                         : j.matchScore>0.25 ? '#F0B429' : '#EEF2F8';
                       const methodBadge = esAmbiguo ? '🤔' : esNuevo ? '🆕' : esManual ? '✋'
                         : !j.jugadora ? '❌' : j.matchMethod==='alias' ? '🔗' : j.matchScore<0.15 ? '✅' : '~';
+                      const pill = esAmbiguo ? { txt:'🤔 ambiguo', bg:'rgba(192,132,252,.16)', c:'#C084FC' }
+                        : esNuevo ? { txt:'🆕 nuevo', bg:'rgba(96,165,250,.14)', c:'#60A5FA' }
+                        : esManual ? { txt:'✋ manual', bg:'rgba(34,208,122,.14)', c:'#22D07A' }
+                        : !j.jugadora ? { txt:'❌', bg:'rgba(240,64,96,.14)', c:'#F04060' }
+                        : j.matchMethod==='alias' ? { txt:'🔗 alias', bg:'rgba(34,208,122,.14)', c:'#22D07A' }
+                        : j.matchScore<0.15 ? { txt:'✅', bg:'rgba(238,242,248,.08)', c:'#EEF2F8' }
+                        : { txt:'~ media', bg:'rgba(240,180,41,.14)', c:'#F0B429' };
                       const rowBg = i%2===0?'#0E1420':'#141C2A';
                       return (
                         <tr key={j._rowId} style={{background:rowBg,opacity:(j.jugadora||esNuevo)?1:0.4}}>
@@ -1227,16 +1354,16 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                             ) : (
                               <div style={{display:'flex',alignItems:'flex-start',gap:4}}>
                                 <div style={{flex:1,minWidth:0}}>
-                                  <div style={{color,fontWeight:600,fontSize:13}}>
-                                    {methodBadge} {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
+                                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                    <span style={{display:'inline-flex',alignItems:'center',fontSize:9.5,fontWeight:700,padding:'2px 7px',borderRadius:20,background:pill.bg,color:pill.c,fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
+                                      {pill.txt}
+                                    </span>
+                                    <span style={{color,fontWeight:600,fontSize:13}}>
+                                      {j.jugadora ? j.jugadora.nombre : j.nombreRaw}
+                                    </span>
                                   </div>
-                                  <div style={{color:'#4A566E',fontSize:10}}>
+                                  <div style={{color:'#4A566E',fontSize:10,marginTop:2}}>
                                     {j.nombreRaw}
-                                    {j.matchMethod && (j.jugadora || esNuevo) && (
-                                      <span style={{marginLeft:6,color: j.matchMethod==='alias'?'#22D07A':'#6B7A99'}}>
-                                        [{j.matchMethod}]
-                                      </span>
-                                    )}
                                   </div>
                                   {esAmbiguo && j.candidatosAmbiguos?.length > 0 && (
                                     <div style={{color:'#C084FC',fontSize:10,marginTop:2}}>
@@ -1244,8 +1371,8 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                                     </div>
                                   )}
                                 </div>
-                                <button onClick={()=>setEditando(j._rowId)} title="Elegir jugador/a manualmente"
-                                  style={{background:'transparent',border:'none',color:esAmbiguo?'#C084FC':'#4A566E',cursor:'pointer',fontSize:12,padding:'2px 2px',flexShrink:0}}>
+                                <button className="xlu-edit" onClick={()=>setEditando(j._rowId)} title="Elegir jugador/a manualmente"
+                                  style={{background:'transparent',border:'none',borderRadius:7,color:esAmbiguo?'#C084FC':'#4A566E',cursor:'pointer',fontSize:12,padding:'3px 4px',flexShrink:0,opacity:esAmbiguo?1:undefined}}>
                                   ✏️
                                 </button>
                               </div>
@@ -1283,11 +1410,15 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             border: esPlayoff ? '1px solid rgba(240,180,41,.35)' : '1px solid #1C2535',
             borderRadius: 12, padding: '16px 18px', marginTop: 20, marginBottom: 4,
           }}>
-            <div style={{color:'#6B7A99',fontSize:11,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+            <div style={{color:'#6B7A99',fontSize:11,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>
               Antes de publicar, revisá
             </div>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:.5,color:'#EEF2F8',marginBottom:10}}>
-              {parsed.equipoLocal} <span style={{color:'#4A566E',fontSize:16}}>vs</span> {parsed.equipoVisit}
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
+              <LogoDot nombre={eqLocalDisp?.name ?? parsed.equipoLocal} logo={eqLocalDisp?.logo} color={eqLocalDisp?.color} size={30} radius={9}/>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:19,color:'#EEF2F8'}}>{parsed.equipoLocal}</span>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:'#4A566E'}}>vs</span>
+              <LogoDot nombre={eqVisitDisp?.name ?? parsed.equipoVisit} logo={eqVisitDisp?.logo} color={eqVisitDisp?.color} size={30} radius={9}/>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:19,color:'#EEF2F8'}}>{parsed.equipoVisit}</span>
             </div>
             <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontSize:13,color:'#8899BB'}}>
@@ -1326,12 +1457,12 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
               🤔 Hay {jugAmbiguoCount} jugador(es) con nombre ambiguo (compañeros de equipo con nombres parecidos). Elegí quién es cada uno con el ✏️ en la tabla antes de publicar.
             </div>
           )}
-          <div style={{display:'flex',gap:12,marginTop:12}}>
-            <button onClick={()=>handlePublish(false)} disabled={!jornada || jugAmbiguoCount>0}
+          <div style={{display:'flex',gap:12,marginTop:12,flexWrap:'wrap'}}>
+            <button className="xlu-btn-publish" onClick={()=>handlePublish(false)} disabled={!jornada || jugAmbiguoCount>0}
               style={{...s.btnPublish,opacity:(jornada && jugAmbiguoCount===0)?1:0.5}}>
-              🚀 PUBLICAR PARTIDO
+              <IcoStar size={17}/> PUBLICAR PARTIDO
             </button>
-            <button onClick={reset} style={s.btnCancel}>← Volver</button>
+            <button className="xlu-btn-cancel" onClick={reset} style={s.btnCancel}>← Volver</button>
           </div>
         </>
       )}
@@ -1358,11 +1489,11 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             Si sobreescribís, se borran el partido anterior y todas sus estadísticas.
           </p>
           <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
-            <button onClick={()=>handlePublish(true)}
+            <button className="xlu-btn-publish" onClick={()=>handlePublish(true)}
               style={{...s.btnPublish,background:'linear-gradient(135deg,#F04060,#B91C1C)',maxWidth:220}}>
               🗑️ SOBREESCRIBIR
             </button>
-            <button onClick={()=>setStep('preview')} style={s.btnCancel}>
+            <button className="xlu-btn-cancel" onClick={()=>setStep('preview')} style={s.btnCancel}>
               ← Volver al preview
             </button>
           </div>
@@ -1398,10 +1529,10 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             en la Fecha {jornada} tipeada arriba.
           </p>
           <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
-            <button onClick={()=>handlePublish(false, pendienteEncontrado)} style={{...s.btnPublish,maxWidth:280}}>
+            <button className="xlu-btn-publish" onClick={()=>handlePublish(false, pendienteEncontrado)} style={{...s.btnPublish,maxWidth:280}}>
               📎 SÍ, PUBLICAR EN ESE PARTIDO
             </button>
-            <button onClick={()=>handlePublish(false, null, true)} style={s.btnCancel}>
+            <button className="xlu-btn-cancel" onClick={()=>handlePublish(false, null, true)} style={s.btnCancel}>
               ➕ No, crear uno nuevo en Fecha {jornada}
             </button>
           </div>
@@ -1452,7 +1583,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             <p key={i} style={{color:'#F0B429',fontSize:14,margin:'4px 0'}}>{l}</p>
           ))}
           <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:20}}>
-            <button onClick={reset} style={{...s.btnPublish,maxWidth:260}}>
+            <button className="xlu-btn-publish" onClick={reset} style={{...s.btnPublish,maxWidth:260}}>
               + Cargar otro partido
             </button>
           </div>
@@ -1464,37 +1595,57 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
 const s = {
   stepper:    {display:'flex',alignItems:'center',marginBottom:28,gap:0},
-  stepWrap:   {display:'flex',alignItems:'center',gap:6,flex:1},
-  stepDot:    {width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0},
-  stepLine:   {flex:1,height:2,borderRadius:1},
-  metaRow:    {display:'flex',gap:16,marginBottom:20,flexWrap:'wrap'},
-  metaGroup:  {display:'flex',flexDirection:'column',gap:6,flex:1,minWidth:140},
-  label:      {fontSize:10,fontWeight:700,letterSpacing:2,color:'#4A566E'},
-  input:      {padding:'11px 12px',background:'#141C2A',border:'1px solid #1C2535',borderRadius:8,color:'#EEF2F8',fontSize:14,outline:'none'},
-  dropZone:   {border:'2px dashed #1C2535',borderRadius:14,padding:'2.5rem 1rem',textAlign:'center',cursor:'pointer',marginBottom:20,transition:'border-color .2s, background .2s',background:'linear-gradient(160deg,#101826,#0B111C)'},
+  stepWrap:   {display:'flex',alignItems:'center',gap:9,flex:1},
+  stepDot:    {width:32,height:32,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,flexShrink:0,transition:'.25s'},
+  stepLine:   {flex:1,height:2,borderRadius:2,margin:'0 4px'},
+  metaRow:    {display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'},
+  metaCard:   {flex:1,minWidth:180,background:'#0B111C',border:'1px solid #1C2535',borderRadius:14,padding:'12px 14px 13px'},
+  metaTop:    {display:'flex',alignItems:'center',gap:7,marginBottom:8,color:'#4A566E'},
+  label:      {fontSize:10,fontWeight:700,letterSpacing:1.6,color:'#4A566E',textTransform:'uppercase'},
+  metaInput:  {width:'100%',background:'transparent',border:'none',outline:'none',color:'#EEF2F8',fontSize:16,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:600,padding:0},
+  input:      {padding:'9px 11px',background:'#101826',border:'1px solid #24304A',borderRadius:9,color:'#EEF2F8',fontSize:13.5,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:600,outline:'none'},
+  poCard:     on=>({borderRadius:14,marginBottom:22,border:on?'1px solid rgba(240,180,41,.4)':'1px solid #1C2535',background:on?'linear-gradient(160deg,rgba(240,180,41,.07),#0B111C 70%)':'#0B111C',overflow:'hidden',transition:'.2s'}),
+  poHead:     {display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',cursor:'pointer'},
+  poIcon:     on=>({width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'.2s',background:on?'linear-gradient(135deg,#F0B429,#FF6B2B)':'#141C2A',color:on?'#241900':'#4A566E'}),
+  switchBase: {width:42,height:24,borderRadius:20,background:'#141C2A',border:'1px solid #24304A',position:'relative',flexShrink:0},
+  dropZone:   drag=>({position:'relative',borderRadius:20,padding:'44px 20px',textAlign:'center',cursor:'pointer',marginBottom:20,overflow:'hidden',
+                background: drag
+                  ? 'linear-gradient(rgba(240,180,41,.10),rgba(240,180,41,.10)) padding-box, linear-gradient(120deg,#F0B429,#FFD166,#F0B429) border-box'
+                  : 'linear-gradient(#0B111C,#0B111C) padding-box, linear-gradient(120deg,rgba(240,180,41,.55),rgba(255,107,43,.35),rgba(240,180,41,.55)) border-box',
+                border:'2px dashed transparent'}),
+  dropIcon:   drag=>({width:72,height:72,margin:'0 auto 14px',borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',
+                background: drag ? 'linear-gradient(135deg,#F0B429,#FF6B2B)' : 'linear-gradient(150deg,#141C2A,#101826)',
+                border: drag ? 'none' : '1px solid #24304A', color: drag ? '#241900' : '#F0B429'}),
+  spinner:    {width:40,height:40,borderRadius:'50%',border:'3px solid #24304A',borderTopColor:'#F0B429',margin:'0 auto 14px'},
+  progressTrack:{maxWidth:240,height:5,margin:'14px auto 0',borderRadius:4,background:'#141C2A',overflow:'hidden'},
+  progressFill:{display:'block',height:'100%',width:'40%',borderRadius:4,background:'linear-gradient(90deg,#F0B429,#FFD166)'},
+  dropCta:    {display:'inline-flex',alignItems:'center',gap:7,marginTop:16,padding:'9px 20px',borderRadius:30,background:'#141C2A',border:'1px solid #24304A',color:'#8899BB',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:600,fontSize:13},
   errBox:     {background:'rgba(240,64,96,.1)',border:'1px solid rgba(240,64,96,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F04060',fontSize:14},
   warnBox:    {background:'rgba(240,180,41,.08)',border:'1px solid rgba(240,180,41,.25)',borderRadius:8,padding:'12px 16px',marginBottom:16,color:'#F0B429',fontSize:13},
-  recientesBox:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:12,padding:'14px 16px'},
-  recientesTitle:{fontSize:10,fontWeight:700,letterSpacing:2,color:'#4A566E',marginBottom:10,textTransform:'uppercase'},
-  recienteRow:{display:'flex',alignItems:'center',gap:10,padding:'6px 4px'},
-  marcadorCard:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:14,padding:'1.5rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
-  marcSide:   {flex:1,textAlign:'center',minWidth:120},
-  marcNombre: {fontFamily:"'Bebas Neue',sans-serif",fontSize:17,letterSpacing:1,color:'#EEF2F8',marginBottom:4},
-  marcTotal:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:62,color:'#F0B429',lineHeight:1},
+  recientesBox:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:16,padding:'16px 16px 8px'},
+  recientesTitle:{display:'flex',alignItems:'center',gap:8,fontSize:10.5,fontWeight:700,letterSpacing:2,color:'#4A566E',marginBottom:10,textTransform:'uppercase'},
+  recienteRow:{display:'flex',alignItems:'center',gap:12,padding:'10px',borderRadius:11,marginBottom:8,background:'#101826',border:'1px solid transparent'},
+  marcadorCard:{background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:18,padding:'1.4rem',display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:16,gap:16,flexWrap:'wrap'},
+  marcSide:   {flex:1,textAlign:'center',minWidth:130,display:'flex',flexDirection:'column',alignItems:'center'},
+  marcNombre: {fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:1,color:'#EEF2F8',marginBottom:4},
+  marcTotal:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:56,color:'#F0B429',lineHeight:1},
   parciales:  {display:'flex',gap:6,justifyContent:'center',marginTop:6,flexWrap:'wrap'},
   parcial:    {background:'#141C2A',padding:'3px 8px',borderRadius:4,fontSize:13,color:'#EEF2F8'},
-  vs:         {fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:'#4A566E'},
+  vs:         {fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:'#4A566E'},
   pctRow:     {display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'},
-  pctCard:    {flex:1,minWidth:90,background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:8,padding:'10px 12px',textAlign:'center'},
-  resumenBar: {display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center',padding:'12px 16px',background:'linear-gradient(160deg,#101826,#0B111C)',borderRadius:10,border:'1px solid #1C2535'},
-  resumenItem:{display:'flex',alignItems:'center',gap:6},
-  resumenDot: c=>({width:8,height:8,borderRadius:'50%',background:c,flexShrink:0}),
-  teamLabel:  {fontFamily:"'Bebas Neue',sans-serif",fontSize:19,letterSpacing:1,color:'#EEF2F8',marginBottom:10,paddingBottom:8,borderBottom:'1px solid #1C2535'},
+  pctCard:    {flex:1,minWidth:130,background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:14,padding:'12px 14px'},
+  pctBar:     {height:6,borderRadius:4,background:'#141C2A',overflow:'hidden',display:'flex'},
+  resumenBar: {display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center',padding:'13px 16px',background:'linear-gradient(160deg,#101826,#0B111C)',borderRadius:14,border:'1px solid #1C2535'},
+  chip:       c=>({display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:700,padding:'5px 12px',borderRadius:20,fontFamily:"'Barlow Condensed',sans-serif",background:`${c}1F`,color:c}),
+  chipDot:    c=>({width:7,height:7,borderRadius:'50%',background:c,flexShrink:0}),
+  teamHead:   {display:'flex',alignItems:'center',gap:10,marginBottom:12},
+  teamHeadName:{fontFamily:"'Bebas Neue',sans-serif",fontSize:19,letterSpacing:1,color:'#EEF2F8'},
+  teamHeadRatio:{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12.5,color:'#4A566E',background:'#141C2A',padding:'3px 10px',borderRadius:20},
   table:      {width:'100%',borderCollapse:'collapse',fontSize:12},
   th:         {background:'#141C2A',color:'#6B7A99',padding:'8px 10px',textAlign:'center',fontSize:10,whiteSpace:'nowrap'},
   td:         {padding:'7px 8px',textAlign:'center',color:'#EEF2F8',borderBottom:'1px solid #1C2535'},
-  btnPublish: {flex:1,maxWidth:280,padding:'13px',background:'linear-gradient(135deg,#F0B429,#FF6B2B)',border:'none',borderRadius:10,color:'#080C12',fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:1,cursor:'pointer'},
-  btnCancel:  {padding:'10px 20px',background:'transparent',border:'1px solid #4A566E',borderRadius:8,color:'#6B7A99',cursor:'pointer',fontSize:14},
+  btnPublish: {flex:1,maxWidth:280,padding:'14px',background:'linear-gradient(135deg,#F0B429,#FF6B2B)',border:'none',borderRadius:12,color:'#080C12',fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:1,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:9,boxShadow:'0 14px 34px -14px rgba(240,180,41,.55)'},
+  btnCancel:  {padding:'11px 22px',background:'transparent',border:'1px solid #24304A',borderRadius:12,color:'#8899BB',cursor:'pointer',fontSize:13.5,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:600},
   logBox:     {background:'linear-gradient(160deg,#101826,#0B111C)',border:'1px solid #1C2535',borderRadius:12,padding:'1.5rem',minHeight:200},
   successBox: {textAlign:'center',padding:'3rem 1rem',background:'linear-gradient(160deg,rgba(34,208,122,.08),#0B111C)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
   dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'linear-gradient(160deg,rgba(240,180,41,.08),#0B111C)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},

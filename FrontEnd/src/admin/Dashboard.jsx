@@ -221,10 +221,20 @@ function KpiCard({ icon, label, value, sub, accent, onClick }) {
 // del máximo) — si no, el cartel se dibuja por fuera del contenedor y en
 // cualquier tile con `overflow:hidden` (como .mosaic-tile, por el brillo
 // dorado en la esquina) queda cortado a la mitad (reporte de Alvaro, 28/08).
-function ChartTooltip({ left, below, children }) {
+// hAlign resuelve el mismo problema que `below` pero en horizontal: un
+// tooltip centrado sobre un punto pegado al borde izquierdo/derecho del
+// gráfico (primera/última semana, primer/último día) se sale del contenedor
+// y `.mosaic-tile{overflow:hidden}` lo corta — reporte de Alvaro, 28/08
+// ("Semana del 24-ago" y "Semana del 03-ago" cortados en los bordes).
+// 'start' pega el borde izquierdo del cartel al punto (se extiende a la
+// derecha); 'end' pega el borde derecho (se extiende a la izquierda).
+function ChartTooltip({ left = '50%', below, hAlign = 'center', children }) {
+  const hPos = hAlign === 'start' ? { left: 0, transform: 'none' }
+    : hAlign === 'end' ? { left: 'auto', right: 0, transform: 'none' }
+    : { left, transform: 'translateX(-50%)' };
   return (
     <div style={{
-      position:'absolute', left, transform:'translateX(-50%)',
+      position:'absolute', ...hPos,
       ...(below ? { top:'calc(100% + 8px)' } : { bottom:'calc(100% + 8px)' }),
       background:'#0E1420', border:'1px solid #F0B42955', borderRadius:8, padding:'7px 11px',
       fontSize:11, whiteSpace:'nowrap', zIndex:5, boxShadow:'0 4px 16px rgba(0,0,0,.5)',
@@ -256,7 +266,7 @@ function SegmentedTrack({ puntos }) {
             <div key={p.id} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
               style={{ flex:1, position:'relative', cursor:'pointer', minWidth:0 }}>
               {activo && (
-                <ChartTooltip left="50%">
+                <ChartTooltip hAlign={i === 0 ? 'start' : i === puntos.length - 1 ? 'end' : 'center'}>
                   <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>{p.label}</div>
                   <div style={{ color:'#8899BB' }}>{p.finalizados}/{p.total} jugados · {Math.round(pct)}%</div>
                 </ChartTooltip>
@@ -355,7 +365,7 @@ function PunchCard({ matriz }) {
                       transition:'box-shadow .15s',
                     }}/>
                     {esActivo && (
-                      <ChartTooltip left="50%">
+                      <ChartTooltip hAlign={di === 0 ? 'start' : di === semana.dias.length - 1 ? 'end' : 'center'}>
                         <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>{fmtDiaLargo(d.iso)}</div>
                         <div style={{ color:'#8899BB' }}>{d.total === 0 ? 'Sin partidos' : `${d.jugados}/${d.total} jugados`}</div>
                       </ChartTooltip>
@@ -502,7 +512,10 @@ function TrendChart({ data }) {
         // arriba), el cartel se muestra hacia ABAJO del punto y nunca queda
         // cortado por el `overflow:hidden` del tile que lo contiene.
         <div style={{ position:'absolute', left:`${(xFor(hover) / W) * 100}%`, top:yFor(data[hover].jugados), pointerEvents:'none' }}>
-          <ChartTooltip left="50%" below={yFor(data[hover].jugados) < 60}>
+          <ChartTooltip
+            below={yFor(data[hover].jugados) < 60}
+            hAlign={xFor(hover) / W < 0.15 ? 'start' : xFor(hover) / W > 0.85 ? 'end' : 'center'}
+          >
             <div style={{ color:'#F0B429', fontWeight:700, marginBottom:2 }}>Semana del {fmtSemana(data[hover].wk)}</div>
             <div style={{ color:'#8899BB' }}>{data[hover].jugados} jugados · {data[hover].total} programados</div>
           </ChartTooltip>

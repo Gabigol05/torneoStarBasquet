@@ -744,7 +744,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     if (ids.length === 0) return null;
     const { data, error } = await supabase
       .from(tablas.partidos)
-      .select('id, fecha_id, estado, es_playoff, copa, instancia, llave')
+      .select('id, fecha_id, estado, es_playoff, copa, instancia, llave, equipo_local_id, equipo_visit_id')
       .in('fecha_id', ids)
       .eq('estado', 'pendiente')
       .or(`and(equipo_local_id.eq.${eqLId},equipo_visit_id.eq.${eqVId}),and(equipo_local_id.eq.${eqVId},equipo_visit_id.eq.${eqLId})`);
@@ -827,7 +827,31 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
 
       // Partido
       addLog(attachPartido ? '🏀 Actualizando partido...' : '🏀 Insertando partido...');
-      const m=parsed.marcador, p=parsed.pct;
+      // BUG REAL (reporte de Alvaro, dos partidos seguidos con el ganador
+      // invertido pese a que "las estadísticas están bien"): el Excel arma
+      // "local"/"visit" según el ORDEN de las filas del marcador (la fila de
+      // arriba es local, la de abajo es visit) — un criterio que no tiene por
+      // qué coincidir con qué equipo quedó cargado como local/visitante
+      // cuando el partido se agendó de antemano (Publicar fecha/Playoffs).
+      // buscarPendiente() ya buscaba el partido agendado SIN importar el
+      // orden (por eso "adjuntar" encontraba el partido igual), pero el
+      // UPDATE de acá abajo nunca comparaba: escribía q1_local/q1_visit tal
+      // cual los daba el Excel, así que si el Excel esa vez tenía las filas
+      // al revés respecto de cómo había quedado agendado, el marcador se
+      // guardaba invertido — mientras que los jugadores (con equipo propio,
+      // no un "local"/"visit" de este partido puntual) quedaban bien, que es
+      // justo lo que reportó Alvaro ("las stats están bien pero marca mal
+      // quien ganó"). Si estamos ADJUNTANDO a un partido ya agendado, hay que
+      // alinear el marcador/porcentajes del Excel a como quedó agendado ese
+      // partido, no al orden en que vinieron las filas esta vez.
+      const invertido = !!attachPartido && attachPartido.equipo_local_id === eqVId && attachPartido.equipo_visit_id === eqLId;
+      const m = invertido
+        ? { local: parsed.marcador.visit, visit: parsed.marcador.local }
+        : parsed.marcador;
+      const p = invertido
+        ? { local: parsed.pct.visit, visit: parsed.pct.local }
+        : parsed.pct;
+      if (invertido) addLog('↔️ El Excel traía los equipos en el orden inverso al ya agendado — se acomoda el marcador antes de guardar.');
       if (m.local.total === m.visit.total) {
         throw new Error(`El Excel da un empate ${m.local.total}-${m.visit.total} — el básquet no admite empates, revisá la planilla antes de publicar.`);
       }

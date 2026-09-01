@@ -53,14 +53,28 @@ export function ToastContainer({ toasts, onRemove }) {
 // equipoId ya protegía el caso de cambiar de modo (femenino/masculino,
 // que son IDs de equipo distintos) pero NO el de cambiar de temporada
 // dentro de la MISMA categoría, porque los equipos (y sus IDs) son los
-// mismos — solo cambia qué partidos trae cada temporada. Ahora, cada vez
-// que cambia `temporadaKey`, se toma como una foto nueva (se guarda el
-// snapshot sin avisar) en vez de comparar contra la temporada anterior.
+// mismos — solo cambia qué partidos trae cada temporada.
+//
+// ⚠️ Segunda vuelta de este mismo fix: la primera versión reseteaba la
+// base de comparación apenas veía cambiar `temporadaKey` — pero ese
+// cambio llega en un render ANTES de que el fetch de la temporada nueva
+// termine (`equipos` todavía tenía, por un instante, los datos de la
+// temporada anterior con `isLoading` ya de nuevo en false). Ese instante
+// quedaba guardado como "la base" para la key nueva — y en cuanto los
+// datos reales de la temporada nueva llegaban un momento después, se
+// comparaban contra esa base vieja/incorrecta y disparaban el mismo
+// alud de toasts que se quería evitar. Ahora la base solo se actualiza
+// en el momento en que un ciclo de carga (isLoading true → false) recién
+// terminó — así nunca se toma una foto a mitad de camino como base.
 export function useResultadosToast(equipos, addToast, isLoading = false, temporadaKey = null) {
   const prevRef = useRef(null);
-  const prevKeyRef = useRef(undefined);
+  const settledKeyRef = useRef(undefined); // key para la que prevRef es confiable
+  const wasLoadingRef = useRef(isLoading);
 
   useEffect(() => {
+    const justFinishedLoading = wasLoadingRef.current && !isLoading;
+    wasLoadingRef.current = isLoading;
+
     // Mientras todavía está cargando, "equipos" puede ser el placeholder
     // (historial:[] para todos). Si tomáramos ese placeholder como snapshot
     // base, en cuanto llegaran los datos reales TODOS los equipos con
@@ -75,13 +89,20 @@ export function useResultadosToast(equipos, addToast, isLoading = false, tempora
       snapshot[eq.id] = eq.historial?.length ?? 0;
     }
 
-    // Cambió la temporada/modo que se está mirando — es un conjunto de
-    // datos distinto, no "resultados nuevos". Se guarda el snapshot nuevo
-    // sin avisar, y recién se vuelve a comparar contra la próxima
-    // actualización real de ESTA temporada.
-    if (prevKeyRef.current !== temporadaKey) {
-      prevKeyRef.current = temporadaKey;
-      prevRef.current = snapshot;
+    const keyIsNueva = settledKeyRef.current !== temporadaKey;
+
+    if (keyIsNueva) {
+      // Cambió la temporada/modo que se está mirando — es un conjunto de
+      // datos distinto, no "resultados nuevos". Solo se toma este
+      // snapshot como base nueva si venimos de un ciclo de carga real
+      // recién terminado (o es la primerísima vez, sin base todavía) —
+      // si `equipos` todavía es un remanente de la temporada anterior
+      // (isLoading ya en false pero el fetch nuevo ni arrancó), se espera
+      // sin tocar nada hasta el próximo ciclo de carga real.
+      if (justFinishedLoading || prevRef.current === null) {
+        settledKeyRef.current = temporadaKey;
+        prevRef.current = snapshot;
+      }
       return;
     }
 

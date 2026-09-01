@@ -31,7 +31,7 @@ const EDICION_OFFSET = { femenino: 0, masculino: 5 };
 
 export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const { mode, toggleMode } = useTournament();
-  const { temporadas } = useTemporada();
+  const { temporadas, esTemporadaActiva } = useTemporada();
 
   // ⚠️ FIX: antes "Edicion" estaba hardcodeado en 1 (femenino) y 6
   // (masculino) para siempre — no se movía nunca, ni cuando se cerraba una
@@ -48,14 +48,21 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     ).length;
     const jugadorasTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
 
+    // ⚠️ FIX: antes decía "En Curso" siempre, sin importar si ya se había
+    // jugado o no un solo partido, y sin importar si la temporada que se
+    // está mirando (chip de arriba) ya terminó. Ahora hay 3 estados: si la
+    // temporada que se está mirando NO es la activa (una archivada, ej.
+    // "Temporada 2026 - Apertura" ya jugada entera) dice "Finalizado" — sin
+    // importar que en su momento haya tenido fechas jugadas. Si es la
+    // activa, usa el mismo criterio que ya tenía el masculino: "En Curso"
+    // recién cuando hay al menos una fecha jugada, si no "Arranca Pronto".
+    const finalizada = !esTemporadaActiva('femenino');
+    const badge = finalizada
+      ? 'Torneo Femenino - Finalizado'
+      : (fechasJugadas > 0 ? 'Torneo Femenino - En Curso' : 'Torneo Femenino - Arranca Pronto');
+
     return {
-      // ⚠️ FIX: antes decía "En Curso" siempre, sin importar si ya se había
-      // jugado o no un solo partido — al crear una temporada nueva (que
-      // arranca en 0) seguía mostrando "En Curso" aunque todavía faltaran
-      // semanas para el primer partido. Ahora usa el mismo criterio que ya
-      // tenía el masculino: recién dice "En Curso" cuando hay al menos una
-      // fecha jugada.
-      badge: fechasJugadas > 0 ? 'Torneo Femenino - En Curso' : 'Torneo Femenino - Arranca Pronto',
+      badge,
       subtitle: 'Categoria Femenina - Cordoba - 2026',
       stats: [
         { end: edicionFemenino, label: 'Edicion' },
@@ -64,7 +71,7 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
         { end: jugadorasTotal || 200, label: 'Jugadoras' },
       ],
     };
-  }, [equipos, partidos, fechas, edicionFemenino]);
+  }, [equipos, partidos, fechas, edicionFemenino, esTemporadaActiva]);
 
   // Antes era un objeto fijo (HERO_MASCULINO) con "Proximamente" y "0 Fechas"
   // pegado con alfileres — se iba a quedar diciendo eso para siempre. Ahora
@@ -76,8 +83,16 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     ).length;
     const jugadoresTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
 
+    // Mismo criterio de 3 estados que el femenino (ver más arriba): si la
+    // temporada que se está mirando ya no es la activa, "Finalizado" —
+    // sin importar cuántas fechas se hayan jugado en su momento.
+    const finalizada = !esTemporadaActiva('masculino');
+    const badge = finalizada
+      ? 'Torneo Masculino - Finalizado'
+      : (fechasJugadas > 0 ? 'Torneo Masculino - En Curso' : 'Torneo Masculino - Arranca Pronto');
+
     return {
-      badge: fechasJugadas > 0 ? 'Torneo Masculino - En Curso' : 'Torneo Masculino - Arranca Pronto',
+      badge,
       subtitle: 'Categoria Masculina - Cordoba - 2026',
       stats: [
         { end: edicionMasculino, label: 'Edicion' },
@@ -86,7 +101,7 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
         { end: jugadoresTotal || 250, label: 'Jugadores', suffix: jugadoresTotal ? '' : '+' },
       ],
     };
-  }, [equipos, partidos, fechas, edicionMasculino]);
+  }, [equipos, partidos, fechas, edicionMasculino, esTemporadaActiva]);
 
   const data = mode === 'femenino' ? heroFemenino : heroMasculino;
 

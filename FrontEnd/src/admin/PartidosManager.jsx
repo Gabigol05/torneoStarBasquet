@@ -679,8 +679,11 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
     ROSTER[categoria].map(e => ({ id: e.id, nombre: e.name ?? e.nombre, color: e.color, logo: e.logo })),
     [categoria]);
   // Toda fecha que se crea desde el panel cae en la temporada ACTIVA — no en
-  // la que se esté mirando en el sitio público, que puede ser una vieja.
-  const { temporadaActivaId } = useTemporada();
+  // la que se esté mirando en el sitio público, que puede ser una vieja — y
+  // en la de la categoría que está elegida acá (femenino y masculino tienen
+  // cada una la suya, ver TemporadaContext).
+  const { temporadaActivaId: temporadaActivaIdPorCategoria } = useTemporada();
+  const temporadaActivaId = temporadaActivaIdPorCategoria[categoria];
 
   const [partidos, setPartidos] = useState([]);
   const [fechas,   setFechas]   = useState([]);

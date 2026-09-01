@@ -12,33 +12,34 @@ const CATEGORIAS = [
 // cuánto se cargó en cada una), reactivar una archivada, arrancar una nueva,
 // y saltar directo a armar los playoffs de la que está en curso.
 //
+// ⚠️ Femenino y masculino tienen cada una SU PROPIA temporada activa — no
+// comparten fila ni estado de "en curso" (ver TemporadaContext y
+// add_temporadas_por_categoria.sql). Es a propósito: los dos torneos no
+// arrancan/terminan el mismo día, así que acá abajo se muestran como dos
+// secciones independientes, una por categoría — crear/archivar en una no
+// toca para nada a la otra.
+//
 // Ojo con no confundir dos cosas distintas que viven acá al lado:
-//  - "Activa" es un estado de CADA TEMPORADA (cuál recibe lo que se cargue de
-//    acá en adelante). Crear una nueva, o reactivar una archivada, cambia esto.
+//  - "Activa" es un estado de CADA TEMPORADA, DENTRO DE SU CATEGORÍA (cuál
+//    recibe lo que se cargue de acá en adelante para femenino o para
+//    masculino). Crear una nueva, o reactivar una archivada, cambia esto
+//    solo para esa categoría.
 //  - "Cerrar temporada" (Herramientas → Playoffs) arma los cruces de playoff
 //    según la tabla de posiciones. NO cambia cuál temporada está activa — es
 //    una acción aparte, que ahora también se puede iniciar directo desde acá.
 // Crear una temporada nueva (o reactivar una vieja) es un cambio grande — todo
-// lo que se cargue de acá en adelante (fechas, partidos, estadísticas) va a
-// caer en la que quede activa, dejando las demás tal cual quedaron, visibles
-// pero congeladas. Por eso ambas acciones piden confirmación explícita.
+// lo que se cargue de acá en adelante (fechas, partidos, estadísticas) DE ESA
+// CATEGORÍA va a caer en la que quede activa, dejando las demás tal cual
+// quedaron, visibles pero congeladas. Por eso ambas acciones piden
+// confirmación explícita.
 export default function TemporadasManager({ onNavigate } = {}) {
   const { temporadas, temporadaActivaId, crearTemporada, activarTemporada, loading } = useTemporada();
-  const [creando, setCreando]         = useState(false);
-  const [nombre, setNombre]           = useState('');
-  const [confirmando, setConfirmando] = useState(false);
-  const [guardando, setGuardando]     = useState(false);
-  const [msg, setMsg]                 = useState(null);
-  // Reactivar una temporada archivada — pide confirmación (mismo criterio que
-  // crear: es un cambio grande, deja la que estaba activa como archivada).
-  const [activandoId, setActivandoId]         = useState(null);
-  const [guardandoActivar, setGuardandoActivar] = useState(false);
-  // Estadísticas por temporada (fechas/partidos/finalizados, femenino +
-  // masculino) — para que cada tarjeta muestre cuánto se cargó ahí sin tener
-  // que entrar a Partidos/Estadísticas a averiguarlo a mano.
+  // Estadísticas por temporada (fechas/partidos/finalizados) — para que cada
+  // tarjeta muestre cuánto se cargó ahí sin tener que entrar a
+  // Partidos/Estadísticas a averiguarlo a mano. Cada temporada ya pertenece
+  // a una sola categoría, así que no hace falta desglosar por categoría como
+  // antes — la tarjeta ya está en la sección correcta.
   const [stats, setStats] = useState({});
-
-  const flash = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 4500); };
 
   useEffect(() => {
     let cancelado = false;
@@ -46,26 +47,17 @@ export default function TemporadasManager({ onNavigate } = {}) {
       if (temporadas.length === 0) return;
       const entries = await Promise.all(temporadas.map(async t => {
         try {
-          const porCategoria = await Promise.all(CATEGORIAS.map(async ({ key }) => {
-            const tablas = TABLAS[key];
-            const { data: fechasT, error: fErr } = await supabase
-              .from(tablas.fechas).select('id').eq('temporada_id', t.id);
-            if (fErr) throw fErr;
-            const ids = (fechasT ?? []).map(f => f.id);
-            if (ids.length === 0) return { fechas: 0, partidos: 0, finalizados: 0 };
-            const { data: partidosT, error: pErr } = await supabase
-              .from(tablas.partidos).select('estado').in('fecha_id', ids);
-            if (pErr) throw pErr;
-            const finalizados = (partidosT ?? []).filter(p => p.estado === 'finalizado').length;
-            return { fechas: ids.length, partidos: (partidosT ?? []).length, finalizados };
-          }));
-          const [femenino, masculino] = porCategoria;
-          const total = {
-            fechas:      femenino.fechas      + masculino.fechas,
-            partidos:    femenino.partidos    + masculino.partidos,
-            finalizados: femenino.finalizados + masculino.finalizados,
-          };
-          return [t.id, { total, femenino, masculino, error: null }];
+          const tablas = TABLAS[t.categoria];
+          const { data: fechasT, error: fErr } = await supabase
+            .from(tablas.fechas).select('id').eq('temporada_id', t.id);
+          if (fErr) throw fErr;
+          const ids = (fechasT ?? []).map(f => f.id);
+          if (ids.length === 0) return [t.id, { fechas: 0, partidos: 0, finalizados: 0, error: null }];
+          const { data: partidosT, error: pErr } = await supabase
+            .from(tablas.partidos).select('estado').in('fecha_id', ids);
+          if (pErr) throw pErr;
+          const finalizados = (partidosT ?? []).filter(p => p.estado === 'finalizado').length;
+          return [t.id, { fechas: ids.length, partidos: (partidosT ?? []).length, finalizados, error: null }];
         } catch (err) {
           return [t.id, { error: err.message }];
         }
@@ -76,14 +68,83 @@ export default function TemporadasManager({ onNavigate } = {}) {
     return () => { cancelado = true; };
   }, [temporadas]);
 
+  return (
+    <div>
+      <div style={S.header}>
+        <div>
+          <h2 style={S.title}>🏆 TEMPORADAS</h2>
+          <p style={S.subtitle}>
+            Cada temporada guarda sus propias fechas, partidos y estadísticas por separado — nada se mezcla entre
+            una y otra, ni tampoco entre femenino y masculino (cada categoría tiene su propia temporada en curso).
+          </p>
+        </div>
+        {temporadas.length > 0 && (
+          <span style={S.countChip}>
+            {temporadas.length} temporada{temporadas.length === 1 ? '' : 's'} en total
+          </span>
+        )}
+      </div>
+
+      <div style={S.hint}>
+        ℹ️ Crear una temporada nueva archiva automáticamente la que está en curso <b>de esa misma categoría</b> (se
+        puede seguir viendo, pero no se le puede cargar nada más) — la otra categoría sigue como estaba, sin
+        tocarse. <b>Activar</b> una archivada hace lo mismo al revés. <b>Cerrar temporada</b> es otra cosa — arma
+        los cruces de playoff según la tabla de posiciones actual; no cambia cuál temporada está en curso.
+      </div>
+
+      {loading ? (
+        <p style={{ color: '#6B7A99' }}>Cargando temporadas...</p>
+      ) : temporadas.length === 0 ? (
+        <p style={S.emptyGlobal}>
+          No hay ninguna temporada todavía — corré <code>add_temporadas.sql</code> y{' '}
+          <code>add_temporadas_por_categoria.sql</code> en Supabase primero.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 34 }}>
+          {CATEGORIAS.map(cat => (
+            <CategoriaTemporadas
+              key={cat.key}
+              cat={cat}
+              temporadas={temporadas.filter(t => t.categoria === cat.key)}
+              temporadaActivaId={temporadaActivaId[cat.key] ?? null}
+              crearTemporada={crearTemporada}
+              activarTemporada={activarTemporada}
+              stats={stats}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Una sección completa (hero "en curso" + archivadas + crear nueva) para UNA
+// categoría — femenino y masculino renderizan cada una la suya, con su
+// propio estado de "creando"/"confirmando"/"activando" totalmente aparte.
+function CategoriaTemporadas({ cat, temporadas, temporadaActivaId, crearTemporada, activarTemporada, stats, onNavigate }) {
+  const [creando, setCreando]         = useState(false);
+  const [nombre, setNombre]           = useState('');
+  const [confirmando, setConfirmando] = useState(false);
+  const [guardando, setGuardando]     = useState(false);
+  const [msg, setMsg]                 = useState(null);
+  const [activandoId, setActivandoId]           = useState(null);
+  const [guardandoActivar, setGuardandoActivar] = useState(false);
+
+  const flash = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 4500); };
+
   const iniciarCreacion = () => { setCreando(true); setConfirmando(false); setNombre(''); };
+
+  const activa      = temporadas.find(t => t.id === temporadaActivaId);
+  const sinActiva   = temporadas.length > 0 && !activa;
+  const archivadas  = [...temporadas].filter(t => t.id !== temporadaActivaId).sort((a, b) => b.id - a.id);
 
   const handleCrear = async () => {
     if (!nombre.trim()) { flash('Ingresá un nombre para la temporada', false); return; }
     if (!confirmando) { setConfirmando(true); return; }
     setGuardando(true);
     try {
-      await crearTemporada(nombre.trim());
+      await crearTemporada(nombre.trim(), cat.key);
       flash(`✅ "${nombre.trim()}" creada y activada`);
       setCreando(false);
       setConfirmando(false);
@@ -95,16 +156,12 @@ export default function TemporadasManager({ onNavigate } = {}) {
     }
   };
 
-  const activa      = temporadas.find(t => t.id === temporadaActivaId);
-  const sinActiva   = temporadas.length > 0 && !activa;
-  const archivadas  = [...temporadas].filter(t => t.id !== temporadaActivaId).sort((a, b) => b.id - a.id);
-
   const handleActivar = async (t) => {
     if (activandoId !== t.id) { setActivandoId(t.id); return; }
     setGuardandoActivar(true);
     try {
       await activarTemporada(t.id);
-      flash(`✅ "${t.nombre}" reactivada — ahora es la temporada en curso`);
+      flash(`✅ "${t.nombre}" reactivada — ahora es la ${cat.label.toLowerCase()} en curso`);
       setActivandoId(null);
     } catch (err) {
       flash(`❌ ${err.message}`, false);
@@ -115,30 +172,11 @@ export default function TemporadasManager({ onNavigate } = {}) {
 
   return (
     <div>
-      <div style={S.header}>
-        <div>
-          <h2 style={S.title}>🏆 TEMPORADAS</h2>
-          <p style={S.subtitle}>
-            Cada temporada guarda sus propias fechas, partidos y estadísticas por separado — nada se mezcla entre una y otra.
-          </p>
-        </div>
-        <div style={S.headerRight}>
-          {temporadas.length > 0 && (
-            <span style={S.countChip}>
-              {temporadas.length} temporada{temporadas.length === 1 ? '' : 's'} en total
-            </span>
-          )}
-          {!creando && (
-            <button onClick={iniciarCreacion} style={S.btnNueva}>➕ NUEVA TEMPORADA</button>
-          )}
-        </div>
-      </div>
-
-      <div style={S.hint}>
-        ℹ️ Crear una temporada nueva archiva automáticamente la que está en curso (se puede seguir
-        viendo, pero no se le puede cargar nada más). <b>Activar</b> una archivada hace lo mismo al
-        revés. <b>Cerrar temporada</b> es otra cosa — arma los cruces de playoff según la tabla de
-        posiciones actual; no cambia cuál temporada está en curso.
+      <div style={S.catHeader}>
+        <h3 style={S.catTitle}>{cat.icon} {cat.label.toUpperCase()}</h3>
+        {!creando && (
+          <button onClick={iniciarCreacion} style={S.btnNueva}>➕ NUEVA TEMPORADA {cat.label.toUpperCase()}</button>
+        )}
       </div>
 
       {msg && (
@@ -149,26 +187,27 @@ export default function TemporadasManager({ onNavigate } = {}) {
 
       {sinActiva && (
         <div style={S.warnBox}>
-          ⚠️ Ninguna temporada está marcada como "en curso" ahora mismo — activá una de la lista de
-          abajo para poder seguir cargando fechas, partidos y estadísticas.
+          ⚠️ Ninguna temporada de {cat.label.toLowerCase()} está marcada como "en curso" ahora mismo — activá una
+          de la lista de abajo para poder seguir cargando fechas, partidos y estadísticas de esta categoría.
         </div>
       )}
 
       {creando && (
         <div style={S.crearBox}>
-          <label style={S.crearLabel}>NOMBRE DE LA TEMPORADA NUEVA</label>
+          <label style={S.crearLabel}>NOMBRE DE LA TEMPORADA NUEVA ({cat.label.toUpperCase()})</label>
           <input
-            type="text" value={nombre} placeholder='Ej: "Temporada 2027" o "Apertura 2027"'
+            type="text" value={nombre} placeholder='Ej: "2026 - Clausura"'
             onChange={e => { setNombre(e.target.value); setConfirmando(false); }}
             style={S.crearInput}
           />
 
           {confirmando && (
             <div style={S.crearWarn}>
-              ⚠️ Esto va a dejar <strong>"{activa?.nombre ?? 'la temporada actual'}"</strong> como archivada
-              (se va a poder seguir viendo con su propio chip, pero no se le va a poder cargar nada más) y
-              todo lo que subas de acá en adelante — fechas, partidos, estadísticas — va a caer en
-              "{nombre.trim()}". Esta acción no se puede deshacer desde el panel. ¿Confirmás?
+              ⚠️ Esto va a dejar <strong>"{activa?.nombre ?? `la ${cat.label.toLowerCase()} actual`}"</strong> como
+              archivada (se va a poder seguir viendo con su propio chip, pero no se le va a poder cargar nada más)
+              y todo lo que subas de {cat.label.toLowerCase()} de acá en adelante — fechas, partidos, estadísticas —
+              va a caer en "{nombre.trim()}". La otra categoría no se toca. Esta acción no se puede deshacer desde
+              el panel. ¿Confirmás?
             </div>
           )}
 
@@ -188,19 +227,15 @@ export default function TemporadasManager({ onNavigate } = {}) {
         </div>
       )}
 
-      {loading ? (
-        <p style={{ color: '#6B7A99' }}>Cargando temporadas...</p>
-      ) : temporadas.length === 0 ? (
-        <p style={S.emptyGlobal}>
-          No hay ninguna temporada todavía — corré <code>add_temporadas.sql</code> en Supabase primero.
-        </p>
+      {temporadas.length === 0 ? (
+        <p style={S.emptyGlobal}>Todavía no hay ninguna temporada de {cat.label.toLowerCase()} — creá la primera arriba.</p>
       ) : (
         <>
           {activa && (
             <div style={S.hero}>
               <div style={S.heroHeader}>
                 <div>
-                  <span style={S.heroBadge}>● EN CURSO — acá cae lo que cargues</span>
+                  <span style={S.heroBadge}>● EN CURSO — acá cae lo que cargues de {cat.label.toLowerCase()}</span>
                   <h3 style={S.heroTitle}>{activa.nombre}</h3>
                   {activa.fecha_inicio && <div style={S.heroFecha}>📆 Iniciada el {activa.fecha_inicio}</div>}
                 </div>
@@ -218,10 +253,10 @@ export default function TemporadasManager({ onNavigate } = {}) {
           )}
 
           <div style={S.sectionLabel}>
-            TEMPORADAS ANTERIORES {archivadas.length > 0 && `(${archivadas.length})`}
+            {cat.label.toUpperCase()} — TEMPORADAS ANTERIORES {archivadas.length > 0 && `(${archivadas.length})`}
           </div>
           {archivadas.length === 0 ? (
-            <p style={S.emptyGlobal}>Todavía no hay temporadas archivadas — esta es la primera.</p>
+            <p style={S.emptyGlobal}>Todavía no hay temporadas de {cat.label.toLowerCase()} archivadas.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {archivadas.map(t => (
@@ -266,21 +301,22 @@ export default function TemporadasManager({ onNavigate } = {}) {
   );
 }
 
-// Fila de estadísticas de una temporada — total combinado + desglose por
-// categoría. `compact` achica un poco el tipo para las tarjetas archivadas,
-// que ya son más chicas que la tarjeta "en curso".
+// Fila de estadísticas de una temporada (ya de una sola categoría — la
+// tarjeta misma ya está en la sección correcta, no hace falta desglosar).
+// `compact` achica un poco el tipo para las tarjetas archivadas, que ya son
+// más chicas que la tarjeta "en curso".
 function StatRow({ s, compact = false }) {
   if (!s) return <div style={S.statsLoading}>Cargando datos de esta temporada…</div>;
   if (s.error) return <div style={S.statsError}>⚠️ No se pudieron cargar los datos: {s.error}</div>;
 
-  const pct = s.total.partidos > 0 ? Math.round((s.total.finalizados / s.total.partidos) * 100) : null;
+  const pct = s.partidos > 0 ? Math.round((s.finalizados / s.partidos) * 100) : null;
 
   return (
     <div>
       <div style={{ ...S.statsChips, fontSize: compact ? 12 : 13 }}>
-        <span style={S.chip}>📅 {s.total.fechas} fecha{s.total.fechas === 1 ? '' : 's'}</span>
-        <span style={S.chip}>🏀 {s.total.partidos} partido{s.total.partidos === 1 ? '' : 's'}</span>
-        <span style={S.chip}>✅ {s.total.finalizados} finalizado{s.total.finalizados === 1 ? '' : 's'}</span>
+        <span style={S.chip}>📅 {s.fechas} fecha{s.fechas === 1 ? '' : 's'}</span>
+        <span style={S.chip}>🏀 {s.partidos} partido{s.partidos === 1 ? '' : 's'}</span>
+        <span style={S.chip}>✅ {s.finalizados} finalizado{s.finalizados === 1 ? '' : 's'}</span>
         {pct !== null && (
           <span style={{ ...S.chip, color: pct === 100 ? '#22D07A' : '#F0B429' }}>{pct}% completado</span>
         )}
@@ -294,21 +330,6 @@ function StatRow({ s, compact = false }) {
           }} />
         </div>
       )}
-
-      {s.total.fechas > 0 && (
-        <div style={{ ...S.byCategoria, fontSize: compact ? 11 : 11.5 }}>
-          {CATEGORIAS.map(({ key, label, icon }) => {
-            const c = s[key];
-            if (c.fechas === 0) return null;
-            return (
-              <span key={key} style={S.catStat}>
-                {icon} {label}: {c.fechas} fecha{c.fechas === 1 ? '' : 's'} · {c.partidos} partido{c.partidos === 1 ? '' : 's'}
-                {c.partidos > 0 ? ` (${c.finalizados} fin.)` : ''}
-              </span>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -316,13 +337,16 @@ function StatRow({ s, compact = false }) {
 const S = {
   header:      { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 },
   title:       { fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: 1, color: '#EEF2F8', margin: 0 },
-  subtitle:    { color: '#6B7A99', fontSize: 13, margin: '4px 0 0', maxWidth: 520 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  subtitle:    { color: '#6B7A99', fontSize: 13, margin: '4px 0 0', maxWidth: 560 },
   countChip:   { fontSize: 11.5, color: '#8899BB', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: .3, whiteSpace: 'nowrap' },
+
+  catHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #1C2535' },
+  catTitle:  { fontFamily: "'Bebas Neue',sans-serif", fontSize: 20, letterSpacing: 1, color: '#EEF2F8', margin: 0 },
+
   btnNueva:    {
     padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
     background: 'linear-gradient(135deg,#F0B429,#FF6B2B)', color: '#080C12',
-    fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, letterSpacing: 1, whiteSpace: 'nowrap',
+    fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, letterSpacing: 1, whiteSpace: 'nowrap',
   },
 
   hint: {
@@ -425,6 +449,4 @@ const S = {
   },
   progressTrack: { height: 5, borderRadius: 100, background: '#080C12', overflow: 'hidden', marginBottom: 8 },
   progressFill:  { height: '100%', borderRadius: 100, transition: 'width .3s' },
-  byCategoria:   { display: 'flex', flexWrap: 'wrap', gap: '4px 14px', color: '#4A566E', fontFamily: "'Barlow Condensed',sans-serif" },
-  catStat:       { whiteSpace: 'nowrap' },
 };

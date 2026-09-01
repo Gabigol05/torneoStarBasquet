@@ -40,7 +40,10 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
   const setCategoria = setCategoriaProp ?? setCategoriaLocal;
   const tablas = TABLAS[categoria];
   const roster = ROSTER[categoria];
-  const { temporadaActivaId, temporadas } = useTemporada();
+  // Cada categoría tiene su propia temporada activa (ver TemporadaContext)
+  // — acá siempre se usa la de la categoría elegida en este panel.
+  const { temporadaActivaId: temporadaActivaIdPorCategoria, temporadas } = useTemporada();
+  const temporadaActivaId = temporadaActivaIdPorCategoria[categoria];
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [loading, setLoading] = useState(false);

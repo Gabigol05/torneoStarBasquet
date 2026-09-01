@@ -2,18 +2,34 @@ import { createContext, useState, useContext, useEffect, useCallback, useMemo } 
 import { supabase, isConfigured } from '../lib/supabase';
 
 // Temporadas/torneos (ej. "Temporada 2026", "Apertura 2027"). Ver
-// add_temporadas.sql para el esquema. Este contexto es compartido por el
-// sitio público (para elegir qué temporada mirar) y el panel admin (para
-// saber cuál es la ACTIVA, que es donde cae todo lo que se carga nuevo).
+// add_temporadas.sql y add_temporadas_por_categoria.sql para el esquema.
+// Este contexto es compartido por el sitio público (para elegir qué
+// temporada mirar) y el panel admin (para saber cuál es la ACTIVA, que es
+// donde cae todo lo que se carga nuevo).
+//
+// ⚠️ Cada temporada pertenece a UNA categoría (femenino o masculino) —
+// femenino y masculino NO comparten fila ni estado de "activa". Esto es a
+// propósito: el torneo femenino y el masculino no arrancan/terminan el
+// mismo día (ver add_temporadas_por_categoria.sql), así que femenino puede
+// estar en "Clausura" mientras masculino sigue en "Apertura" sin pisarse.
+// Por eso `temporadaActivaId`/`temporadaSeleccionadaId` de acá abajo son
+// MAPAS `{ femenino: id, masculino: id }`, no un solo id — cualquier
+// componente que los use tiene que indexarlos por la categoría que le
+// corresponda (normalmente el `mode` de TournamentContext, o el `categoria`
+// que ya recibe la sección del panel en la que está).
 const TemporadaContext = createContext(null);
+
+const CATEGORIAS = ['femenino', 'masculino'];
+
+function vacioPorCategoria() { return { femenino: null, masculino: null }; }
 
 const FALLBACK = {
   temporadas: [],
-  temporadaActivaId: null,
-  temporadaSeleccionadaId: null,
+  temporadaActivaId: vacioPorCategoria(),
+  temporadaSeleccionadaId: vacioPorCategoria(),
   setTemporadaSeleccionadaId: () => {},
-  temporadaSeleccionada: null,
-  esTemporadaActiva: true,
+  temporadaSeleccionada: () => null,
+  esTemporadaActiva: () => true,
   crearTemporada: async () => { throw new Error('TemporadaProvider no está montado'); },
   activarTemporada: async () => { throw new Error('TemporadaProvider no está montado'); },
   loading: false,
@@ -22,11 +38,12 @@ const FALLBACK = {
 
 export function TemporadaProvider({ children }) {
   const [temporadas, setTemporadas] = useState([]);
-  const [temporadaActivaId, setTemporadaActivaId] = useState(null);
-  // La que se está MIRANDO en el sitio público — arranca en la activa, pero
-  // el visitante la puede cambiar con el chip para ver una temporada vieja
-  // sin que eso afecte qué temporada es la "actual" para el resto del sitio.
-  const [temporadaSeleccionadaId, setTemporadaSeleccionadaId] = useState(null);
+  const [temporadaActivaId, setTemporadaActivaId] = useState(vacioPorCategoria);
+  // La que se está MIRANDO en el sitio público — arranca en la activa de
+  // cada categoría, pero el visitante la puede cambiar con el chip para ver
+  // una temporada vieja sin que eso afecte qué temporada es la "actual"
+  // para el resto del sitio ni para la otra categoría.
+  const [temporadaSeleccionadaId, setTemporadaSeleccionadaIdState] = useState(vacioPorCategoria);
   const [loading, setLoading] = useState(isConfigured);
 
   const cargar = useCallback(async () => {
@@ -42,14 +59,25 @@ export function TemporadaProvider({ children }) {
     }
     const rows = data ?? [];
     setTemporadas(rows);
-    const activa = rows.find(t => t.activa);
-    setTemporadaActivaId(activa?.id ?? null);
-    // Solo pisar la seleccionada si todavía no había ninguna (primera carga)
-    // o si la que estaba seleccionada dejó de existir — así no se resetea
-    // la vista de alguien que estaba mirando a propósito una temporada vieja.
-    setTemporadaSeleccionadaId(prev => {
-      if (prev != null && rows.some(t => t.id === prev)) return prev;
-      return activa?.id ?? rows[0]?.id ?? null;
+
+    const activaPorCat = vacioPorCategoria();
+    for (const cat of CATEGORIAS) {
+      activaPorCat[cat] = rows.find(t => t.categoria === cat && t.activa)?.id ?? null;
+    }
+    setTemporadaActivaId(activaPorCat);
+
+    // Solo pisar la seleccionada de cada categoría si todavía no había
+    // ninguna (primera carga) o si la que estaba seleccionada dejó de
+    // existir — así no se resetea la vista de alguien que estaba mirando
+    // a propósito una temporada vieja.
+    setTemporadaSeleccionadaIdState(prev => {
+      const next = { ...prev };
+      for (const cat of CATEGORIAS) {
+        const rowsCat = rows.filter(t => t.categoria === cat);
+        if (prev[cat] != null && rowsCat.some(t => t.id === prev[cat])) continue;
+        next[cat] = activaPorCat[cat] ?? rowsCat[0]?.id ?? null;
+      }
+      return next;
     });
     setLoading(false);
   }, []);
@@ -68,28 +96,33 @@ export function TemporadaProvider({ children }) {
     return () => supabase.removeChannel(channel);
   }, [cargar]);
 
-  // Crea una temporada nueva y la deja como activa (usa fn_crear_temporada,
-  // que en un solo paso desactiva la anterior y activa esta — ver
-  // add_temporadas.sql). Después de crearla, la deja también como la
-  // seleccionada, para que quien la crea vea inmediatamente la temporada
-  // en blanco que acaba de arrancar.
-  const crearTemporada = useCallback(async (nombre) => {
+  const setTemporadaSeleccionadaId = useCallback((categoria, id) => {
+    setTemporadaSeleccionadaIdState(prev => ({ ...prev, [categoria]: id }));
+  }, []);
+
+  // Crea una temporada nueva PARA UNA CATEGORÍA y la deja como activa de
+  // esa categoría (usa fn_crear_temporada, que en un solo paso desactiva la
+  // anterior de esa misma categoría y activa esta — ver
+  // add_temporadas_por_categoria.sql — la otra categoría no se toca).
+  // Después de crearla, la deja también como la seleccionada de esa
+  // categoría, para que quien la crea vea inmediatamente la temporada en
+  // blanco que acaba de arrancar.
+  const crearTemporada = useCallback(async (nombre, categoria) => {
     if (!isConfigured) throw new Error('Supabase no está configurado');
+    if (!CATEGORIAS.includes(categoria)) throw new Error(`categoría inválida: ${categoria}`);
     const nombreLimpio = (nombre ?? '').trim();
     if (!nombreLimpio) throw new Error('El nombre de la temporada no puede estar vacío');
-    const { data: nuevaId, error } = await supabase.rpc('fn_crear_temporada', { p_nombre: nombreLimpio });
+    const { data: nuevaId, error } = await supabase.rpc('fn_crear_temporada', { p_nombre: nombreLimpio, p_categoria: categoria });
     if (error) throw error;
     await cargar();
-    setTemporadaSeleccionadaId(nuevaId);
+    setTemporadaSeleccionadaId(categoria, nuevaId);
     return nuevaId;
-  }, [cargar]);
+  }, [cargar, setTemporadaSeleccionadaId]);
 
-  // Reactiva una temporada ya existente (por ejemplo una archivada por error,
-  // o para "volver" a una temporada anterior). Antes la ÚNICA forma de dejar
-  // algo como activo era crear una temporada nueva — no había vuelta atrás
-  // si alguien archivaba la que no era. Usa fn_activar_temporada, que en un
-  // solo paso desactiva la que estaba activa y activa la elegida (ver
-  // fn_activar_temporada.sql).
+  // Reactiva una temporada ya existente (por ejemplo una archivada por
+  // error, o para "volver" a una temporada anterior). La categoría se
+  // deduce de la fila misma — fn_activar_temporada solo desactiva la que
+  // estaba activa DENTRO de esa categoría, la otra categoría sigue igual.
   const activarTemporada = useCallback(async (id) => {
     if (!isConfigured) throw new Error('Supabase no está configurado');
     const { error } = await supabase.rpc('fn_activar_temporada', { p_id: id });
@@ -97,8 +130,14 @@ export function TemporadaProvider({ children }) {
     await cargar();
   }, [cargar]);
 
-  const temporadaSeleccionada = temporadas.find(t => t.id === temporadaSeleccionadaId) ?? null;
-  const esTemporadaActiva = temporadaActivaId == null || temporadaSeleccionadaId === temporadaActivaId;
+  const temporadaSeleccionada = useCallback(
+    (categoria) => temporadas.find(t => t.id === temporadaSeleccionadaId[categoria]) ?? null,
+    [temporadas, temporadaSeleccionadaId]
+  );
+  const esTemporadaActiva = useCallback(
+    (categoria) => temporadaActivaId[categoria] == null || temporadaSeleccionadaId[categoria] === temporadaActivaId[categoria],
+    [temporadaActivaId, temporadaSeleccionadaId]
+  );
 
   // Este contexto envuelve TODA la app — sin memoizar, cualquier render de
   // TemporadaProvider (por ejemplo por el `loading`/`temporadas` cambiando)
@@ -120,6 +159,7 @@ export function TemporadaProvider({ children }) {
     temporadas,
     temporadaActivaId,
     temporadaSeleccionadaId,
+    setTemporadaSeleccionadaId,
     temporadaSeleccionada,
     esTemporadaActiva,
     crearTemporada,

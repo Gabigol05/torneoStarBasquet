@@ -244,8 +244,11 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
   // estadisticas_X ahora tiene clave compuesta (jugador_id, temporada_id) —
   // sin este filtro, un/a jugador/a con stats de más de una temporada traía
   // varias filas y esta pantalla se quedaba con una al azar (ver
-  // add_temporadas.sql). Todo acá corrige la temporada ACTIVA únicamente.
-  const { temporadaActivaId } = useTemporada();
+  // add_temporadas.sql). Todo acá corrige la temporada ACTIVA únicamente —
+  // la de la categoría elegida (femenino y masculino tienen cada una la
+  // suya, ver TemporadaContext).
+  const { temporadaActivaId: temporadaActivaIdPorCategoria } = useTemporada();
+  const temporadaActivaId = temporadaActivaIdPorCategoria[categoria];
 
   const [equipoId,  setEquipoId]  = useState('');
   const [busqueda,  setBusqueda]  = useState('');

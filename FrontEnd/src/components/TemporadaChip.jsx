@@ -1,18 +1,25 @@
 import { useTemporada } from '../context/TemporadaContext';
+import { useTournament } from '../context/TournamentContext';
 
-// Selector global de temporada — un chip por cada temporada cargada, arriba
-// de todo el contenido (Posiciones, Resultados, Líderes, Jugadoras,
-// Playoffs cambian todos juntos según cuál esté seleccionada). Se auto-oculta
-// si todavía hay una sola temporada, para no meter un chip de más cuando
-// no hace falta elegir nada.
+// Selector de temporada — un chip por cada temporada cargada DE LA
+// CATEGORÍA QUE SE ESTÁ MIRANDO (femenino/masculino, según el toggle de
+// arriba de todo), arriba de todo el contenido (Posiciones, Resultados,
+// Líderes, Jugadoras, Playoffs cambian todos juntos según cuál esté
+// seleccionada). Femenino y masculino tienen temporadas independientes
+// (ver TemporadaContext) — por eso este chip filtra por categoría en vez
+// de mezclar las de las dos juntas en una sola fila. Se auto-oculta si la
+// categoría que se está mirando todavía tiene una sola temporada, para no
+// meter un chip de más cuando no hace falta elegir nada.
 export function TemporadaChip() {
   const { temporadas, temporadaSeleccionadaId, temporadaActivaId, setTemporadaSeleccionadaId, esTemporadaActiva } = useTemporada();
+  const { mode } = useTournament();
 
-  if (!temporadas || temporadas.length <= 1) return null;
+  const deLaCategoria = (temporadas ?? []).filter(t => t.categoria === mode);
+  if (deLaCategoria.length <= 1) return null;
 
   // Más nueva primero — así la temporada en curso siempre está a la vista
   // sin tener que scrollear la lista de chips.
-  const ordenadas = [...temporadas].sort((a, b) => b.id - a.id);
+  const ordenadas = [...deLaCategoria].sort((a, b) => b.id - a.id);
 
   return (
     // No sticky acá a propósito: tanto Navbar (desktop) como MobileHeader
@@ -28,12 +35,12 @@ export function TemporadaChip() {
     }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
         {ordenadas.map(t => {
-          const selected = t.id === temporadaSeleccionadaId;
-          const activa   = t.id === temporadaActivaId;
+          const selected = t.id === temporadaSeleccionadaId[mode];
+          const activa   = t.id === temporadaActivaId[mode];
           return (
             <button
               key={t.id}
-              onClick={() => setTemporadaSeleccionadaId(t.id)}
+              onClick={() => setTemporadaSeleccionadaId(mode, t.id)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 100, cursor: 'pointer',
@@ -57,7 +64,7 @@ export function TemporadaChip() {
           );
         })}
       </div>
-      {!esTemporadaActiva && (
+      {!esTemporadaActiva(mode) && (
         <div style={{
           fontSize: 11, color: '#8899BB', fontFamily: "'Barlow Condensed',sans-serif",
           display: 'flex', alignItems: 'center', gap: 6,

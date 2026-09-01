@@ -497,8 +497,11 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const tablas = TABLAS[categoria];
   const roster = categoria === 'masculino' ? equiposMasculino : equiposFemenino;
   const fuseEq = categoria === 'masculino' ? fuseEqMasc : fuseEqFem;
-  // Todo lo que se publica desde acá cae en la temporada ACTIVA.
-  const { temporadaActivaId } = useTemporada();
+  // Todo lo que se publica desde acá cae en la temporada ACTIVA — de la
+  // categoría que está elegida en este momento (femenino y masculino tienen
+  // cada una la suya, ver TemporadaContext).
+  const { temporadaActivaId: temporadaActivaIdPorCategoria } = useTemporada();
+  const temporadaActivaId = temporadaActivaIdPorCategoria[categoria];
 
   // Índice de jugadores/as para fuzzy matching — se trae de la base cada vez
   // que se cambia de categoría, para las dos categorías por igual (antes

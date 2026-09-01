@@ -992,42 +992,57 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
   // que ya no corresponde a nada visible.
   useEffect(() => { setFechaFiltro('todas'); }, [categoria]);
   const { temporadaActivaId, temporadas, loading: temporadaLoading } = useTemporada();
-  const temporadaActiva = temporadas.find(t => t.id === temporadaActivaId);
   // Qué temporada está mirando el resumen — arranca en la activa, pero el
   // dueño puede elegir ver el resumen de una temporada archivada sin que eso
   // mezcle nada (todo el fetch de abajo se re-scopea a esta, no a la activa).
   // Si por algún motivo no hay ninguna marcada como activa, cae en la más
   // reciente en vez de bloquear todo el resumen.
-  const [temporadaVerId, setTemporadaVerId] = useState(null);
+  // ⚠️ Femenino y masculino ya NO comparten fila de temporada (ver
+  // add_temporadas_por_categoria.sql) — cada categoría tiene su propio id,
+  // así que esto tiene que ser un objeto {femenino,masculino}, no un solo
+  // valor. El selector de más abajo solo muestra/cambia el de la categoría
+  // que está elegida en el toggle de arriba de todo.
+  const [temporadaVerId, setTemporadaVerId] = useState({ femenino: null, masculino: null });
   // Si alguna de las consultas de este resumen falla (RLS, red, lo que sea),
   // se muestra acá en vez de dejar todo en cero sin explicación.
   const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
-    if (temporadaVerId != null) return;
-    if (temporadaActivaId != null) { setTemporadaVerId(temporadaActivaId); return; }
-    if (temporadas.length > 0) {
-      const masReciente = [...temporadas].sort((a, b) => b.id - a.id)[0];
-      setTemporadaVerId(masReciente.id);
-    }
-  }, [temporadaActivaId, temporadas, temporadaVerId]);
+    setTemporadaVerId(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const cat of ['femenino', 'masculino']) {
+        if (next[cat] != null) continue;
+        const masReciente = [...temporadas].filter(t => t.categoria === cat).sort((a, b) => b.id - a.id)[0];
+        const val = temporadaActivaId[cat] ?? masReciente?.id ?? null;
+        if (val != null) { next[cat] = val; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [temporadaActivaId, temporadas]);
 
   useEffect(() => {
-    // Todavía no se resolvió qué temporada mirar — esperar antes de pedir
-    // datos, para no traer "todo" sin filtro por un instante y mezclar
-    // temporadas en la primera pintada.
-    if (!temporadaVerId) return;
+    // Todavía no se resolvió qué temporada mirar en NINGUNA categoría —
+    // esperar antes de pedir datos, para no traer "todo" sin filtro por un
+    // instante y mezclar temporadas en la primera pintada.
+    if (temporadaVerId.femenino == null && temporadaVerId.masculino == null) return;
     let cancelado = false;
     (async () => {
       setLoading(true);
       setFetchError(null);
       try {
-        // 1. Fechas de la temporada ACTIVA únicamente — todo lo demás se
-        // filtra a partir de estos ids, porque partidos_X no tiene
-        // temporada_id propio (solo lo tiene fechas_X).
+        // 1. Fechas de la temporada elegida DE CADA CATEGORÍA (pueden ser
+        // temporadas distintas — femenino en Clausura, masculino todavía en
+        // Apertura, por ejemplo) — todo lo demás se filtra a partir de
+        // estos ids, porque partidos_X no tiene temporada_id propio (solo
+        // lo tiene fechas_X).
         const [{ data: ff, error: ffErr }, { data: fm, error: fmErr }] = await Promise.all([
-          supabase.from(TABLAS.femenino.fechas).select('*').eq('temporada_id', temporadaVerId).order('numero', { ascending:true }),
-          supabase.from(TABLAS.masculino.fechas).select('*').eq('temporada_id', temporadaVerId).order('numero', { ascending:true }),
+          temporadaVerId.femenino != null
+            ? supabase.from(TABLAS.femenino.fechas).select('*').eq('temporada_id', temporadaVerId.femenino).order('numero', { ascending:true })
+            : Promise.resolve({ data: [] }),
+          temporadaVerId.masculino != null
+            ? supabase.from(TABLAS.masculino.fechas).select('*').eq('temporada_id', temporadaVerId.masculino).order('numero', { ascending:true })
+            : Promise.resolve({ data: [] }),
         ]);
         if (cancelado) return;
         // Acá antes se ignoraba `error` por completo — si cualquiera de las
@@ -1047,8 +1062,8 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
         ] = await Promise.all([
           fechaIdsFem.length  ? supabase.from(TABLAS.femenino.partidos).select('*').in('fecha_id', fechaIdsFem)   : Promise.resolve({ data: [] }),
           fechaIdsMasc.length ? supabase.from(TABLAS.masculino.partidos).select('*').in('fecha_id', fechaIdsMasc) : Promise.resolve({ data: [] }),
-          supabase.from(TABLAS.femenino.estadisticas).select('*').eq('temporada_id', temporadaVerId),
-          supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaVerId),
+          temporadaVerId.femenino != null  ? supabase.from(TABLAS.femenino.estadisticas).select('*').eq('temporada_id', temporadaVerId.femenino)   : Promise.resolve({ data: [] }),
+          temporadaVerId.masculino != null ? supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaVerId.masculino) : Promise.resolve({ data: [] }),
           supabase.from(TABLAS.femenino.jugadores).select('id,nombre,equipo_id'),
           supabase.from(TABLAS.masculino.jugadores).select('id,nombre,equipo_id'),
           supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending:false }).limit(1),
@@ -1254,9 +1269,9 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
       }
     })();
     return () => { cancelado = true; };
-  }, [temporadaVerId]);
+  }, [temporadaVerId.femenino, temporadaVerId.masculino]);
 
-  if (temporadaLoading || (loading && temporadaVerId)) {
+  if (temporadaLoading || (loading && (temporadaVerId.femenino != null || temporadaVerId.masculino != null))) {
     return <div style={{ padding:'40px 0', textAlign:'center', color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando resumen…</div>;
   }
   if (temporadas.length === 0) {
@@ -1276,23 +1291,26 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
       )}
       {/* Selector de temporada — el resumen se puede mirar por temporada
           separada (la en curso u otra archivada), así nunca se mezclan
-          números de una con otra. */}
+          números de una con otra. Muestra solo las temporadas de la
+          categoría elegida en el toggle de arriba — femenino y masculino
+          ya no comparten temporada, así que no tendría sentido un solo
+          selector para las dos. */}
       <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <span style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}><IconTrophy size={13} color="#4A566E"/>Viendo resumen de:</span>
+        <span style={{ fontSize:12, color:'#4A566E', display:'flex', alignItems:'center', gap:6 }}><IconTrophy size={13} color="#4A566E"/>Viendo resumen {categoria} de:</span>
         <select
-          value={temporadaVerId ?? ''}
-          onChange={e => setTemporadaVerId(Number(e.target.value))}
+          value={temporadaVerId[categoria] ?? ''}
+          onChange={e => { const id = Number(e.target.value); setTemporadaVerId(prev => ({ ...prev, [categoria]: id })); }}
           style={{
             padding:'7px 12px', borderRadius:9, border:'1px solid #1C2535', background:'#0E1420',
             color:'#EEF2F8', fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", outline:'none', cursor:'pointer',
           }}>
-          {[...temporadas].sort((a, b) => b.id - a.id).map(t => (
+          {[...temporadas].filter(t => t.categoria === categoria).sort((a, b) => b.id - a.id).map(t => (
             <option key={t.id} value={t.id}>
-              {t.nombre}{t.id === temporadaActivaId ? ' · en curso' : ' · archivada'}
+              {t.nombre}{t.id === temporadaActivaId[categoria] ? ' · en curso' : ' · archivada'}
             </option>
           ))}
         </select>
-        {temporadaVerId != null && temporadaVerId !== temporadaActivaId && (
+        {temporadaVerId[categoria] != null && temporadaVerId[categoria] !== temporadaActivaId[categoria] && (
           <span style={{
             fontSize:10.5, fontWeight:700, letterSpacing:.5, color:'#8899BB',
             background:'rgba(136,153,187,.1)', border:'1px solid #1C2535',

@@ -780,15 +780,30 @@ nav {
     font-size: clamp(44px, 15vw, 72px);
   }
 
-  /* ⚠️ FIX (reporte Alvaro: "en la compu se ve re bien, en el celu sigue
-     oscuro"): el text-shadow de .hero-title-accent (0 3px 10px) está en px
-     fijos, pensado para el tamaño de letra de escritorio (hasta 184px). En
-     mobile la letra baja a 44-72px — la MISMA sombra, contra una letra 2-3
-     veces más chica, tapa proporcionalmente mucha más superficie del
-     dorado y se ve oscura/opaca en vez de sutil. Se escala la sombra hacia
-     abajo en la misma proporción para mobile. */
+  /* ⚠️ CAUSA REAL (reporte Alvaro: "en la compu se ve re bien, en el celu
+     sigue oscuro" — el ajuste de shadow anterior NO alcanzó). En iPhone/
+     Safari, "background-clip:text" + "text-fill-color:transparent" sobre
+     una capa forzada a composición propia (transform/backface-visibility/
+     will-change — lo que se agregó para el bug de pixelado) tiene un bug
+     conocido de WebKit: en vez de dejar el relleno recortado 100%
+     transparente, esa capa se rasteriza con un fondo semitransparente
+     oscuro por detrás del degradé — por eso en el celu real se ve un
+     dorado apagado/oliva aunque el CSS sea idéntico al de escritorio (que
+     no tiene ese bug). Es el mismo tipo de bug de compositing que el del
+     pixelado, del lado opuesto — seguir retocando sombra/opacidad no lo
+     arregla porque el problema no es el valor, es el propio clip-text.
+     Solución: en mobile se saca el degradé recortado y "STAR BASQUET" pasa
+     a un dorado SÓLIDO bien saturado (más fuerte que el --gold de base) —
+     se garantiza el mismo resultado en cualquier celular, sin depender de
+     cómo cada motor rasterice un texto clippeado. En escritorio no cambia
+     nada (ahí ya se ve bien). */
   .hero-title-accent {
-    text-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    -webkit-text-fill-color: #FFCC33;
+    color: #FFCC33;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .4), 0 0 18px rgba(240, 180, 41, .45);
   }
 
   .hero-liga-label {

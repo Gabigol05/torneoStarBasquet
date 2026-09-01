@@ -3608,14 +3608,23 @@ body.theme-femenino {
 /* ============================================================
    LEADERS SECTION — empty state
    ============================================================ */
-.lc-empty-state {
-  text-align: center; padding: 32px 16px;
-  color: var(--gray);
+/* MEJORA: antes esta era una caja centrada aparte (guioncito + texto) que
+   se veía distinta al resto de las tarjetas. Ahora la tarjeta sin datos
+   reusa .lc-avatar/.lc-big-num/.lc-player-name/.lc-team-name (la misma
+   anatomía que la tarjeta con datos) — estos dos modificadores la
+   atenúan (borde punteado en el avatar, opacidad baja en el resto) en vez
+   de darle una caja/tipografía propia. .lc-empty-txt sigue siendo el pie
+   de "Disponible cuando arranque el torneo". */
+.lc-avatar-empty {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  opacity: .75;
 }
-.lc-empty-icon { font-size: 32px; margin-bottom: 8px; }
+.lc-empty-muted { opacity: .5; }
 .lc-empty-txt {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 13px; line-height: 1.5;
+  font-size: 13px; line-height: 1.5; color: var(--gray);
 }
 
 /* ============================================================

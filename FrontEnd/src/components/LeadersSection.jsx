@@ -50,14 +50,30 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
     background: `linear-gradient(160deg, ${hexA(accent,'14')}, #0B111C 60%)`,
   } : undefined;
 
+  // MEJORA (pedido de Alvaro): antes esto era una caja aparte con un
+  // guioncito de 32px y un texto gris — se veía deslucido al lado del
+  // resto de las tarjetas del sitio. Ahora reusa la MISMA anatomía que la
+  // tarjeta con datos (etiqueta, avatar + nombre, número grande, sub) pero
+  // atenuada — así encaja con el resto de las tarjetas en vez de ser una
+  // caja distinta, y ya no hace falta esperar a que arranque el torneo
+  // para que la sección se vea prolija.
   if (!hayDatos) {
+    const dim = color ?? '#6B7A99';
     return (
       <div className={`leader-card reveal-on-scroll ${modeClass}`}>
         <div className="lc-stat-label">{emoji} {titulo}</div>
-        <div className="lc-empty-state">
-          <div className="lc-empty-icon">-</div>
-          <div className="lc-empty-txt">Disponible cuando comience el torneo</div>
+        <div className="lc-top">
+          <div className="lc-avatar lc-avatar-empty" style={{ borderColor: hexA(dim, '40'), color: dim }}>
+            {emoji}
+          </div>
+          <div>
+            <div className="lc-player-name lc-empty-muted">Sin datos aún</div>
+            <div className="lc-team-name">—</div>
+          </div>
         </div>
+        <div className="lc-big-num lc-empty-muted" style={{ color: dim }}>—</div>
+        <div className="lc-sub">{sub}</div>
+        <div className="lc-empty-txt" style={{ marginTop: 12 }}>Disponible cuando arranque el torneo</div>
       </div>
     );
   }
@@ -150,14 +166,17 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
   );
 }
 
+// ⚠️ FIX: los 7 emoji estaban vacíos ('') desde siempre — cada tarjeta
+// mostraba solo el título pelado ("PUNTOS", "REBOTES"...), sin ícono al
+// lado, en las dos versiones de la tarjeta (con y sin datos).
 const LIDER_CATEGORIAS = [
-  { titulo: 'Puntos',      emoji: '', statKey: 'pts_total', promKey: 'pts_prom', sub: 'acumulado en el torneo', color: '#F0B429' },
-  { titulo: 'Rebotes',     emoji: '', statKey: 'reb_total', promKey: 'reb_prom', sub: 'acumulado en el torneo', color: '#60A5FA' },
-  { titulo: 'Asistencias', emoji: '', statKey: 'ast_total', promKey: 'ast_prom', sub: 'acumulado en el torneo', color: '#22D07A' },
-  { titulo: 'Robos',       emoji: '', statKey: 'rob_total', promKey: 'rob_prom', sub: 'acumulado en el torneo', color: '#F97316' },
-  { titulo: 'Tapones',     emoji: '', statKey: 'tap_total', promKey: 'tap_prom', sub: 'acumulado en el torneo', color: '#A78BFA' },
-  { titulo: '% Triples',   emoji: '', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
-  { titulo: 'Valoracion',  emoji: '', statKey: 'val_total', promKey: 'val_prom', sub: 'acumulado en el torneo', color: '#FCD34D' },
+  { titulo: 'Puntos',      emoji: '🏀', statKey: 'pts_total', promKey: 'pts_prom', sub: 'acumulado en el torneo', color: '#F0B429' },
+  { titulo: 'Rebotes',     emoji: '🔁', statKey: 'reb_total', promKey: 'reb_prom', sub: 'acumulado en el torneo', color: '#60A5FA' },
+  { titulo: 'Asistencias', emoji: '🤝', statKey: 'ast_total', promKey: 'ast_prom', sub: 'acumulado en el torneo', color: '#22D07A' },
+  { titulo: 'Robos',       emoji: '🖐️', statKey: 'rob_total', promKey: 'rob_prom', sub: 'acumulado en el torneo', color: '#F97316' },
+  { titulo: 'Tapones',     emoji: '🛡️', statKey: 'tap_total', promKey: 'tap_prom', sub: 'acumulado en el torneo', color: '#A78BFA' },
+  { titulo: '% Triples',   emoji: '🎯', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
+  { titulo: 'Valoracion',  emoji: '⭐', statKey: 'val_total', promKey: 'val_prom', sub: 'acumulado en el torneo', color: '#FCD34D' },
 ];
 
 export function LeadersSection({ equipos = [], isLoading = false }) {

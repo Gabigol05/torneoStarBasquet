@@ -857,10 +857,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 {isLoadingStats ? <ResultSkeleton/> : (
                   partidosFinalizados.length === 0 ? (
                     resultadosView === 'playoffs' ? (
-                      <EmptyState icon="B" title="Sin resultados de playoffs todavia"
+                      <EmptyState icon="🏆" title="Sin resultados de playoffs todavia"
                         sub="Los resultados de postemporada apareceran aca en cuanto se cargue el primer partido."/>
                     ) : (
-                      <EmptyState icon="B" title="Sin resultados todavia"
+                      <EmptyState icon="🏀" title="Sin resultados todavia"
                         sub="Los resultados apareceran aca en cuanto se cargue el primer partido."/>
                     )
                   ) : (
@@ -883,7 +883,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                 <FechaChips modo="fixture"/>
                 {isLoadingStats ? <ResultSkeleton/> : (
                   partidosPendientes.length === 0 ? (
-                    <EmptyState icon="C" title="Sin partidos en esta fecha"
+                    <EmptyState icon="📅" title="Sin partidos en esta fecha"
                       sub="Todavia no hay partidos cargados para esta fecha."/>
                   ) : (
                     <div className="fixture-grid">
@@ -967,7 +967,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     ))
                   ) : jugadorasFiltradas.length === 0 ? (
                     <div style={{ gridColumn: '1/-1' }}>
-                      <EmptyState icon="?"
+                      <EmptyState icon="🔍"
                         title={searchJugadoras ? `Sin resultados para "${searchJugadoras}"` : (mode === 'femenino' ? 'Sin jugadoras' : 'Sin jugadores')}
                         sub={mode === 'femenino' ? 'Proba con otro nombre o equipo' : 'Van a aparecer apenas se juegue la primera fecha'} showIG={false}/>
                     </div>

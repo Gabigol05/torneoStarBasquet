@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navbar }           from './Navbar.jsx';
 import { MobileHeader }     from './MobileHeader.jsx';
+import { TemporadaChip }    from './TemporadaChip.jsx';
 import { WaveBackground }   from './WaveBackground.jsx';
 import { Hero }             from './Hero.jsx';
 import { TorneoView }       from './TorneoView.jsx';
@@ -18,6 +19,7 @@ import { useScrollReveal }  from '../hooks/useScrollReveal';
 import { useFemeninoStats }  from '../hooks/useFemeninoStats';
 import { useMasculinoStats } from '../hooks/useMasculinoStats';
 import { useTournament }     from '../context/TournamentContext';
+import { useTemporada }      from '../context/TemporadaContext';
 import { StatsContext }     from '../context/StatsContext';
 import { FavoritoProvider } from '../hooks/useFavorito.jsx';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.jsx';
@@ -69,12 +71,17 @@ export function PageHome() {
   const [deepLinkPlayer, setDeepLinkPlayer] = useState(null);
   const [deepLinkPartido, setDeepLinkPartido] = useState(null);
   const { mode, setMode } = useTournament();
+  // Qué temporada está mirando el visitante (arranca en la activa — ver
+  // TemporadaContext — y el chip de arriba de todo la deja cambiar a una
+  // vieja). Antes esto no se pasaba a los hooks de stats, así que el sitio
+  // público traía TODAS las temporadas mezcladas sin importar el chip.
+  const { temporadaSeleccionadaId } = useTemporada();
   // Antes los dos hooks pedían datos y abrían su canal de Realtime siempre,
   // aunque solo se ve un modo a la vez — cada visitante hacía el doble de
   // queries/websockets de lo necesario. Ahora solo el hook del modo activo
   // hace fetch/subscribe; el otro se activa recién si el usuario cambia de modo.
-  const statsFem  = useFemeninoStats(mode !== 'masculino');
-  const statsMasc = useMasculinoStats(mode === 'masculino');
+  const statsFem  = useFemeninoStats(mode !== 'masculino', temporadaSeleccionadaId);
+  const statsMasc = useMasculinoStats(mode === 'masculino', temporadaSeleccionadaId);
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
@@ -216,6 +223,9 @@ export function PageHome() {
       <div className="mobile-only">
         <MobileHeader onRefresh={handlePullRefresh} />
       </div>
+      {/* Se auto-oculta sola mientras exista una sola temporada cargada —
+          no hace falta envolverla en una condición acá. */}
+      <TemporadaChip />
       <Hero equipos={equipos} partidos={partidos} fechas={fechas} />
       <div className="full-rule"></div>
       <TorneoView />

@@ -15,8 +15,13 @@ export function TemporadaChip() {
   const ordenadas = [...temporadas].sort((a, b) => b.id - a.id);
 
   return (
+    // No sticky acá a propósito: tanto Navbar (desktop) como MobileHeader
+    // (mobile) ya son sticky con top:0 propio — si este chip también fuera
+    // sticky con top:0, al scrollear terminaría empujado detrás del header
+    // (mismo top, pero el header tiene z-index más alto) y desaparecería de
+    // la vista en vez de quedar pegado debajo. Como fila normal, se ve
+    // siempre apenas se entra a la página, justo debajo del header.
     <div style={{
-      position: 'sticky', top: 0, zIndex: 40,
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       padding: '10px 16px', background: 'rgba(8,16,26,.92)', backdropFilter: 'blur(8px)',
       borderBottom: '1px solid #1C2535',

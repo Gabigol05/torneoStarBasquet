@@ -566,11 +566,31 @@ nav {
   color: var(--white);
 }
 
+/* ⚠️ FIX (reporte Alvaro, captura de celular): "STAR BASQUET" a veces se
+   veía pixelado/granulado en el celular, mientras que "TORNEO" arriba (que
+   es texto sólido normal) siempre se ve nítido. Es un glitch conocido de
+   Safari/Chrome mobile: un gradiente recortado en el texto
+   (background-clip:text + text-fill-color:transparent) heredaba el
+   text-shadow de 55px de blur de .hero-title — esa combinación hace que el
+   navegador a veces rasterice el texto en una capa de menor calidad hasta
+   que la repinta (por eso era intermitente, "a veces"). Se le saca el
+   heredado con sombra propia más chica (no hace falta el mismo blur que el
+   texto blanco, el gradiente ya se distingue solo del fondo) y se fuerza a
+   su propia capa de composición (translateZ) — el fix estándar para este
+   glitch en iOS/Android. */
 .hero-title-accent {
   background: linear-gradient(100deg, var(--gold) 0%, var(--orange) 52%, var(--gold2) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, .55);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
 }
 
 .hero-subtitle {

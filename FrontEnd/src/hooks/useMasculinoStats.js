@@ -229,15 +229,25 @@ export function useMasculinoStats(enabled = true, temporadaId = null) {
   const [error,           setError]           = useState(null);
   const [lastUpdated,     setLastUpdated]     = useState(null);
 
-  const fetchingRef = useRef(false);
+  // ⚠️ FIX BUG (mismo diagnóstico que useFemeninoStats.js — ver el comentario
+  // largo ahí): el "fetchingRef" de acá descartaba en silencio el refresh()
+  // que llega con el temporadaId YA correcto si todavía seguía en vuelo el
+  // primer fetch (con temporadaId=null, disparado antes de que
+  // TemporadaContext resolviera cuál es la temporada activa al recargar la
+  // página) — dejando al hook pegado con datos de TODAS las temporadas hasta
+  // el próximo trigger real. Se reemplaza por un contador de "generación":
+  // los dos fetches corren igual, pero solo se aplica el resultado del más
+  // nuevo, así nunca se pierde el que trae el filtro correcto.
+  const fetchIdRef = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!isConfigured || fetchingRef.current) return;
-    fetchingRef.current = true;
+    if (!isConfigured) return;
+    const miId = ++fetchIdRef.current;
     try {
       setIsLoading(true);
       const data = await fetchTodo(temporadaId);
       if (!data) return;
+      if (miId !== fetchIdRef.current) return;
       setEquipos(data.equipos);
       setPartidos(data.partidos);
       setFechas(data.fechas);
@@ -246,10 +256,9 @@ export function useMasculinoStats(enabled = true, temporadaId = null) {
       setError(null);
     } catch (err) {
       console.error('[useMasculinoStats]', err);
-      setError(err.message);
+      if (miId === fetchIdRef.current) setError(err.message);
     } finally {
-      setIsLoading(false);
-      fetchingRef.current = false;
+      if (miId === fetchIdRef.current) setIsLoading(false);
     }
   }, [temporadaId]);
 

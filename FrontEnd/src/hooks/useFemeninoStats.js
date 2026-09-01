@@ -240,16 +240,36 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
   const [error,           setError]           = useState(null);
   const [lastUpdated,     setLastUpdated]     = useState(null);
 
-  // Evitar refetch si ya hay uno en curso
-  const fetchingRef = useRef(false);
+  // ⚠️ FIX BUG (reporte Alvaro: al recargar la página a veces el hero queda
+  // pegado en "En Curso" hasta que cambiás de torneo y volvés). Antes había
+  // acá un "fetchingRef" que directamente CANCELABA cualquier refresh() que
+  // llegara mientras otro seguía en vuelo. Al recargar, TemporadaContext
+  // todavía no resolvió cuál es la temporada activa en el primer render, así
+  // que este hook arranca con temporadaId=null (fetchTodo(null) trae TODAS
+  // las fechas/partidos de todas las temporadas, no solo la actual). Un
+  // instante después TemporadaContext resuelve el id real, `refresh` cambia
+  // de identidad (depende de temporadaId) y el efecto de abajo dispara un
+  // SEGUNDO refresh() ya con el filtro correcto — pero si el primero (el de
+  // temporadaId=null) todavía no había terminado, fetchingRef seguía en
+  // true y ese segundo refresh, el único con el dato bueno, se descartaba
+  // en silencio. La página quedaba mostrando el conteo de TODAS las
+  // temporadas (fechasJugadas > 0 de temporadas viejas) y no se volvía a
+  // pedir nada hasta el próximo trigger real (ej: apagar/prender el hook al
+  // cambiar de torneo con `enabled`).
+  // Ahora, en vez de bloquear el refresh nuevo, se dejan correr los dos pero
+  // se ignora el resultado de cualquiera que ya haya quedado viejo (si para
+  // cuando responde ya se pidió un refresh más nuevo) — así nunca se pierde
+  // el fetch con los datos correctos, sea cual sea el orden en que respondan.
+  const fetchIdRef = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!isConfigured || fetchingRef.current) return;
-    fetchingRef.current = true;
+    if (!isConfigured) return;
+    const miId = ++fetchIdRef.current;
     try {
       setIsLoading(true);
       const data = await fetchTodo(temporadaId);
       if (!data) return;
+      if (miId !== fetchIdRef.current) return; // ya hay un refresh más nuevo en curso/resuelto
       setEquipos(data.equipos);
       setPartidos(data.partidos);
       setFechas(data.fechas);
@@ -258,10 +278,9 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
       setError(null);
     } catch (err) {
       console.error('[useFemeninoStats]', err);
-      setError(err.message);
+      if (miId === fetchIdRef.current) setError(err.message);
     } finally {
-      setIsLoading(false);
-      fetchingRef.current = false;
+      if (miId === fetchIdRef.current) setIsLoading(false);
     }
   }, [temporadaId]);
 

@@ -587,8 +587,16 @@ nav {
      se notaba por detrás de las letras (fuente condensada, muy juntas) y
      oscurecía toda la palabra en vez de solo darle profundidad — reporte de
      Alvaro: "se ve como una sombra negra, se ve medio oscuro". Se deja bien
-     liviana, lo justo para separar el dorado del fondo de la pelota. */
-  text-shadow: 0 2px 7px rgba(0, 0, 0, .28);
+     liviana, lo justo para separar el dorado del fondo de la pelota.
+     Con esa sombra ya liviana, en el torneo masculino (pelota más clara/gris,
+     tonos parecidos al dorado del texto) el contraste quedaba bajo y las
+     letras se leían como "borrosas" — no era un glitch de render, era que el
+     borde de cada letra se perdía contra el fondo. Se le suma un trazo fino
+     oscuro (-webkit-text-stroke) que define el borde de la letra SIEMPRE,
+     sea cual sea el fondo detrás, más una sombra bien pegada (casi sin
+     blur) que refuerza ese borde sin oscurecer el relleno dorado. */
+  -webkit-text-stroke: 0.6px rgba(8, 12, 18, .55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 1px rgba(0, 0, 0, .45);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transform: translateZ(0);

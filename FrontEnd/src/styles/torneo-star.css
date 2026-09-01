@@ -577,26 +577,23 @@ nav {
    heredado con sombra propia más chica (no hace falta el mismo blur que el
    texto blanco, el gradiente ya se distingue solo del fondo) y se fuerza a
    su propia capa de composición (translateZ) — el fix estándar para este
-   glitch en iOS/Android. */
+   glitch en iOS/Android.
+   ⚠️ Intento fallido (revertido): se probó agregar -webkit-text-stroke para
+   definir el borde de la letra contra la pelota más clara del masculino —
+   en Bebas Neue condensada, ese trazo terminaba pisando todo el relleno y
+   la palabra se veía como una silueta negra sólida ("HORRIBLE", reporte de
+   Alvaro). Se saca por completo — no volver a agregar text-stroke acá.
+   Lo que sí pidió Alvaro: mantener el estilo original pero con un dorado
+   más fuerte/amarillo, que se lea bien contra cualquier fondo. Se lleva el
+   degradé a puro dorado/amarillo (--gold/--gold2, sin el --orange del medio
+   que se camuflaba contra la pelota) y se deja una sombra intermedia (ni
+   tan fuerte que oscurezca, ni tan liviana que pierda el borde). */
 .hero-title-accent {
-  background: linear-gradient(100deg, var(--gold) 0%, var(--orange) 52%, var(--gold2) 100%);
+  background: linear-gradient(100deg, var(--gold2) 0%, var(--gold) 50%, var(--gold2) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  /* Bajado de rgba(0,0,0,.55)/18px: con el clip-text esa sombra tan oscura
-     se notaba por detrás de las letras (fuente condensada, muy juntas) y
-     oscurecía toda la palabra en vez de solo darle profundidad — reporte de
-     Alvaro: "se ve como una sombra negra, se ve medio oscuro". Se deja bien
-     liviana, lo justo para separar el dorado del fondo de la pelota.
-     Con esa sombra ya liviana, en el torneo masculino (pelota más clara/gris,
-     tonos parecidos al dorado del texto) el contraste quedaba bajo y las
-     letras se leían como "borrosas" — no era un glitch de render, era que el
-     borde de cada letra se perdía contra el fondo. Se le suma un trazo fino
-     oscuro (-webkit-text-stroke) que define el borde de la letra SIEMPRE,
-     sea cual sea el fondo detrás, más una sombra bien pegada (casi sin
-     blur) que refuerza ese borde sin oscurecer el relleno dorado. */
-  -webkit-text-stroke: 0.6px rgba(8, 12, 18, .55);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 1px rgba(0, 0, 0, .45);
+  text-shadow: 0 3px 10px rgba(0, 0, 0, .45);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transform: translateZ(0);

@@ -57,23 +57,32 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
   // atenuada — así encaja con el resto de las tarjetas en vez de ser una
   // caja distinta, y ya no hace falta esperar a que arranque el torneo
   // para que la sección se vea prolija.
+  // Fondo: mismo degradé con el color de la categoría que usa la tarjeta
+  // CON datos (ver cardBg/innerBg más abajo) — antes esto se quedaba en el
+  // gris parejo (--dark3) de una tarjeta cualquiera, plano al lado de las
+  // demás. Con menos intensidad de color que la versión con datos (no hay
+  // líder real todavía), pero ya no es un gris liso.
   if (!hayDatos) {
     const dim = color ?? '#6B7A99';
+    const cardBgEmpty = { background: `linear-gradient(160deg, ${hexA(dim, '40')}, #1C2535 65%)` };
+    const innerBgEmpty = { background: `linear-gradient(160deg, ${hexA(dim, '0d')}, #0B111C 60%)` };
     return (
-      <div className={`leader-card reveal-on-scroll ${modeClass}`}>
-        <div className="lc-stat-label">{emoji} {titulo}</div>
-        <div className="lc-top">
-          <div className="lc-avatar lc-avatar-empty" style={{ borderColor: hexA(dim, '40'), color: dim }}>
-            {emoji}
+      <div className={`leader-card has-color reveal-on-scroll ${modeClass}`} style={cardBgEmpty}>
+        <div className="lc-inner" style={innerBgEmpty}>
+          <div className="lc-stat-label">{emoji} {titulo}</div>
+          <div className="lc-top">
+            <div className="lc-avatar lc-avatar-empty" style={{ borderColor: hexA(dim, '40'), color: dim }}>
+              {emoji}
+            </div>
+            <div>
+              <div className="lc-player-name lc-empty-muted">Sin datos aún</div>
+              <div className="lc-team-name">—</div>
+            </div>
           </div>
-          <div>
-            <div className="lc-player-name lc-empty-muted">Sin datos aún</div>
-            <div className="lc-team-name">—</div>
-          </div>
+          <div className="lc-big-num lc-empty-muted" style={{ color: dim }}>—</div>
+          <div className="lc-sub">{sub}</div>
+          <div className="lc-empty-txt" style={{ marginTop: 12 }}>Disponible cuando arranque el torneo</div>
         </div>
-        <div className="lc-big-num lc-empty-muted" style={{ color: dim }}>—</div>
-        <div className="lc-sub">{sub}</div>
-        <div className="lc-empty-txt" style={{ marginTop: 12 }}>Disponible cuando arranque el torneo</div>
       </div>
     );
   }

@@ -780,6 +780,17 @@ nav {
     font-size: clamp(44px, 15vw, 72px);
   }
 
+  /* ⚠️ FIX (reporte Alvaro: "en la compu se ve re bien, en el celu sigue
+     oscuro"): el text-shadow de .hero-title-accent (0 3px 10px) está en px
+     fijos, pensado para el tamaño de letra de escritorio (hasta 184px). En
+     mobile la letra baja a 44-72px — la MISMA sombra, contra una letra 2-3
+     veces más chica, tapa proporcionalmente mucha más superficie del
+     dorado y se ve oscura/opaca en vez de sutil. Se escala la sombra hacia
+     abajo en la misma proporción para mobile. */
+  .hero-title-accent {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
   .hero-liga-label {
     font-size: 10px;
     letter-spacing: 2px;

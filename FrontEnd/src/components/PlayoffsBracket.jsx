@@ -173,7 +173,11 @@ function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
   const colorCss = accentColor ?? 'var(--gold)';
   const colorHex = accentColor ?? '#F0B429';
   const iconSize = size === 8 ? 92 : size === 4 ? 80 : 68;
-  const paddingTop = size === 8 ? 48 : 20;
+  // En escritorio este padding baja el casillero para alinearlo con el
+  // árbol horizontal (queda a la altura de la Final); ese corrimiento no
+  // aplica en la lista vertical de mobile — se saca casi del todo ahí vía
+  // --po-pt-campeon8/4 (ver @media 767px en torneo-star.css).
+  const paddingTop = size === 8 ? 'var(--po-pt-campeon8, 48px)' : size === 4 ? 'var(--po-pt-campeon4, 20px)' : 0;
 
   const pl = partidoFinal?.puntos_local ?? 0;
   const pv = partidoFinal?.puntos_visit ?? 0;
@@ -269,18 +273,18 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
           </div>
           <div className="bracket-round">
             <div className="bracket-round-label">Semifinal</div>
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 'var(--po-mt-semi1, 32px)' }}>
               <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={1}
                 fallbackA={ganadoresCuartos[0]} fallbackB={ganadoresCuartos[1]}/>
             </div>
-            <div style={{ marginTop: 48 }}>
+            <div style={{ marginTop: 'var(--po-mt-semi2, 48px)' }}>
               <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={2}
                 fallbackA={ganadoresCuartos[2]} fallbackB={ganadoresCuartos[3]}/>
             </div>
           </div>
           <div className="bracket-round">
             <div className="bracket-round-label">Final</div>
-            <div style={{ marginTop: 120 }}>
+            <div style={{ marginTop: 'var(--po-mt-final8, 120px)' }}>
               <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
                 fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
             </div>
@@ -316,7 +320,7 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
           </div>
           <div className="bracket-round">
             <div className="bracket-round-label">Final</div>
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 'var(--po-mt-final4, 32px)' }}>
               <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
                 fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
             </div>

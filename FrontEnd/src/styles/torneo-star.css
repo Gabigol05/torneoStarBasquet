@@ -1797,6 +1797,56 @@ tbody td {
   min-width: clamp(140px, 20vw, 180px);
 }
 
+/* ⚠️ FIX (reporte Alvaro, captura de celular: cruces de playoff pisándose,
+   texto cortado, la tarjeta de "Campeón" flotando arriba de otro cruce): el
+   cuadro (Cuartos/Semifinal/Final/Campeón) es un árbol de columnas lado a
+   lado pensado para .bracket-match — una tarjeta compacta (~60px de alto).
+   Pero en cuanto hay un resultado real cargado, PlayoffsBracket.jsx dibuja
+   ahí adentro la MISMA tarjeta grande de Resultados/Fixture
+   (.result-card-v2/.fixture-card-v2, con un piso de min-width:320px para no
+   aplastarse — ver el comentario en esa regla). En escritorio hay lugar de
+   sobra y el cuadro scrollea horizontal sin problema. En celular esa
+   tarjeta de 320px de ancho no entra en una columna de ~150-180px: se
+   desborda para los costados, encima de la columna vecina — y los
+   corrimientos verticales (32/48/120px, puestos a mano para alinear el
+   árbol contra tarjetas COMPACTAS) quedan totalmente desalineados contra
+   tarjetas reales de 300-500px de alto, así que las columnas terminan
+   pisándose también verticalmente. No es una cuestión de sombra/ancho, es
+   que el layout de "árbol horizontal" no tiene sentido en una pantalla
+   angosta con tarjetas completas. En mobile se pasa a una lista vertical:
+   una ronda debajo de la otra, cada una a todo el ancho — misma tarjeta,
+   mismo contenido, sin comprimir nada ni necesitar los corrimientos del
+   árbol (se llevan a 0 acá abajo vía las variables --po-*, que
+   PlayoffsBracket.jsx usa en sus estilos inline en vez del número fijo). */
+@media (max-width: 767px) {
+  .bracket-wrap {
+    overflow-x: visible;
+  }
+  .bracket {
+    flex-direction: column;
+    gap: 28px;
+    min-width: 0;
+  }
+  .bracket-round {
+    flex: none;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 0;
+    min-width: 0;
+    width: 100%;
+    --po-mt-semi1: 0px;
+    --po-mt-semi2: 0px;
+    --po-mt-final8: 0px;
+    --po-mt-final4: 0px;
+    --po-pt-campeon8: 8px;
+    --po-pt-campeon4: 8px;
+  }
+  .bracket-round-label {
+    text-align: left;
+    padding-left: 2px;
+  }
+}
+
 .bracket-round-label {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: clamp(11px, 1.3vw, 13px);

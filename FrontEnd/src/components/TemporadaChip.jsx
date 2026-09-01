@@ -3,40 +3,52 @@ import { createPortal } from 'react-dom';
 import { useTemporada } from '../context/TemporadaContext';
 import { useTournament } from '../context/TournamentContext';
 
-// Selector de temporada — un desplegable propio (chevron dibujado + puntito
-// de estado) con las temporadas DE LA CATEGORÍA QUE SE ESTÁ MIRANDO
-// (femenino/masculino, según el toggle de arriba de todo), arriba de todo
-// el contenido (Posiciones, Resultados, Líderes, Jugadoras, Playoffs
-// cambian todos juntos según cuál esté seleccionada). Femenino y masculino
-// tienen temporadas independientes (ver TemporadaContext) — por eso este
-// selector filtra por categoría en vez de mezclar las de las dos juntas.
+// Selector de temporada — la temporada es el encabezado de la barra (no un
+// botón dorado suelto): rótulo chico arriba, nombre en Barlow Condensed
+// grande abajo, y el estado de esa temporada al costado derecho.
 //
-// Historial de este componente: arrancó como una fila de chips (uno por
-// temporada, todos desplegados a la vez) — con 2 se veía bien, pero con 5
-// o 10 (con el tiempo, cada Apertura/Clausura suma una más) quedaba una
-// fila larga y desordenada. Se pasó a un <select> nativo, compacto sin
-// importar cuántas haya — pero un <select> no puede pintar un puntito de
-// color adentro de cada <option>, así que se perdió la señal visual de
-// "cuál está en curso" hasta que se abría. Se pasó a un desplegable propio
-// para recuperar esa señal — pero al vivir DENTRO del flujo normal de la
-// página, cualquier contenedor padre con overflow:hidden (headers/wrappers
-// con esquinas redondeadas o blur suelen tenerlo) recortaba la lista
-// apenas se pasaba de un par de opciones (el bug que reportó Alvaro: se
-// veía "cortado abajo", no aparecía la temporada vieja).
+// Decisiones visuales (cambio de set/2026):
+//  - Se sacaron los emojis (📅 / 📁). El estado se comunica con el punto de
+//    color + texto, que es lo que ya usaba el menú desplegado.
+//  - El dorado #F0B429 dejó de pintar un chip relleno. Ahora significa una
+//    sola cosa: "estás mirando una temporada archivada" (nombre + regla
+//    lateral + aviso). En la temporada en curso la barra es neutra y el
+//    verde #22D07A lleva la señal de "en vivo".
+//  - Tipografía más grande (20/17px el nombre contra los 12.5px del chip
+//    viejo) porque el selector se usa seguido y era lo más chico de la
+//    pantalla.
 //
-// Por eso el menú desplegado se pinta con un portal directo a <body> y se
-// posiciona en base a las coordenadas reales del botón en pantalla
-// (getBoundingClientRect) — así queda completamente afuera del flujo/
-// recorte de sus contenedores padre, sin importar qué overflow tengan.
+// El menú desplegado sigue pintándose con un portal a <body> posicionado
+// por getBoundingClientRect: cualquier contenedor padre con overflow:hidden
+// lo recortaba (bug reportado por Alvaro: "se veía cortado abajo").
 //
 // Se auto-oculta si la categoría que se está mirando todavía tiene una
-// sola temporada, para no meter un selector de más cuando no hace falta
-// elegir nada.
+// sola temporada.
+const ORO   = '#F0B429';
+const VERDE = '#22D07A';
+const LINEA = '#1C2535';
+const MUTED = '#6B7A99';
+const COND  = "'Barlow Condensed',sans-serif";
+
+function useEsMobile() {
+  const [esMobile, setEsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const on = e => setEsMobile(e.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return esMobile;
+}
+
 export function TemporadaChip() {
   const { temporadas, temporadaSeleccionadaId, temporadaActivaId, setTemporadaSeleccionadaId, esTemporadaActiva } = useTemporada();
   const { mode } = useTournament();
   const [abierto, setAbierto] = useState(false);
   const [coords, setCoords] = useState(null);
+  const esMobile = useEsMobile();
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -45,22 +57,16 @@ export function TemporadaChip() {
   const actualizarPosicion = () => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
-    // Si no entra a la derecha, se alinea por el borde derecho del botón
-    // en vez del izquierdo — para que no se corte contra el borde de la
-    // pantalla en celulares angostos.
-    const anchoEstimado = 240;
+    const anchoEstimado = 280;
     const alinearDerecha = r.left + anchoEstimado > window.innerWidth - 8;
     setCoords({
-      top: r.bottom + 6,
+      top: r.bottom + 8,
       left: alinearDerecha ? null : r.left,
       right: alinearDerecha ? (window.innerWidth - r.right) : null,
-      minWidth: r.width,
+      minWidth: Math.max(r.width, 240),
     });
   };
 
-  // Cerrar al tocar afuera o con Escape; reposicionar si hay scroll/resize
-  // mientras está abierto (el portal ya no se mueve solo con el botón, al
-  // vivir fuera del flujo normal).
   useEffect(() => {
     if (!abierto) return;
     actualizarPosicion();
@@ -83,123 +89,156 @@ export function TemporadaChip() {
     };
   }, [abierto]);
 
-  // Si cambia de categoría (toggle femenino/masculino) con el desplegable
-  // abierto, lo cerramos — evita que quede abierto mostrando temporadas
-  // de la categoría anterior.
   useEffect(() => { setAbierto(false); }, [mode]);
 
   if (deLaCategoria.length <= 1) return null;
 
-  // Más nueva primero — así la temporada en curso siempre está arriba de
-  // todo en la lista, sin tener que scrollear.
   const ordenadas = [...deLaCategoria].sort((a, b) => b.id - a.id);
   const seleccionadaId = temporadaSeleccionadaId[mode];
   const seleccionada = ordenadas.find(t => t.id === seleccionadaId) ?? ordenadas[0];
-  const enCurso = seleccionada?.id === temporadaActivaId[mode];
+  const enCurso = esTemporadaActiva(mode);
 
   const elegir = id => {
     setTemporadaSeleccionadaId(mode, id);
     setAbierto(false);
   };
 
+  const acento = enCurso ? VERDE : ORO;
+
   return (
-    // No sticky acá a propósito: tanto Navbar (desktop) como MobileHeader
-    // (mobile) ya son sticky con top:0 propio — si este selector también
-    // fuera sticky con top:0, al scrollear terminaría empujado detrás del
-    // header (mismo top, pero el header tiene z-index más alto) y
-    // desaparecería de la vista en vez de quedar pegado debajo. Como fila
-    // normal, se ve siempre apenas se entra a la página, justo debajo del
-    // header.
+    // No sticky a propósito: Navbar (desktop) y MobileHeader (mobile) ya son
+    // sticky con top:0 — si esta barra también lo fuera, quedaría empujada
+    // detrás del header al scrollear.
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      padding: '10px 16px', background: 'rgba(8,16,26,.92)', backdropFilter: 'blur(8px)',
-      borderBottom: '1px solid #1C2535',
+      display: 'flex',
+      flexDirection: esMobile ? 'column' : 'row',
+      alignItems: esMobile ? 'stretch' : 'center',
+      justifyContent: 'space-between',
+      gap: esMobile ? 10 : 20,
+      padding: esMobile ? '12px 16px 14px' : '14px 24px',
+      background: 'rgba(8,16,26,.92)',
+      backdropFilter: 'blur(8px)',
+      borderBottom: `1px solid ${LINEA}`,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: .5, color: '#4A566E',
-          fontFamily: "'Barlow Condensed',sans-serif", textTransform: 'uppercase',
-        }}>
-          📅 Temporada
-        </span>
-
-        <button
-          ref={btnRef}
-          type="button"
-          onClick={() => setAbierto(a => !a)}
-          aria-expanded={abierto}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '7px 8px 7px 14px', borderRadius: 100, cursor: 'pointer',
-            fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12.5, letterSpacing: .5,
-            border: '1px solid #F0B429', background: 'rgba(240,180,41,.14)', color: '#F0B429',
-            boxShadow: abierto ? '0 0 14px rgba(240,180,41,.16)' : 'none',
-            maxWidth: '60vw', outline: 'none',
-          }}
-        >
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {seleccionada?.nombre}
-          </span>
+      {/* Izquierda — la temporada como encabezado */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: esMobile ? 12 : 14, minWidth: 0 }}>
+        <span aria-hidden style={{ width: 3, borderRadius: 2, background: acento, flexShrink: 0 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
           <span style={{
-            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-            background: enCurso ? '#22D07A' : '#6B7A99',
-            boxShadow: enCurso ? '0 0 6px #22D07A' : 'none',
-          }} />
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="3"
-            strokeLinecap="round" strokeLinejoin="round"
-            style={{ flexShrink: 0, transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </button>
-
-        {abierto && coords && createPortal(
-          <div
-            ref={menuRef}
+            fontFamily: COND, fontWeight: 700, fontSize: 10.5, letterSpacing: 1.6,
+            textTransform: 'uppercase', color: MUTED, lineHeight: 1,
+          }}>
+            Temporada
+          </span>
+          <button
+            ref={btnRef}
+            type="button"
+            onClick={() => setAbierto(a => !a)}
+            aria-expanded={abierto}
+            aria-haspopup="listbox"
             style={{
-              position: 'fixed', top: coords.top,
-              left: coords.left ?? 'auto', right: coords.right ?? 'auto',
-              minWidth: coords.minWidth, maxWidth: 'calc(100vw - 16px)',
-              zIndex: 9999, overflow: 'hidden',
-              borderRadius: 12, border: '1px solid #1C2535', background: '#0E1420',
-              boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              padding: 0, margin: 0, border: 0, background: 'none', cursor: 'pointer',
+              outline: 'none', minWidth: 0, minHeight: 44, alignSelf: 'flex-start',
+              fontFamily: COND, fontWeight: 700, letterSpacing: .3,
+              fontSize: esMobile ? 19 : 21, lineHeight: 1.1,
+              color: enCurso ? '#EEF2F8' : ORO,
             }}
           >
-            {ordenadas.map(t => {
-              const activa = t.id === temporadaActivaId[mode];
-              const sel = t.id === seleccionadaId;
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => elegir(t.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                    cursor: 'pointer', whiteSpace: 'nowrap',
-                    fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13,
-                    background: sel ? 'rgba(240,180,41,.14)' : 'transparent',
-                    color: sel ? '#F0B429' : '#EEF2F8',
-                  }}
-                >
-                  <span style={{ flex: 1 }}>{t.nombre}</span>
-                  <span style={{
-                    fontSize: 10.5, fontWeight: 700, letterSpacing: .4, textTransform: 'uppercase',
-                    color: activa ? '#22D07A' : '#6B7A99',
-                  }}>
-                    {activa ? '● en curso' : 'finalizada'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>,
-          document.body
-        )}
-      </div>
-      {!esTemporadaActiva(mode) && (
-        <div style={{
-          fontSize: 11, color: '#8899BB', fontFamily: "'Barlow Condensed',sans-serif",
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          📁 Estás viendo una temporada anterior — los datos no se mezclan con la actual.
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {seleccionada?.nombre}
+            </span>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              background: 'rgba(240,180,41,.13)',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ORO} strokeWidth="3"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{ transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </span>
+          </button>
         </div>
+      </div>
+
+      {/* Derecha — estado de la temporada que se está mirando */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 9,
+        padding: esMobile ? '9px 11px' : 0,
+        borderRadius: esMobile ? 8 : 0,
+        background: esMobile ? (enCurso ? 'rgba(255,255,255,.04)' : 'rgba(240,180,41,.09)') : 'transparent',
+        flexShrink: 0,
+      }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: acento,
+          boxShadow: enCurso ? `0 0 6px ${VERDE}` : 'none',
+        }} />
+        <span style={{
+          fontFamily: COND, fontWeight: 700, fontSize: 11, letterSpacing: 1.2,
+          textTransform: 'uppercase', color: acento, whiteSpace: 'nowrap',
+        }}>
+          {enCurso ? 'En curso' : 'Temporada anterior'}
+        </span>
+        <span aria-hidden style={{ width: 1, height: 13, background: LINEA, flexShrink: 0 }} />
+        <span style={{
+          fontFamily: COND, fontWeight: 500, fontSize: 13, lineHeight: 1.25,
+          color: enCurso ? MUTED : '#B9A06A',
+        }}>
+          {enCurso ? 'Resultados y tabla en vivo' : 'Los datos no se mezclan con la actual'}
+        </span>
+      </div>
+
+      {abierto && coords && createPortal(
+        <div
+          ref={menuRef}
+          role="listbox"
+          style={{
+            position: 'fixed', top: coords.top,
+            left: coords.left ?? 'auto', right: coords.right ?? 'auto',
+            minWidth: coords.minWidth, maxWidth: 'calc(100vw - 16px)',
+            zIndex: 9999, overflow: 'hidden', padding: 5,
+            borderRadius: 12, border: `1px solid ${LINEA}`, background: '#0E1420',
+            boxShadow: '0 18px 40px rgba(0,0,0,.55)',
+          }}
+        >
+          {ordenadas.map(t => {
+            const activa = t.id === temporadaActivaId[mode];
+            const sel = t.id === (seleccionada?.id ?? seleccionadaId);
+            return (
+              <div
+                key={t.id}
+                role="option"
+                aria-selected={sel}
+                onClick={() => elegir(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px',
+                  minHeight: 44, borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: sel ? 'rgba(240,180,41,.12)' : 'transparent',
+                }}
+              >
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: sel ? ORO : 'transparent',
+                }} />
+                <span style={{
+                  flex: 1, fontFamily: COND, fontWeight: 700, fontSize: 15.5,
+                  color: sel ? ORO : '#EEF2F8',
+                }}>
+                  {t.nombre}
+                </span>
+                <span style={{
+                  fontFamily: COND, fontSize: 11, fontWeight: 700, letterSpacing: .8,
+                  textTransform: 'uppercase', color: activa ? VERDE : MUTED,
+                }}>
+                  {activa ? 'En curso' : 'Finalizada'}
+                </span>
+              </div>
+            );
+          })}
+        </div>,
+        document.body
       )}
     </div>
   );

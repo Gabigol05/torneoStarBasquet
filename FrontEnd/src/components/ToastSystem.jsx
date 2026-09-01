@@ -41,8 +41,24 @@ export function ToastContainer({ toasts, onRemove }) {
 // ── HOOK que detecta nuevos resultados del backend ────────────
 // Compara el snapshot anterior con el nuevo y emite un toast
 // si aparece un partido nuevo en algún equipo
-export function useResultadosToast(equipos, addToast, isLoading = false) {
+//
+// `temporadaKey` identifica QUÉ está mirando el visitante ahora mismo (por
+// ejemplo `${mode}:${temporadaSeleccionadaId}`). ⚠️ FIX (reporte Alvaro):
+// sin esto, cambiar de temporada con el chip de arriba (ej: de "2026 -
+// Clausura", recién arrancada y en 0, a la vieja "Temporada 2026" con sus
+// 54 partidos ya jugados) hacía que CADA equipo pasara de golpe de "0
+// partidos" a "muchos partidos" — y el hook lo interpretaba como que todos
+// esos partidos eran "nuevos resultados" recién salidos, disparando una
+// pila entera de toasts por resultados de hace meses. La comparación de
+// equipoId ya protegía el caso de cambiar de modo (femenino/masculino,
+// que son IDs de equipo distintos) pero NO el de cambiar de temporada
+// dentro de la MISMA categoría, porque los equipos (y sus IDs) son los
+// mismos — solo cambia qué partidos trae cada temporada. Ahora, cada vez
+// que cambia `temporadaKey`, se toma como una foto nueva (se guarda el
+// snapshot sin avisar) en vez de comparar contra la temporada anterior.
+export function useResultadosToast(equipos, addToast, isLoading = false, temporadaKey = null) {
   const prevRef = useRef(null);
+  const prevKeyRef = useRef(undefined);
 
   useEffect(() => {
     // Mientras todavía está cargando, "equipos" puede ser el placeholder
@@ -57,6 +73,16 @@ export function useResultadosToast(equipos, addToast, isLoading = false) {
     const snapshot = {};
     for (const eq of equipos) {
       snapshot[eq.id] = eq.historial?.length ?? 0;
+    }
+
+    // Cambió la temporada/modo que se está mirando — es un conjunto de
+    // datos distinto, no "resultados nuevos". Se guarda el snapshot nuevo
+    // sin avisar, y recién se vuelve a comparar contra la próxima
+    // actualización real de ESTA temporada.
+    if (prevKeyRef.current !== temporadaKey) {
+      prevKeyRef.current = temporadaKey;
+      prevRef.current = snapshot;
+      return;
     }
 
     // Primera carga (con datos reales ya disponibles): solo guardar
@@ -89,5 +115,5 @@ export function useResultadosToast(equipos, addToast, isLoading = false) {
     }
 
     prevRef.current = snapshot;
-  }, [equipos, addToast]);
+  }, [equipos, addToast, isLoading, temporadaKey]);
 }

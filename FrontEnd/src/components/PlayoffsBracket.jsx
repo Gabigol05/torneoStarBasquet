@@ -159,27 +159,78 @@ function Slot({ partidosCopa, instancia, llave, accentColor, fallbackA, fallback
   return <BracketMatch teamA={fallbackA} teamB={fallbackB} seedA={seedA} seedB={seedB}/>;
 }
 
+// ── MEJORA (pedido de Alvaro): el campeón es el logro más importante del
+// cuadro y antes era un ícono chico (40-48px) con el nombre en letra
+// chica, exactamente igual de discreto que cualquier otro casillero del
+// bracket — se perdía. Ahora es una tarjeta propia (solo cuando ya hay
+// campeón definido — mientras está "Por definir" se deja igual de
+// discreto que antes, para no decorar de más algo que todavía no pasó):
+// más aire, el logo bien grande con doble anillo dorado + resplandor, una
+// etiqueta "🏆 CAMPEÓN" arriba, el nombre en letra grande y el marcador de
+// la final abajo — de un vistazo se nota cuál es el cajón importante.
 function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
   const ganador = resolveWinner(partidoFinal, equipoMap);
-  const iconSize = size === 8 ? 48 : 40;
-  const paddingTop = size === 8 ? 80 : 40;
+  const colorCss = accentColor ?? 'var(--gold)';
+  const colorHex = accentColor ?? '#F0B429';
+  const iconSize = size === 8 ? 92 : size === 4 ? 80 : 68;
+  const paddingTop = size === 8 ? 48 : 20;
+
+  const pl = partidoFinal?.puntos_local ?? 0;
+  const pv = partidoFinal?.puntos_visit ?? 0;
+  const marcador = ganador && partidoFinal ? `${Math.max(pl, pv)} - ${Math.min(pl, pv)}` : null;
+
+  const contenido = (
+    <div style={{ textAlign: 'center' }}>
+      {ganador && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px',
+          borderRadius: 100, border: `1px solid ${hexA(colorHex, '55')}`, background: hexA(colorHex, '1a'),
+          fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 11,
+          letterSpacing: 2, textTransform: 'uppercase', color: colorCss, marginBottom: 16,
+        }}>
+          🏆 Campeón
+        </div>
+      )}
+      {ganador?.logo ? (
+        <img src={ganador.logo} alt="" decoding="async"
+          style={{ width: iconSize, height: iconSize, borderRadius: '50%', objectFit: 'cover',
+            border: `3px solid ${colorCss}`,
+            boxShadow: `0 0 26px ${hexA(colorHex, '80')}, 0 0 0 6px ${hexA(colorHex, '14')}` }}
+          onError={e => { e.target.style.display = 'none'; }}/>
+      ) : (
+        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={colorCss} opacity={ganador ? 1 : .3}>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+      )}
+      <div style={{
+        fontFamily: "'Bebas Neue'", fontSize: size === 8 ? 27 : 20, letterSpacing: 2,
+        marginTop: 14, color: colorCss, opacity: ganador ? 1 : .4, lineHeight: 1.05,
+      }}>
+        {ganador ? ganador.name : 'Por definir'}
+      </div>
+      {marcador && (
+        <div style={{
+          marginTop: 6, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+          fontSize: 13, letterSpacing: 1, color: '#8899BB',
+        }}>
+          {marcador} en la Final
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', paddingTop }}>
-      <div style={{ textAlign: 'center', color: accentColor ?? 'var(--gold)' }}>
-        {ganador?.logo ? (
-          <img src={ganador.logo} alt="" decoding="async"
-            style={{ width: iconSize, height: iconSize, borderRadius: '50%', objectFit: 'cover',
-              border: `2px solid ${accentColor ?? 'var(--gold)'}`, boxShadow: `0 0 14px ${hexA(accentColor ?? '#F0B429', '66')}` }}
-            onError={e => { e.target.style.display = 'none'; }}/>
-        ) : (
-          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={accentColor ?? 'var(--gold)'} opacity={ganador ? 1 : .3}>
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-        )}
-        <div style={{ fontFamily: "'Bebas Neue'", fontSize: size === 8 ? 18 : 16, letterSpacing: 2, marginTop: 8, opacity: ganador ? 1 : .4 }}>
-          {ganador ? ganador.name : 'Por definir'}
+      {ganador ? (
+        <div style={{
+          position: 'relative', padding: '26px 24px 22px', borderRadius: 20,
+          border: `1px solid ${hexA(colorHex, '4d')}`,
+          background: `radial-gradient(ellipse 170px 130px at 50% 0%, ${hexA(colorHex, '26')}, transparent 70%), rgba(8,16,26,.5)`,
+          boxShadow: `0 0 36px ${hexA(colorHex, '20')}`,
+        }}>
+          {contenido}
         </div>
-      </div>
+      ) : contenido}
     </div>
   );
 }

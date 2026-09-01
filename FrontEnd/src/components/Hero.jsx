@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CounterUp } from './CounterUp';
 import { useTournament } from '../context/TournamentContext';
+import { useTemporada } from '../context/TemporadaContext';
 import logoTorneo from '../assets/logo_torneo.jpg';
 import sponsorAustral from '../assets/sponsor_austral_bar.png';
 import sponsorLening from '../assets/sponsor_lening.png';
@@ -15,8 +16,31 @@ const MODE_COLORS = {
   femenino: { hex: 0xe8187a },
 };
 
+// "Edición" = cuántos torneos reales tiene encima cada categoría. Antes de
+// que este panel existiera ya se habían jugado ediciones (sobre todo del
+// masculino, que arrancó bastante antes) que nunca quedaron cargadas como
+// filas de `temporadas` — por eso no alcanza con contar filas de la tabla:
+// hay que sumarle un "arrastre" de las ediciones previas al software. Este
+// offset es ese arrastre por categoría (arrastre + filas en `temporadas` =
+// edición actual). Masculino: offset 5 porque cuando se cargó la primera
+// fila de `temporadas` para masculino, ya era la 6ta edición real (5 previas
+// + esa 1 fila = 6). Femenino: offset 0, porque su primera fila cargada acá
+// FUE la 1ra edición real. Si alguno de los dos arrastres no es exacto,
+// ajustar el número de acá.
+const EDICION_OFFSET = { femenino: 0, masculino: 5 };
+
 export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const { mode, toggleMode } = useTournament();
+  const { temporadas } = useTemporada();
+
+  // ⚠️ FIX: antes "Edicion" estaba hardcodeado en 1 (femenino) y 6
+  // (masculino) para siempre — no se movía nunca, ni cuando se cerraba una
+  // temporada y arrancaba la siguiente (ej: al crear "2026 - Clausura" para
+  // femenino, que ya es la 2da edición). Ahora cuenta cuántas temporadas
+  // tiene cargadas cada categoría (Apertura + Clausura suman ediciones
+  // distintas) y le suma el arrastre de ediciones previas al software.
+  const edicionFemenino  = EDICION_OFFSET.femenino  + temporadas.filter(t => t.categoria === 'femenino').length;
+  const edicionMasculino = EDICION_OFFSET.masculino + temporadas.filter(t => t.categoria === 'masculino').length;
 
   const heroFemenino = useMemo(() => {
     const fechasJugadas = fechas.filter(f =>
@@ -25,16 +49,22 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     const jugadorasTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
 
     return {
-      badge: 'Torneo Femenino - En Curso',
+      // ⚠️ FIX: antes decía "En Curso" siempre, sin importar si ya se había
+      // jugado o no un solo partido — al crear una temporada nueva (que
+      // arranca en 0) seguía mostrando "En Curso" aunque todavía faltaran
+      // semanas para el primer partido. Ahora usa el mismo criterio que ya
+      // tenía el masculino: recién dice "En Curso" cuando hay al menos una
+      // fecha jugada.
+      badge: fechasJugadas > 0 ? 'Torneo Femenino - En Curso' : 'Torneo Femenino - Arranca Pronto',
       subtitle: 'Categoria Femenina - Cordoba - 2026',
       stats: [
-        { end: 1, label: 'Edicion' },
+        { end: edicionFemenino, label: 'Edicion' },
         { end: equipos.length || 10, label: 'Equipos' },
         { end: fechasJugadas, label: 'Fechas' },
         { end: jugadorasTotal || 200, label: 'Jugadoras' },
       ],
     };
-  }, [equipos, partidos, fechas]);
+  }, [equipos, partidos, fechas, edicionFemenino]);
 
   // Antes era un objeto fijo (HERO_MASCULINO) con "Proximamente" y "0 Fechas"
   // pegado con alfileres — se iba a quedar diciendo eso para siempre. Ahora
@@ -50,13 +80,13 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
       badge: fechasJugadas > 0 ? 'Torneo Masculino - En Curso' : 'Torneo Masculino - Arranca Pronto',
       subtitle: 'Categoria Masculina - Cordoba - 2026',
       stats: [
-        { end: 6, label: 'Edicion' },
+        { end: edicionMasculino, label: 'Edicion' },
         { end: equipos.length || 22, label: 'Equipos' },
         { end: fechasJugadas, label: 'Fechas' },
         { end: jugadoresTotal || 250, label: 'Jugadores', suffix: jugadoresTotal ? '' : '+' },
       ],
     };
-  }, [equipos, partidos, fechas]);
+  }, [equipos, partidos, fechas, edicionMasculino]);
 
   const data = mode === 'femenino' ? heroFemenino : heroMasculino;
 

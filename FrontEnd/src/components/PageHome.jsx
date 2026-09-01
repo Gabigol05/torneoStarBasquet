@@ -92,7 +92,12 @@ export function PageHome() {
   const { toasts, addToast, removeToast } = useToast();
   // `equipos` ya refleja el modo activo (línea de arriba), antes esto se
   // limitaba a femenino y el masculino nunca mostraba el aviso de "nuevo resultado".
-  useResultadosToast(equipos, addToast, isLoading);
+  // Se le pasa además QUÉ temporada se está mirando (mode + su id
+  // seleccionado) — así, si el visitante cambia de temporada con el chip,
+  // el hook lo toma como una foto nueva en vez de comparar contra la
+  // temporada anterior y disparar un toast de "nuevo resultado" por cada
+  // partido viejo que aparece de golpe (bug reportado por Alvaro).
+  useResultadosToast(equipos, addToast, isLoading, `${mode}:${temporadaSeleccionadaId[mode]}`);
 
   // Chequea si hay una version nueva publicada (comparando el bundle actual
   // contra el que esta realmente sirviendo el servidor ahora mismo). Si

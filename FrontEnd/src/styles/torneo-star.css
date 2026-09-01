@@ -583,7 +583,12 @@ nav {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 4px 18px rgba(0, 0, 0, .55);
+  /* Bajado de rgba(0,0,0,.55)/18px: con el clip-text esa sombra tan oscura
+     se notaba por detrás de las letras (fuente condensada, muy juntas) y
+     oscurecía toda la palabra en vez de solo darle profundidad — reporte de
+     Alvaro: "se ve como una sombra negra, se ve medio oscuro". Se deja bien
+     liviana, lo justo para separar el dorado del fondo de la pelota. */
+  text-shadow: 0 2px 7px rgba(0, 0, 0, .28);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transform: translateZ(0);

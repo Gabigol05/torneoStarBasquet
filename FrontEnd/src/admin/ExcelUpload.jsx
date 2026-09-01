@@ -274,16 +274,35 @@ function parsearExcel(wb) {
   }
 
   // Marcador (acumulados → parciales)
+  //
+  // ⚠️ FIX BUG OT (reporte de Alvaro: partido con tiempo extra publicado
+  // como 111-110 en vez de 61-60). La columna "OT" del Excel sigue la MISMA
+  // convención acumulada que 1º/2º/3º/4º (ej: 4º=50, OT=60 → se jugaron 10
+  // puntos de tiempo extra), pero acá se guardaba tal cual venía — un valor
+  // todavía acumulado, no el parcial del período extra. La tabla en Supabase
+  // NO guarda puntos_local/puntos_visit directo: un trigger (fn_sync_partido,
+  // ver create_tables.sql/create_tables_masculino.sql) los recalcula siempre
+  // como q1+q2+q3+q4+ot. Con "ot" todavía acumulado, el trigger sumaba de
+  // vuelta los puntos de los 4 cuartos que ya estaban adentro de ese
+  // acumulado (50 + 60 = 110 en vez de 60) — de ahí el resultado inflado.
+  // Se convierte "ot" a parcial igual que q2/q3/q4 (acumulado de OT menos el
+  // acumulado del 4º cuarto), y así queda bien para CUALQUIER partido con
+  // tiempo extra de acá en adelante. Partidos sin OT no cambian: la celda
+  // OT viene vacía/0 → parcial 0, igual que antes.
   const rL=rows[marcRow+1], rV=rows[marcRow+2];
   if (rL) {
     res.equipoLocal = String(rL[M.equipo]??'').trim();
-    const par = acumAParcial(n(rL[M.q1]),n(rL[M.q2acum]),n(rL[M.q3acum]),n(rL[M.q4acum]));
-    res.marcador.local = { ...par, ot:n(rL[M.ot]), total:n(rL[M.total]) };
+    const q1=n(rL[M.q1]), q2acum=n(rL[M.q2acum]), q3acum=n(rL[M.q3acum]), q4acum=n(rL[M.q4acum]), otAcum=n(rL[M.ot]);
+    const par = acumAParcial(q1, q2acum, q3acum, q4acum);
+    const ot = otAcum>0 ? otAcum-q4acum : 0;
+    res.marcador.local = { ...par, ot, total:n(rL[M.total]) };
   }
   if (rV) {
     res.equipoVisit = String(rV[M.equipo]??'').trim();
-    const par = acumAParcial(n(rV[M.q1]),n(rV[M.q2acum]),n(rV[M.q3acum]),n(rV[M.q4acum]));
-    res.marcador.visit = { ...par, ot:n(rV[M.ot]), total:n(rV[M.total]) };
+    const q1=n(rV[M.q1]), q2acum=n(rV[M.q2acum]), q3acum=n(rV[M.q3acum]), q4acum=n(rV[M.q4acum]), otAcum=n(rV[M.ot]);
+    const par = acumAParcial(q1, q2acum, q3acum, q4acum);
+    const ot = otAcum>0 ? otAcum-q4acum : 0;
+    res.marcador.visit = { ...par, ot, total:n(rV[M.total]) };
   }
   if (!res.equipoLocal||!res.equipoVisit) { res.errores.push('No se leyeron los equipos.'); return res; }
 

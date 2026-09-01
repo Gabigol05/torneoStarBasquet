@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTemporada } from '../context/TemporadaContext';
 import { useTournament } from '../context/TournamentContext';
 
@@ -16,10 +17,17 @@ import { useTournament } from '../context/TournamentContext';
 // fila larga y desordenada. Se pasó a un <select> nativo, compacto sin
 // importar cuántas haya — pero un <select> no puede pintar un puntito de
 // color adentro de cada <option>, así que se perdió la señal visual de
-// "cuál está en curso" hasta que se abría. Esta versión vuelve a un
-// desplegable propio (mismo tamaño compacto que el <select>) para
-// recuperar esa señal: el puntito de estado ahora se ve siempre, sin
-// tener que abrir nada.
+// "cuál está en curso" hasta que se abría. Se pasó a un desplegable propio
+// para recuperar esa señal — pero al vivir DENTRO del flujo normal de la
+// página, cualquier contenedor padre con overflow:hidden (headers/wrappers
+// con esquinas redondeadas o blur suelen tenerlo) recortaba la lista
+// apenas se pasaba de un par de opciones (el bug que reportó Alvaro: se
+// veía "cortado abajo", no aparecía la temporada vieja).
+//
+// Por eso el menú desplegado se pinta con un portal directo a <body> y se
+// posiciona en base a las coordenadas reales del botón en pantalla
+// (getBoundingClientRect) — así queda completamente afuera del flujo/
+// recorte de sus contenedores padre, sin importar qué overflow tengan.
 //
 // Se auto-oculta si la categoría que se está mirando todavía tiene una
 // sola temporada, para no meter un selector de más cuando no hace falta
@@ -28,20 +36,48 @@ export function TemporadaChip() {
   const { temporadas, temporadaSeleccionadaId, temporadaActivaId, setTemporadaSeleccionadaId, esTemporadaActiva } = useTemporada();
   const { mode } = useTournament();
   const [abierto, setAbierto] = useState(false);
-  const wrapRef = useRef(null);
+  const [coords, setCoords] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
   const deLaCategoria = (temporadas ?? []).filter(t => t.categoria === mode);
 
-  // Cerrar al tocar afuera o con Escape.
+  const actualizarPosicion = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    // Si no entra a la derecha, se alinea por el borde derecho del botón
+    // en vez del izquierdo — para que no se corte contra el borde de la
+    // pantalla en celulares angostos.
+    const anchoEstimado = 240;
+    const alinearDerecha = r.left + anchoEstimado > window.innerWidth - 8;
+    setCoords({
+      top: r.bottom + 6,
+      left: alinearDerecha ? null : r.left,
+      right: alinearDerecha ? (window.innerWidth - r.right) : null,
+      minWidth: r.width,
+    });
+  };
+
+  // Cerrar al tocar afuera o con Escape; reposicionar si hay scroll/resize
+  // mientras está abierto (el portal ya no se mueve solo con el botón, al
+  // vivir fuera del flujo normal).
   useEffect(() => {
     if (!abierto) return;
+    actualizarPosicion();
+    const onScrollOrResize = () => actualizarPosicion();
     const onClickFuera = e => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setAbierto(false);
+      if (btnRef.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setAbierto(false);
     };
     const onEsc = e => { if (e.key === 'Escape') setAbierto(false); };
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
     document.addEventListener('mousedown', onClickFuera);
     document.addEventListener('keydown', onEsc);
     return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
       document.removeEventListener('mousedown', onClickFuera);
       document.removeEventListener('keydown', onEsc);
     };
@@ -87,70 +123,75 @@ export function TemporadaChip() {
           📅 Temporada
         </span>
 
-        <div ref={wrapRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setAbierto(a => !a)}
-            aria-expanded={abierto}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '7px 8px 7px 14px', borderRadius: 100, cursor: 'pointer',
-              fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12.5, letterSpacing: .5,
-              border: '1px solid #F0B429', background: 'rgba(240,180,41,.14)', color: '#F0B429',
-              boxShadow: abierto ? '0 0 14px rgba(240,180,41,.16)' : 'none',
-              maxWidth: '60vw', outline: 'none',
-            }}
-          >
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {seleccionada?.nombre}
-            </span>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: enCurso ? '#22D07A' : '#6B7A99',
-              boxShadow: enCurso ? '0 0 6px #22D07A' : 'none',
-            }} />
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="3"
-              strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0, transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
-              <path d="M6 9l6 6 6-6"/>
-            </svg>
-          </button>
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={() => setAbierto(a => !a)}
+          aria-expanded={abierto}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '7px 8px 7px 14px', borderRadius: 100, cursor: 'pointer',
+            fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12.5, letterSpacing: .5,
+            border: '1px solid #F0B429', background: 'rgba(240,180,41,.14)', color: '#F0B429',
+            boxShadow: abierto ? '0 0 14px rgba(240,180,41,.16)' : 'none',
+            maxWidth: '60vw', outline: 'none',
+          }}
+        >
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {seleccionada?.nombre}
+          </span>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: enCurso ? '#22D07A' : '#6B7A99',
+            boxShadow: enCurso ? '0 0 6px #22D07A' : 'none',
+          }} />
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="3"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{ flexShrink: 0, transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
 
-          {abierto && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20,
-              minWidth: '100%', maxWidth: '70vw', overflow: 'hidden',
+        {abierto && coords && createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed', top: coords.top,
+              left: coords.left ?? 'auto', right: coords.right ?? 'auto',
+              minWidth: coords.minWidth, maxWidth: 'calc(100vw - 16px)',
+              zIndex: 9999, overflow: 'hidden',
               borderRadius: 12, border: '1px solid #1C2535', background: '#0E1420',
               boxShadow: '0 8px 24px rgba(0,0,0,.4)',
-            }}>
-              {ordenadas.map(t => {
-                const activa = t.id === temporadaActivaId[mode];
-                const sel = t.id === seleccionadaId;
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => elegir(t.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                      fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13,
-                      background: sel ? 'rgba(240,180,41,.14)' : 'transparent',
-                      color: sel ? '#F0B429' : '#EEF2F8',
-                    }}
-                  >
-                    <span style={{ flex: 1 }}>{t.nombre}</span>
-                    <span style={{
-                      fontSize: 10.5, fontWeight: 700, letterSpacing: .4, textTransform: 'uppercase',
-                      color: activa ? '#22D07A' : '#6B7A99',
-                    }}>
-                      {activa ? '● en curso' : 'finalizada'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+            }}
+          >
+            {ordenadas.map(t => {
+              const activa = t.id === temporadaActivaId[mode];
+              const sel = t.id === seleccionadaId;
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => elegir(t.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13,
+                    background: sel ? 'rgba(240,180,41,.14)' : 'transparent',
+                    color: sel ? '#F0B429' : '#EEF2F8',
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{t.nombre}</span>
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 700, letterSpacing: .4, textTransform: 'uppercase',
+                    color: activa ? '#22D07A' : '#6B7A99',
+                  }}>
+                    {activa ? '● en curso' : 'finalizada'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>,
+          document.body
+        )}
       </div>
       {!esTemporadaActiva(mode) && (
         <div style={{

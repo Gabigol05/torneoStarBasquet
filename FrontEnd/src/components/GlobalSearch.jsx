@@ -169,8 +169,15 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                             onMouseEnter={() => setCursor(i)}
                             onClick={() => handleSelect({ type: 'jugadora', data: j })}>
                             <span className={`gs-rank ${rankClass(i)}`}>{i + 1}</span>
+                            {/* Puesto #1 con anillo dorado permanente ("medalla") — antes ese
+                                brillo solo aparecía con :hover (clase .gs-item-active/hover en
+                                el CSS), que en mobile no existe, así que el ranking de "Más
+                                buscados" no se notaba de un vistazo. */}
                             <div className="gs-item-avatar"
-                              style={{ background:`${j.equipoColor}20`, color:j.equipoColor, border:`1.5px solid ${j.equipoColor}40` }}>
+                              style={{
+                                background:`${j.equipoColor}20`, color:j.equipoColor, border:`1.5px solid ${j.equipoColor}40`,
+                                ...(i === 0 ? { boxShadow: '0 0 10px rgba(240,180,41,.35)' } : {}),
+                              }}>
                               {initials}
                             </div>
                             <div className="gs-item-info">

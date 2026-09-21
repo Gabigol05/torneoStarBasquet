@@ -232,7 +232,7 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
       {/* Parciales */}
       <div style={{ background:'#080C12', border:'1px solid #1C2535', borderRadius:10, padding:'14px', marginBottom:16 }}>
         <div style={{ fontSize:10, fontWeight:700, letterSpacing:2, color:'#4A566E', marginBottom:12 }}>PARCIALES POR CUARTO</div>
-        <div style={{ overflowX:'auto' }}>
+        <div className="scrollbar-accent" style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'center', minWidth:400 }}>
             <thead>
               <tr>

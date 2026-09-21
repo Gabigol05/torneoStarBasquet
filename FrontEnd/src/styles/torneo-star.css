@@ -1086,11 +1086,20 @@ nav {
   margin-bottom: var(--spacing-xl);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Barra fina del color de acento de la categoría, igual que .table-wrap —
+     antes quedaba con el gris de default del navegador (o sin color en
+     Firefox), desentonando con el resto de las barras ya tematizadas. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
 
 .tab-nav::-webkit-scrollbar {
   height: 2px;
 }
+
+.tab-nav::-webkit-scrollbar-track { background: transparent; }
+.tab-nav::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.tab-nav::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .tab-btn {
   padding: clamp(10px, 1.5vw, 12px) clamp(14px, 2vw, 18px);
@@ -1153,6 +1162,23 @@ nav {
   scrollbar-width: thin;
   scrollbar-color: var(--color-accent) transparent;
 }
+
+/* Utilidad genérica para cualquier otro contenedor con scroll (vertical u
+   horizontal) que use estilos inline en vez de una clase propia — mismo
+   tratamiento fino del color de acento que .table-wrap, para no dejar
+   ninguna barra con el gris de default del navegador (reporte de Alvaro:
+   "donde haya que usar barras mejoralas, sea en el panel o pagina"). Sirve
+   tanto para scroll horizontal (ej: tablas angostas en admin) como vertical
+   (ej: listas de resultados) — el navegador solo aplica el ancho o el alto
+   según corresponda. */
+.scrollbar-accent {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+.scrollbar-accent::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-accent::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-accent::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.scrollbar-accent::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .table-wrap::-webkit-scrollbar {
   height: 6px;
@@ -1805,7 +1831,14 @@ tbody td {
   overflow-x: auto;
   padding-bottom: clamp(12px, 2vw, 16px);
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+
+.bracket-wrap::-webkit-scrollbar { height: 6px; }
+.bracket-wrap::-webkit-scrollbar-track { background: transparent; }
+.bracket-wrap::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.bracket-wrap::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .bracket {
   display: flex;
@@ -2461,7 +2494,14 @@ body.theme-femenino {
   display: flex;
   flex-direction: column;
   padding: 0 24px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+
+.gc-modal::-webkit-scrollbar { width: 6px; }
+.gc-modal::-webkit-scrollbar-track { background: transparent; }
+.gc-modal::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.gc-modal::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .gc-header {
   margin: 0 -24px;
@@ -2736,7 +2776,17 @@ body.theme-femenino {
   max-height: 90vh; overflow-y: auto;
   box-shadow: 0 24px 60px rgba(0,0,0,0.5);
   animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  /* Antes esta barra vertical se veía gris y "cortada" (default del
+     navegador) — mismo tratamiento que .table-wrap/.gc-modal: fina, del
+     color de acento de la categoría, con track transparente. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+
+.pp-modal::-webkit-scrollbar { width: 6px; }
+.pp-modal::-webkit-scrollbar-track { background: transparent; }
+.pp-modal::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.pp-modal::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .pp-card {
   position: relative;
@@ -3051,7 +3101,14 @@ body.theme-femenino {
   background: var(--dark, #080C12);
   overflow-y: auto;
   animation: tpFadeIn 0.3s ease;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+
+.team-page-overlay::-webkit-scrollbar { width: 6px; }
+.team-page-overlay::-webkit-scrollbar-track { background: transparent; }
+.team-page-overlay::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.team-page-overlay::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 @keyframes tpFadeIn {
   from { opacity: 0; transform: translateY(20px); }
@@ -3160,7 +3217,14 @@ body.theme-femenino {
   margin: 0 -28px;
   padding: 0 28px;
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+
+.team-page-tabs::-webkit-scrollbar { height: 2px; }
+.team-page-tabs::-webkit-scrollbar-track { background: transparent; }
+.team-page-tabs::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.team-page-tabs::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .team-page-tab {
   background: none;
@@ -3518,7 +3582,15 @@ body.theme-femenino {
 }
 .gs-clear:hover { color: var(--white); }
 
-.gs-results { max-height: 360px; overflow-y: auto; }
+.gs-results {
+  max-height: 360px; overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+.gs-results::-webkit-scrollbar { width: 6px; }
+.gs-results::-webkit-scrollbar-track { background: transparent; }
+.gs-results::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.gs-results::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 .gs-hint, .gs-empty {
   padding: 32px 20px; text-align: center;
   font-family: 'Barlow Condensed', sans-serif;
@@ -5722,7 +5794,13 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .leader-flip-face.back {
   transform: rotateY(180deg);
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
+.leader-flip-face.back::-webkit-scrollbar { width: 5px; }
+.leader-flip-face.back::-webkit-scrollbar-track { background: transparent; }
+.leader-flip-face.back::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.leader-flip-face.back::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .lc-strength-track {
   width: 100%;
@@ -6155,8 +6233,12 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   padding-bottom: 6px;
   margin-bottom: 14px;
   scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
 }
 .dash-tabs-scroll::-webkit-scrollbar { height: 4px; }
+.dash-tabs-scroll::-webkit-scrollbar-track { background: transparent; }
+.dash-tabs-scroll::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
+.dash-tabs-scroll::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 .dash-podio-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

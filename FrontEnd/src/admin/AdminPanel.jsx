@@ -246,7 +246,7 @@ function MobileDrawer({ sec, setSec, logout, greeting, categoria, setCategoria, 
         </div>
 
         {/* Nav scrollable: unica zona con overflow, no puede pisar al header ni al footer */}
-        <div style={{ overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'.9rem 1rem', minHeight:0 }}>
+        <div className="scrollbar-accent" style={{ overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'.9rem 1rem', minHeight:0 }}>
           <div style={{ fontSize:10, fontWeight:700, letterSpacing:2.5, color:'#6B7A99', fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6, paddingLeft:4 }}>NAVEGACIÓN</div>
           <nav style={NAV_RESET}>
             {TABS.map(item => (

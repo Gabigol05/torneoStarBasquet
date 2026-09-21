@@ -132,7 +132,7 @@ export default function AdminSearch({ setSec, setCategoria, setFoco }) {
           }}/>
       </div>
       {open && q.trim().length >= 2 && (
-        <div style={{
+        <div className="scrollbar-accent" style={{
           position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:80, maxHeight:400, overflowY:'auto',
           background:'#0E1420', border:'1px solid #1C2535', borderRadius:11, padding:6,
           boxShadow:'0 12px 32px rgba(0,0,0,.5)',

@@ -1361,7 +1361,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                   {jugs.filter(j=>j.jugadora||j.matchMethod==='nuevo').length}/{jugs.length} jugadoras
                 </span>
               </div>
-              <div style={{overflowX:'auto',borderRadius:14,border:'1px solid #1C2535'}}>
+              <div className="scrollbar-accent" style={{overflowX:'auto',borderRadius:14,border:'1px solid #1C2535'}}>
                 <table style={s.table} className="xlu-table">
                   <thead>
                     <tr>

@@ -401,7 +401,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {historialGrafico.length > 0 && (
                 <div>
                   <div style={ST.sectionTitle}>📋 Stats por fecha</div>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="scrollbar-accent" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
                         <tr>

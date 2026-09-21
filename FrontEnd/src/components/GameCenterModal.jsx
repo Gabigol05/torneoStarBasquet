@@ -392,7 +392,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                   </button>
                 </div>
               )}
-              <div style={{ overflowX:'auto', padding: 1, borderRadius: 10,
+              <div className="scrollbar-accent" style={{ overflowX:'auto', padding: 1, borderRadius: 10,
                 background: `linear-gradient(160deg, ${hexA(cAct, '35')}, #1C2535 60%)` }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, borderRadius: 9, overflow: 'hidden' }}>
                   <thead>

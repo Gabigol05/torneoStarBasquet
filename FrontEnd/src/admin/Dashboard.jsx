@@ -329,7 +329,7 @@ function PunchCard({ matriz }) {
       <div className="dash-punchcard-title" style={{ fontSize:9, color:'#4A566E', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>
         Mapa de actividad · últimas {matriz.length} semanas
       </div>
-      <div style={{ overflowX:'auto' }}>
+      <div className="scrollbar-accent" style={{ overflowX:'auto' }}>
         <div className="dash-punchcard-grid" style={{ minWidth:340 }}>
           <div style={{ display:'grid', gridTemplateColumns:'44px repeat(7,1fr)', gap:3, marginBottom:3 }}>
             <div/>

@@ -488,7 +488,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
 
       {/* ── VISTA TABLA ── */}
       {equipo && !loading && viewMode === 'tabla' && (
-        <div style={{ overflowX:'auto', marginBottom:20 }}>
+        <div className="scrollbar-accent" style={{ overflowX:'auto', marginBottom:20 }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr>

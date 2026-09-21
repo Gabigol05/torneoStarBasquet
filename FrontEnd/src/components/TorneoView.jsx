@@ -499,10 +499,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // de abajo desde que femenino también pasó a jugarse por zonas.
   const zonaA = useMemo(() => equiposOrdenados.filter(t => t.zona === 'A'), [equiposOrdenados]);
   const zonaB = useMemo(() => equiposOrdenados.filter(t => t.zona === 'B'), [equiposOrdenados]);
-  // ⚠️ FIX: antes un equipo sin zona asignada en la base (zona !== 'A'/'B')
-  // desaparecía sin aviso de la tabla, porque no entraba en zonaA ni zonaB.
-  // Ahora se muestra un aviso explícito con los equipos afectados.
-  const sinZona = useMemo(() => equiposOrdenados.filter(t => t.zona !== 'A' && t.zona !== 'B'), [equiposOrdenados]);
+  // Un equipo sin zona asignada en la base (ej: Black Mamba/Pilar/Ferrobre,
+  // que no juegan esta temporada) simplemente no entra en zonaA ni zonaB, así
+  // que no aparece en la tabla de posiciones — a propósito, sin ningún aviso
+  // en la página pública (reporte de Alvaro: el cartel de advertencia no
+  // debe mostrarse ahí, es información interna/de administración).
 
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
@@ -683,15 +684,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
               <div>
                 {isLoadingStats ? <TableSkeleton/> : (
                   <>
-                  {sinZona.length > 0 && (
-                    <div style={{
-                      marginBottom: 14, padding: '10px 14px', borderRadius: 8,
-                      background: 'rgba(240,180,41,.08)', border: '1px solid rgba(240,180,41,.35)',
-                      fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, color: '#F0B429',
-                    }}>
-                      ⚠️ {sinZona.length} equipo{sinZona.length === 1 ? '' : 's'} sin zona asignada (no aparece{sinZona.length === 1 ? '' : 'n'} en la tabla): {sinZona.map(t => t.name).join(', ')}
-                    </div>
-                  )}
                   <div className="zonas-grid">
                     {[{ zona: 'A', lista: zonaA }, { zona: 'B', lista: zonaB }].map(({ zona, lista }) => (
                       <div className="table-wrap zona-tabla" key={zona}>

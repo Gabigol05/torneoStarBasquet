@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
+import { useTemporada } from '../context/TemporadaContext';
 import { useStats } from '../context/StatsContext';
 import { GameCenterModal } from './GameCenterModal';
 import { MatchResultCard, FixtureCard, buildJugadorasMap } from './TorneoView.jsx';
@@ -470,14 +471,29 @@ function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasM
 export function PlayoffsBracket() {
   const { mode } = useTournament();
   const { equipos, partidos, fechas } = useStats();
+  const { esTemporadaActiva } = useTemporada();
   // Click en un resultado o próximo cruce de playoff abre el mismo Game
   // Center (marcador, parciales, box score por jugadora/jugador) que se abre
   // desde "Resultados" — mismo patrón que ya usa TorneoView.jsx.
   const [selectedMatch, setSelectedMatch] = useState(null);
 
-  const pools = useMemo(() => buildPools(equipos ?? [], mode), [equipos, mode]);
-  const equipoMap = useMemo(() => Object.fromEntries((equipos ?? []).map(t => [t.id, t])), [equipos]);
-  const jugadorasMap = useMemo(() => buildJugadorasMap(equipos ?? []), [equipos]);
+  // Mismo criterio de "juega esta temporada" que TorneoView.jsx/Hero.jsx/
+  // SeasonKpis.jsx: `zona` (A/B) es un dato GLOBAL en la base, no algo fijado
+  // por temporada — sin este filtro, el cuadro de playoffs de una temporada
+  // archivada terminaba armándose con equipos de la temporada actual (o al
+  // revés), dando cruces y campeón mal armados (reporte de Alvaro sobre el
+  // cuadro de Copa de Bronce). Se usa la participación real (pj/historial
+  // dentro de ESA temporada) y la zona solo entra como fallback cuando la
+  // temporada mirada es la ACTIVA ahora mismo.
+  const activaCategoria = esTemporadaActiva(mode);
+  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
+  const equiposDeTemporada = useMemo(() => (equipos ?? []).filter(e =>
+    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
+  ), [equipos, activaCategoria]);
+
+  const pools = useMemo(() => buildPools(equiposDeTemporada, mode), [equiposDeTemporada, mode]);
+  const equipoMap = useMemo(() => Object.fromEntries(equiposDeTemporada.map(t => [t.id, t])), [equiposDeTemporada]);
+  const jugadorasMap = useMemo(() => buildJugadorasMap(equiposDeTemporada), [equiposDeTemporada]);
   // Solo partidos de playoff (cargados desde el admin con "¿Es Playoff?"
   // tildado) — el resto de partidos de temporada regular no entra acá.
   const partidosPlayoff = useMemo(() => (partidos ?? []).filter(p => p.es_playoff), [partidos]);
@@ -516,7 +532,7 @@ export function PlayoffsBracket() {
 
         {CUPS.map(cup => (
           <CupBracket key={cup.key} cup={cup} pool={pools[cup.key]} partidosPlayoff={partidosPlayoff} equipoMap={equipoMap}
-            equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={setSelectedMatch}/>
+            equipos={equiposDeTemporada} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={setSelectedMatch}/>
         ))}
       </section>
     </>

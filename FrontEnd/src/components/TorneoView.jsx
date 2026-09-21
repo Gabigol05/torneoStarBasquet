@@ -48,6 +48,7 @@ function TableSkeleton() {
 }
 
 import { useTournament }    from '../context/TournamentContext';
+import { useTemporada }     from '../context/TemporadaContext';
 import { GameCenterModal }  from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { TeamPageFem }      from './TeamPageFem';
@@ -326,6 +327,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     statsPorPartido = {},
   } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
+  const { esTemporadaActiva } = useTemporada();
   const filterChipsWheelRef = useWheelHorizontal();
   const fechaChipsWheelRef  = useWheelHorizontal();
 
@@ -400,9 +402,25 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     setActiveTab(prevTab);
   };
 
+  // Igual que en Hero.jsx / SeasonKpis.jsx: `zona` (A/B) es un dato GLOBAL en
+  // la base, no algo fijado por temporada, así que por sí solo no sirve para
+  // decidir "este equipo juega la temporada que estoy mirando" — un equipo
+  // nuevo de Clausura con zona asignada aparecía también dentro de Apertura
+  // (archivada), y equipos que ya no juegan aparecían en Clausura. Lo
+  // confiable es si el equipo tiene partidos/historial DENTRO de esa
+  // temporada puntual (`equipos` ya viene con pj/historial filtrado por
+  // temporada desde el hook); la zona solo se usa como fallback para que un
+  // equipo recién armado con 0 partidos igual aparezca, y únicamente cuando
+  // la temporada mirada es la ACTIVA ahora mismo (nunca para una archivada).
+  const activaCategoria = esTemporadaActiva(mode);
+  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
+  const equiposDeTemporada = useMemo(() => equiposFemenino.filter(e =>
+    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
+  ), [equiposFemenino, activaCategoria]);
+
   const jugadorasFiltradas = useMemo(() => {
     const q = searchJugadoras.toLowerCase();
-    return equiposFemenino.flatMap(team =>
+    return equiposDeTemporada.flatMap(team =>
       team.jugadoras
         .filter(j => {
           const matchSearch = !q || j.nombre.toLowerCase().includes(q);
@@ -411,7 +429,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         })
         .map(j => ({ ...j, equipo: team.name, equipoColor: team.color, equipoId: team.id, equipoLogo: team.logo }))
     );
-  }, [equiposFemenino, searchJugadoras, filterEquipoId]);
+  }, [equiposDeTemporada, searchJugadoras, filterEquipoId]);
 
   // Volver a la primera tanda cada vez que cambia la búsqueda o el filtro
   useEffect(() => { setPlayersVisible(PLAYERS_PAGE_SIZE); }, [searchJugadoras, filterEquipoId]);
@@ -485,14 +503,14 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     [partidos, fechaSelId, fechaDiaPorId]);
 
   const equiposOrdenados = useMemo(() =>
-    [...equiposFemenino].sort((a, b) => {
+    [...equiposDeTemporada].sort((a, b) => {
       const ptsA = a.pg * 2 + a.pp, ptsB = b.pg * 2 + b.pp;
       if (ptsB !== ptsA) return ptsB - ptsA;
       const difA = a.pf - a.pc, difB = b.pf - b.pc;
       if (difB !== difA) return difB - difA;
       return b.pf - a.pf;
     }),
-    [equiposFemenino]);
+    [equiposDeTemporada]);
 
   // Tabla dividida en Zona A / Zona B (asignación en equipos_femenino.zona /
   // equipos_masculino.zona) — femenino y masculino comparten el mismo bloque
@@ -594,7 +612,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
       <TeamPageFem
         team={selectedTeamFem}
         onBack={handleBackFromTeam}
-        allTeams={equiposFemenino}
+        allTeams={equiposDeTemporada}
         isLoadingStats={isLoadingStats}
         statsPorPartido={statsPorPartido}
         partidos={partidos}
@@ -858,7 +876,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                       onClick={() => setFilterEquipoId(null)}>
                       Todos
                     </button>
-                    {equiposFemenino.map(eq => (
+                    {equiposDeTemporada.map(eq => (
                       <button key={eq.id}
                         className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
                         style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
@@ -948,7 +966,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'equipos' && (
               <div className="teams-grid">
-                {equiposFemenino.map(team => (
+                {equiposDeTemporada.map(team => (
                   <div
                     className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
                     key={team.id}

@@ -1,8 +1,10 @@
 ﻿import { useTournament } from '../context/TournamentContext';
+import { useTemporada } from '../context/TemporadaContext';
 import { CounterUp } from './CounterUp';
 
 export function SeasonKpis({ equipos = [], partidos = [] }) {
   const { mode } = useTournament();
+  const { esTemporadaActiva } = useTemporada();
 
   if (mode === 'masculino') {
     const MASC = [
@@ -18,15 +20,21 @@ export function SeasonKpis({ equipos = [], partidos = [] }) {
 
   const finalizados  = partidos.filter(p => p.estado === 'finalizado');
   const numPartidos  = finalizados.length;
-  // "Equipos"/"Jugadoras" cuentan solo los planteles que juegan esta
-  // temporada — si hay zona (A/B) asignada, un equipo que no la tiene es
-  // uno que quedó afuera (ver comentario en femeninoData.js: Black Mamba,
-  // Pilar y Ferrobre se dejan en el archivo para no romper temporadas
-  // archivadas, pero no juegan 2026), así que no debe sumar al contador.
-  // Si NINGÚN equipo tiene zona (una temporada archivada de antes de las
-  // zonas) no se filtra, para no vaciar el contador de esas temporadas.
-  const usaZonas       = equipos.some(e => e.zona === 'A' || e.zona === 'B');
-  const equiposActivos = usaZonas ? equipos.filter(e => e.zona === 'A' || e.zona === 'B') : equipos;
+  // "Equipos"/"Jugadoras" cuentan solo los planteles que juegan la temporada
+  // que se está mirando. ⚠️ FIX (reporte Alvaro: viendo la temporada
+  // archivada "Apertura" contaba los equipos NUEVOS de Clausura, que ahí
+  // tienen 0 partidos): la zona (A/B) es un dato GLOBAL en la base, no algo
+  // fijado por temporada, así que solo sirve para decidir "juega esta
+  // temporada" cuando la temporada mirada es la ACTIVA ahora mismo (ahí un
+  // equipo recién armado con 0 partidos igual debe contar). Para cualquier
+  // otra temporada (archivada) lo confiable es si el equipo tiene
+  // partidos/historial dentro de ESA temporada — `equipos` ya viene
+  // filtrado por temporada desde el hook. Mismo criterio que Hero.jsx.
+  const activaCategoria = esTemporadaActiva(mode);
+  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
+  const equiposActivos = equipos.filter(e =>
+    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
+  );
   const numJugadoras = equiposActivos.reduce((a, e) => a + (e.jugadoras?.length ?? 0), 0);
   const numEquipos   = equiposActivos.length;
   const fechasJug    = new Set(finalizados.map(p => p.fecha_id).filter(Boolean)).size;

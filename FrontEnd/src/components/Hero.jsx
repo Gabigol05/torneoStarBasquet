@@ -31,26 +31,46 @@ const EDICION_OFFSET = { femenino: 0, masculino: 5 };
 
 export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const { mode, toggleMode } = useTournament();
-  const { temporadas, esTemporadaActiva } = useTemporada();
+  const { temporadas, esTemporadaActiva, temporadaSeleccionada } = useTemporada();
 
-  // ⚠️ FIX: antes "Edicion" estaba hardcodeado en 1 (femenino) y 6
-  // (masculino) para siempre — no se movía nunca, ni cuando se cerraba una
-  // temporada y arrancaba la siguiente (ej: al crear "2026 - Clausura" para
-  // femenino, que ya es la 2da edición). Ahora cuenta cuántas temporadas
-  // tiene cargadas cada categoría (Apertura + Clausura suman ediciones
-  // distintas) y le suma el arrastre de ediciones previas al software.
-  const edicionFemenino  = EDICION_OFFSET.femenino  + temporadas.filter(t => t.categoria === 'femenino').length;
-  const edicionMasculino = EDICION_OFFSET.masculino + temporadas.filter(t => t.categoria === 'masculino').length;
+  // ⚠️ FIX (reporte Alvaro: viendo "Temporada 2026 - Apertura" archivada
+  // decía "Edición 2", cuando esa fue la 1ra edición y Clausura es la 2da):
+  // antes esto contaba CUÁNTAS temporadas hay en total para la categoría,
+  // sin importar cuál se está mirando — con 2 temporadas cargadas, Apertura
+  // Y Clausura mostraban "2" por igual. Ahora se calcula la POSICIÓN de la
+  // temporada elegida dentro del historial de esa categoría (ordenado por
+  // fecha de creación): la primera que se jugó es la edición 1, la
+  // siguiente la 2, etc. — cada temporada archivada conserva el número que
+  // le corresponde a ella, no el total actual.
+  const edicionPara = (categoria) => {
+    const propias = temporadas
+      .filter(t => t.categoria === categoria)
+      .sort((a, b) => new Date(a.creada_en ?? 0) - new Date(b.creada_en ?? 0) || a.id - b.id);
+    const sel = temporadaSeleccionada(categoria);
+    const idx = sel ? propias.findIndex(t => t.id === sel.id) : -1;
+    return EDICION_OFFSET[categoria] + (idx >= 0 ? idx + 1 : propias.length);
+  };
+  const edicionFemenino  = edicionPara('femenino');
+  const edicionMasculino = edicionPara('masculino');
 
   // El contador "Equipos" (y "Jugadoras/Jugadores", que suma por equipo) debe
-  // contar solo los planteles que juegan esta temporada — un equipo sin zona
-  // asignada es uno que se dejó en el archivo de datos para no romper
-  // temporadas archivadas pero no juega la actual (ver femeninoData.js). Si
-  // NINGÚN equipo tiene zona (temporada archivada de antes de que existieran
-  // las zonas) no se filtra, para no vaciar el contador de esas temporadas.
-  // Mismo criterio que ya usa SeasonKpis.jsx.
-  const usaZonas       = equipos.some(e => e.zona === 'A' || e.zona === 'B');
-  const equiposActivos = usaZonas ? equipos.filter(e => e.zona === 'A' || e.zona === 'B') : equipos;
+  // contar solo los planteles que juegan la temporada que se está mirando.
+  // ⚠️ FIX (reporte Alvaro: viendo la temporada archivada "Apertura" de
+  // femenino aparecían los equipos NUEVOS de Clausura con 0 partidos, y a la
+  // vez faltaban equipos viejos que sí jugaron Apertura): la zona (A/B) de
+  // un equipo es un dato GLOBAL en la base, no algo que quede fijado por
+  // temporada — así que usarla sola para decidir "quién juega esta
+  // temporada" solo tiene sentido para la temporada ACTIVA ahora mismo (los
+  // equipos recién armados, con 0 partidos todavía, deben poder mostrarse
+  // igual). Para cualquier otra temporada (archivada) el dato que sí es
+  // confiable es si el equipo tiene partidos/historial dentro de ESA
+  // temporada (`equipos` ya viene filtrado por temporada desde el hook) —
+  // eso es lo único que dice de verdad "este equipo jugó esta temporada".
+  const activaCategoria = esTemporadaActiva(mode);
+  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
+  const equiposActivos = equipos.filter(e =>
+    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
+  );
 
   const heroFemenino = useMemo(() => {
     const fechasJugadas = fechas.filter(f =>

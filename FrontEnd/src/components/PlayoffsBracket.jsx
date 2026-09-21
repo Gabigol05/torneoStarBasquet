@@ -61,11 +61,17 @@ export function buildPools(equipos, mode) {
       bronce: sortByStandings([...zonaA.slice(gA * 2),     ...zonaB.slice(gB * 2)]),
     };
   }
+  // Mismo corte dinámico de ~1/3 que la rama por zona de arriba — antes acá
+  // quedaba un corte fijo 4/8 que, con una temporada archivada chica (pocos
+  // equipos), dejaba la Copa de Bronce vacía (slice(8) de una lista de 7
+  // equipos = nada). Con el corte dinámico, Bronce siempre se lleva su
+  // tercio real, sea cual sea la cantidad de equipos de esa temporada.
   const ordenados = sortByStandings(equipos);
+  const g = Math.ceil(ordenados.length / 3);
   return {
-    oro:    ordenados.slice(0, 4),
-    plata:  ordenados.slice(4, 8),
-    bronce: ordenados.slice(8),
+    oro:    ordenados.slice(0, g),
+    plata:  ordenados.slice(g, g * 2),
+    bronce: ordenados.slice(g * 2),
   };
 }
 
@@ -491,7 +497,20 @@ export function PlayoffsBracket() {
     jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
   ), [equipos, activaCategoria]);
 
-  const pools = useMemo(() => buildPools(equiposDeTemporada, mode), [equiposDeTemporada, mode]);
+  // `zona` (A/B) es un valor GLOBAL/actual, no algo guardado por temporada —
+  // para la temporada ACTIVA coincide con la realidad, pero para una
+  // temporada archivada ya no significa nada (esos equipos pueden tener hoy
+  // la zona de la temporada nueva, o ninguna). Por eso acá se le "saca" la
+  // zona a los equipos antes de armar los pools cuando se está mirando una
+  // temporada archivada — buildPools() cae solo en su modo sin zonas (tabla
+  // general dividida en tercios), que es el método que ya se usaba antes de
+  // que existieran las zonas, y que no depende de ningún dato mutable de hoy.
+  const equiposParaPools = useMemo(
+    () => activaCategoria ? equiposDeTemporada : equiposDeTemporada.map(t => ({ ...t, zona: null })),
+    [equiposDeTemporada, activaCategoria]
+  );
+
+  const pools = useMemo(() => buildPools(equiposParaPools, mode), [equiposParaPools, mode]);
   const equipoMap = useMemo(() => Object.fromEntries(equiposDeTemporada.map(t => [t.id, t])), [equiposDeTemporada]);
   const jugadorasMap = useMemo(() => buildJugadorasMap(equiposDeTemporada), [equiposDeTemporada]);
   // Solo partidos de playoff (cargados desde el admin con "¿Es Playoff?"

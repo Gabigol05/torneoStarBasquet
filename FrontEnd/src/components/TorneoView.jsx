@@ -515,13 +515,29 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // Tabla dividida en Zona A / Zona B (asignación en equipos_femenino.zona /
   // equipos_masculino.zona) — femenino y masculino comparten el mismo bloque
   // de abajo desde que femenino también pasó a jugarse por zonas.
-  const zonaA = useMemo(() => equiposOrdenados.filter(t => t.zona === 'A'), [equiposOrdenados]);
-  const zonaB = useMemo(() => equiposOrdenados.filter(t => t.zona === 'B'), [equiposOrdenados]);
-  // Un equipo sin zona asignada en la base (ej: Black Mamba/Pilar/Ferrobre,
-  // que no juegan esta temporada) simplemente no entra en zonaA ni zonaB, así
-  // que no aparece en la tabla de posiciones — a propósito, sin ningún aviso
-  // en la página pública (reporte de Alvaro: el cartel de advertencia no
-  // debe mostrarse ahí, es información interna/de administración).
+  //
+  // ⚠️ `zona` es un dato GLOBAL/actual en la base, no algo guardado por
+  // temporada. Para la temporada ACTIVA coincide con la realidad de hoy, pero
+  // para una temporada ARCHIVADA ya no dice nada confiable: un equipo que
+  // jugó esa temporada puede hoy tener la zona de la temporada nueva, o
+  // ninguna — usarla ahí mezclaba equipos entre temporadas y, peor, dejaba
+  // afuera de la tabla a equipos que sí jugaron pero se quedaron sin zona
+  // asignada (reporte de Alvaro: "sale con menos equipos la tabla en el
+  // apertura"). Por eso acá solo se arma por zona cuando se está mirando la
+  // temporada activa; cualquier temporada archivada usa la tabla general
+  // (mismo método que se usaba antes de que existieran las zonas), que no
+  // depende de ningún dato mutable de hoy y queda igual de fija que el resto
+  // de esa temporada finalizada.
+  const zonaA = useMemo(() => activaCategoria ? equiposOrdenados.filter(t => t.zona === 'A') : [], [equiposOrdenados, activaCategoria]);
+  const zonaB = useMemo(() => activaCategoria ? equiposOrdenados.filter(t => t.zona === 'B') : [], [equiposOrdenados, activaCategoria]);
+  const usaZonasEnVista = activaCategoria && (zonaA.length > 0 || zonaB.length > 0);
+  // Paneles a renderizar en la tabla de posiciones: 2 (Zona A / Zona B)
+  // cuando la vista usa zonas, o 1 solo panel "Tabla General" (con todos los
+  // equipos de esa temporada juntos, dividido en tercios Oro/Plata/Bronce
+  // igual que bandFor de más abajo) para cualquier temporada archivada.
+  const panelesTabla = usaZonasEnVista
+    ? [{ zona: 'A', lista: zonaA }, { zona: 'B', lista: zonaB }]
+    : [{ zona: null, lista: equiposOrdenados }];
 
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
@@ -702,10 +718,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
               <div>
                 {isLoadingStats ? <TableSkeleton/> : (
                   <>
-                  <div className="zonas-grid">
-                    {[{ zona: 'A', lista: zonaA }, { zona: 'B', lista: zonaB }].map(({ zona, lista }) => (
-                      <div className="table-wrap zona-tabla" key={zona}>
-                        <div className="zona-tabla-title" style={{ color: modeColor }}>ZONA {zona}</div>
+                  <div className="zonas-grid" style={panelesTabla.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}>
+                    {panelesTabla.map(({ zona, lista }) => (
+                      <div className="table-wrap zona-tabla" key={zona ?? 'general'}>
+                        <div className="zona-tabla-title" style={{ color: modeColor }}>{zona ? `ZONA ${zona}` : 'TABLA GENERAL'}</div>
                         <table>
                           <thead>
                             <tr>
@@ -718,7 +734,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           </thead>
                           <tbody>
                             {lista.length === 0 ? (
-                              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--gray)' }}>Sin equipos asignados a esta zona</td></tr>
+                              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--gray)' }}>{zona ? 'Sin equipos asignados a esta zona' : 'Sin equipos en esta temporada'}</td></tr>
                             ) : lista.flatMap((t, idx) => {
                               const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
                               const dif = t.pf - t.pc;

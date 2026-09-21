@@ -52,7 +52,7 @@ export const equiposFemenino = [
   { id: 'f_cuervas',       name: 'Cuervas',            logo: logoCuervas,      color: '#64748b' },
   { id: 'f_no_vayase',     name: 'No Vayase',          logo: logoNoVayase,     color: '#eab308' },
   { id: 'f_el_h',          name: 'El H',               logo: logoElH,          color: '#14b8a6' },
-  { id: 'f_sacale_jugo',   name: 'Sácale Jugo',        logo: logoSacaleJugo,   color: '#d946ef' },
+  { id: 'f_sacale_jugo',   name: 'Sácale el Jugo a la Naranja', logo: logoSacaleJugo, color: '#ea580c' },
   { id: 'f_club_pesca',    name: 'Club Pesca',         logo: logoClubPesca,    color: '#0ea5e9' },
 
   // ── No juegan la temporada 2026 (ver comentario arriba) ──

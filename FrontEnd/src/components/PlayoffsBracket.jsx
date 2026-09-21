@@ -32,22 +32,32 @@ export function sortByStandings(equipos) {
 }
 
 // Arma los 3 pools (oro/plata/bronce) según la posición actual en la tabla,
-// con el mismo corte que ya se usa para las bandas de color (1-4 oro, 5-8
-// plata, resto bronce). Si los equipos que llegan tienen zona asignada (A/B)
-// se arma por zona y se combinan, igual que la banda por zona que ya se
-// muestra en la tabla de posiciones — masculino siempre la tiene, y femenino
-// desde que también pasó a jugarse por zonas (temporada 2026). Si ningún
-// equipo tiene zona (por ejemplo, una temporada archivada de femenino de
-// antes de las zonas) se arma con la tabla general, como se hacía antes.
+// con el mismo corte que ya se usa para las bandas de color. Si los equipos
+// que llegan tienen zona asignada (A/B) se arma por zona y se combinan,
+// igual que la banda por zona que ya se muestra en la tabla de posiciones —
+// masculino siempre la tiene, y femenino desde que también pasó a jugarse
+// por zonas (temporada 2026). Si ningún equipo tiene zona (por ejemplo, una
+// temporada archivada de femenino de antes de las zonas) se arma con la
+// tabla general, como se hacía antes.
+//
+// El corte por zona NO es un número fijo de equipos: cada zona se parte en
+// 3 grupos de ~1/3 de sus equipos (redondeando para arriba), así los pools
+// quedan parejos entre sí sea cual sea el tamaño de la zona — con 2 equipos
+// arriba de cada zona a Oro, los 2 siguientes a Plata y los últimos 2 a
+// Bronce (zonas de 6, como femenino), o con 4/4/4 (zonas de 12, como
+// masculino) — y los cuadros de playoff quedan alineados (mismo tamaño de
+// cuadro en las 3 copas).
 export function buildPools(equipos, mode) {
   const usaZonas = equipos.some(t => t.zona === 'A' || t.zona === 'B');
   if (usaZonas) {
     const zonaA = sortByStandings(equipos.filter(t => t.zona === 'A'));
     const zonaB = sortByStandings(equipos.filter(t => t.zona === 'B'));
+    const gA = Math.ceil(zonaA.length / 3);
+    const gB = Math.ceil(zonaB.length / 3);
     return {
-      oro:    sortByStandings([...zonaA.slice(0, 4), ...zonaB.slice(0, 4)]),
-      plata:  sortByStandings([...zonaA.slice(4, 8), ...zonaB.slice(4, 8)]),
-      bronce: sortByStandings([...zonaA.slice(8),    ...zonaB.slice(8)]),
+      oro:    sortByStandings([...zonaA.slice(0, gA),      ...zonaB.slice(0, gB)]),
+      plata:  sortByStandings([...zonaA.slice(gA, gA * 2), ...zonaB.slice(gB, gB * 2)]),
+      bronce: sortByStandings([...zonaA.slice(gA * 2),     ...zonaB.slice(gB * 2)]),
     };
   }
   const ordenados = sortByStandings(equipos);

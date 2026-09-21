@@ -24,6 +24,30 @@ function buildEquiposBase() {
   }));
 }
 
+// ⚠️ FIX BUG REAL (mismo bug reportado por Alvaro en masculino — ver el
+// comentario completo en useMasculinoStats.js): Supabase/PostgREST corta
+// cualquier .select() en 1000 filas si no se pagina con .range(), y
+// stats_partido_femenino YA está por encima de esa marca (1075 filas al
+// momento de este fix). Femenino no había disparado el reporte todavía
+// porque recién ahora cruzó el límite, pero el mecanismo es idéntico:
+// sin paginar, las filas de las fechas más nuevas quedan afuera del
+// select en silencio. Este helper pagina en bloques de 1000 hasta traer
+// la tabla completa. `queryFactory` devuelve un builder NUEVO en cada
+// llamada (no se puede reusar uno ya ejecutado con .range() otra vez).
+async function fetchAllRows(queryFactory, pageSize = 1000) {
+  let from = 0;
+  let out = [];
+  while (true) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (error) return { data: out.length ? out : null, error };
+    const rows = data ?? [];
+    out = out.concat(rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: out, error: null };
+}
+
 // ─── Fetch optimizado: una sola ronda de queries paralelas ────────────────────
 // El plantel (jugadoras_femenino) viene de la base igual que en masculino —
 // dejó de ser un array estático para que el roster esté siempre al día
@@ -66,8 +90,8 @@ async function fetchTodo(temporadaId) {
       .select('*')
       .order('fecha_id', { ascending: true }),
     fechasQuery,
-    supabase.from('stats_partido_femenino')
-      .select('partido_id,jugadora_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf'),
+    fetchAllRows(() => supabase.from('stats_partido_femenino')
+      .select('partido_id,jugadora_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')),
   ]);
 
   // Log errores sin crashear — tablas pueden no existir todavía

@@ -23,6 +23,35 @@ function buildEquiposBase() {
   }));
 }
 
+// ⚠️ FIX BUG REAL (reporte Alvaro: jugadores que jugaron la fecha 5 se ven
+// bien en el resultado del partido, pero no aparecen en su gráfico/resumen
+// individual). Causa: Supabase/PostgREST corta cualquier .select() en 1000
+// filas si no se pagina con .range() — y stats_partido_masculino YA superó
+// las 1000 filas esta temporada (1141 al momento de este fix, sigue
+// creciendo con cada fecha que se carga). Sin paginar, ese select traía
+// SOLO las primeras 1000 filas en un orden que Postgres no garantiza sin
+// ORDER BY explícito, así que las filas de las fechas más nuevas (como la
+// fecha 5) quedaban afuera en silencio — mientras que el resultado de un
+// partido puntual (GameCenterModal) seguía viéndose bien porque esa
+// consulta filtra por partido_id puntual y nunca se acerca al límite. Este
+// helper pagina en bloques de 1000 hasta traer la tabla completa.
+// `queryFactory` tiene que devolver un builder NUEVO en cada llamada (no
+// reusar uno ya ejecutado) porque .range() en el mismo builder después de
+// un await no está garantizado por supabase-js.
+async function fetchAllRows(queryFactory, pageSize = 1000) {
+  let from = 0;
+  let out = [];
+  while (true) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (error) return { data: out.length ? out : null, error };
+    const rows = data ?? [];
+    out = out.concat(rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: out, error: null };
+}
+
 // A diferencia del femenino (roster estático + stats dinámicas), en masculino
 // TODO viene de la base: equipos (para zona), jugadores (roster) y stats.
 //
@@ -56,8 +85,8 @@ async function fetchTodo(temporadaId) {
       .select('*')
       .order('fecha_id', { ascending: true }),
     fechasQuery,
-    supabase.from('stats_partido_masculino')
-      .select('partido_id,jugador_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf'),
+    fetchAllRows(() => supabase.from('stats_partido_masculino')
+      .select('partido_id,jugador_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')),
   ]);
 
   if (e0)  console.warn('[useMasculinoStats] equipos:', e0.message);

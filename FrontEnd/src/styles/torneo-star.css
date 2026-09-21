@@ -1144,6 +1144,31 @@ nav {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   -webkit-overflow-scrolling: touch;
+  /* ⚠️ FIX (reporte Alvaro: la barra de scroll horizontal se veía "fea y
+     cortada" en celular) — sin esto el navegador dibuja su scrollbar por
+     default (gris sólido, con flechitas en los extremos en algunos Android),
+     que no pega nada con el resto del diseño oscuro. Se reemplaza por una
+     barra fina del color de acento de la categoría (dorado en masculino,
+     rosa en femenino vía --color-accent, que ya cambia solo con el modo). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--gold2);
 }
 
 /* ══════════════════════════════

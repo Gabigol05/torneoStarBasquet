@@ -18,8 +18,17 @@ export function SeasonKpis({ equipos = [], partidos = [] }) {
 
   const finalizados  = partidos.filter(p => p.estado === 'finalizado');
   const numPartidos  = finalizados.length;
-  const numJugadoras = equipos.reduce((a, e) => a + (e.jugadoras?.length ?? 0), 0);
-  const numEquipos   = equipos.length;
+  // "Equipos"/"Jugadoras" cuentan solo los planteles que juegan esta
+  // temporada — si hay zona (A/B) asignada, un equipo que no la tiene es
+  // uno que quedó afuera (ver comentario en femeninoData.js: Black Mamba,
+  // Pilar y Ferrobre se dejan en el archivo para no romper temporadas
+  // archivadas, pero no juegan 2026), así que no debe sumar al contador.
+  // Si NINGÚN equipo tiene zona (una temporada archivada de antes de las
+  // zonas) no se filtra, para no vaciar el contador de esas temporadas.
+  const usaZonas       = equipos.some(e => e.zona === 'A' || e.zona === 'B');
+  const equiposActivos = usaZonas ? equipos.filter(e => e.zona === 'A' || e.zona === 'B') : equipos;
+  const numJugadoras = equiposActivos.reduce((a, e) => a + (e.jugadoras?.length ?? 0), 0);
+  const numEquipos   = equiposActivos.length;
   const fechasJug    = new Set(finalizados.map(p => p.fecha_id).filter(Boolean)).size;
 
   const totalPts = finalizados.reduce((a, p) =>

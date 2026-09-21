@@ -42,11 +42,21 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   const edicionFemenino  = EDICION_OFFSET.femenino  + temporadas.filter(t => t.categoria === 'femenino').length;
   const edicionMasculino = EDICION_OFFSET.masculino + temporadas.filter(t => t.categoria === 'masculino').length;
 
+  // El contador "Equipos" (y "Jugadoras/Jugadores", que suma por equipo) debe
+  // contar solo los planteles que juegan esta temporada — un equipo sin zona
+  // asignada es uno que se dejó en el archivo de datos para no romper
+  // temporadas archivadas pero no juega la actual (ver femeninoData.js). Si
+  // NINGÚN equipo tiene zona (temporada archivada de antes de que existieran
+  // las zonas) no se filtra, para no vaciar el contador de esas temporadas.
+  // Mismo criterio que ya usa SeasonKpis.jsx.
+  const usaZonas       = equipos.some(e => e.zona === 'A' || e.zona === 'B');
+  const equiposActivos = usaZonas ? equipos.filter(e => e.zona === 'A' || e.zona === 'B') : equipos;
+
   const heroFemenino = useMemo(() => {
     const fechasJugadas = fechas.filter(f =>
       partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado')
     ).length;
-    const jugadorasTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
+    const jugadorasTotal = equiposActivos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
 
     // ⚠️ FIX: antes decía "En Curso" siempre, sin importar si ya se había
     // jugado o no un solo partido, y sin importar si la temporada que se
@@ -66,12 +76,12 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
       subtitle: 'Categoria Femenina - Cordoba - 2026',
       stats: [
         { end: edicionFemenino, label: 'Edicion' },
-        { end: equipos.length || 10, label: 'Equipos' },
+        { end: equiposActivos.length || 10, label: 'Equipos' },
         { end: fechasJugadas, label: 'Fechas' },
         { end: jugadorasTotal || 200, label: 'Jugadoras' },
       ],
     };
-  }, [equipos, partidos, fechas, edicionFemenino, esTemporadaActiva]);
+  }, [equiposActivos, partidos, fechas, edicionFemenino, esTemporadaActiva]);
 
   // Antes era un objeto fijo (HERO_MASCULINO) con "Proximamente" y "0 Fechas"
   // pegado con alfileres — se iba a quedar diciendo eso para siempre. Ahora
@@ -81,7 +91,7 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     const fechasJugadas = fechas.filter(f =>
       partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado')
     ).length;
-    const jugadoresTotal = equipos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
+    const jugadoresTotal = equiposActivos.reduce((sum, eq) => sum + (eq.jugadoras?.length ?? 0), 0);
 
     // Mismo criterio de 3 estados que el femenino (ver más arriba): si la
     // temporada que se está mirando ya no es la activa, "Finalizado" —
@@ -96,12 +106,12 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
       subtitle: 'Categoria Masculina - Cordoba - 2026',
       stats: [
         { end: edicionMasculino, label: 'Edicion' },
-        { end: equipos.length || 22, label: 'Equipos' },
+        { end: equiposActivos.length || 22, label: 'Equipos' },
         { end: fechasJugadas, label: 'Fechas' },
         { end: jugadoresTotal || 250, label: 'Jugadores', suffix: jugadoresTotal ? '' : '+' },
       ],
     };
-  }, [equipos, partidos, fechas, edicionMasculino, esTemporadaActiva]);
+  }, [equiposActivos, partidos, fechas, edicionMasculino, esTemporadaActiva]);
 
   const data = mode === 'femenino' ? heroFemenino : heroMasculino;
 

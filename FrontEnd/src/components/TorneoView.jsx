@@ -83,10 +83,17 @@ export function buildJugadorasMap(equipos) {
   return map;
 }
 
-// Sistema de copas: banda segun posicion en la tabla (femenino: general; masculino: por zona)
-function bandFor(rank) {
-  if (rank <= 4) return { label: 'Copa de Oro', color: '#F0B429', tint: 'rgba(240,180,41,.06)' };
-  if (rank <= 8) return { label: 'Copa de Plata', color: '#C7D1DD', tint: 'rgba(199,209,221,.045)' };
+// Sistema de copas: banda segun posicion DENTRO DE LA ZONA (A o B), con el
+// mismo corte dinamico que usa buildPools() en PlayoffsBracket.jsx (cada
+// zona partida en 3 grupos de ~1/3 de sus equipos, redondeando para arriba)
+// — así la banda de color que se ve acá en la tabla SIEMPRE coincide con la
+// copa real a la que ese equipo va a jugar. `zoneSize` es la cantidad de
+// equipos de esa zona (lista.length); si no se pasa, cae en el viejo corte
+// fijo de 4/8 por compatibilidad.
+function bandFor(rank, zoneSize) {
+  const g = Math.ceil((zoneSize || 12) / 3);
+  if (rank <= g)     return { label: 'Copa de Oro', color: '#F0B429', tint: 'rgba(240,180,41,.06)' };
+  if (rank <= g * 2) return { label: 'Copa de Plata', color: '#C7D1DD', tint: 'rgba(199,209,221,.045)' };
   return { label: 'Copa de Bronce', color: '#CD7F32', tint: 'rgba(205,127,50,.05)' };
 }
 
@@ -705,8 +712,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                             ) : lista.flatMap((t, idx) => {
                               const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
                               const dif = t.pf - t.pc;
-                              const band = bandFor(idx + 1);
-                              const isBandStart = idx === 0 || idx === 4 || idx === 8;
+                              const grupoZona = Math.ceil(lista.length / 3);
+                              const band = bandFor(idx + 1, lista.length);
+                              const isBandStart = idx === 0 || idx === grupoZona || idx === grupoZona * 2;
                               const rows = [];
                               if (isBandStart) {
                                 rows.push(
@@ -751,15 +759,15 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
                               <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
-                              Copa de Oro - 1 a 4
+                              Copa de Oro - 1 a {Math.ceil(lista.length / 3)}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
                               <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
-                              Copa de Plata - 5 a 8
+                              Copa de Plata - {Math.ceil(lista.length / 3) + 1} a {Math.ceil(lista.length / 3) * 2}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
                               <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
-                              Copa de Bronce - 9+
+                              Copa de Bronce - {Math.ceil(lista.length / 3) * 2 + 1}+
                             </div>
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>

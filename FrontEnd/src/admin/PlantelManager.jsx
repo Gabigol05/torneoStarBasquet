@@ -9,11 +9,13 @@ const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
 
 // ─── Editor de plantel — altas, cambio de equipo, edición y borrado ──────────
-// Hasta ahora jugadoras_femenino/jugadores_masculino solo se escribían desde
-// la carga de Excel (y ahí, solo masculino podía crear gente nueva sobre la
-// marcha — femenino se trataba como plantel cerrado). Esta pantalla es la
-// forma de editar el plantel directamente, sin pasar por SQL a mano — clave
-// ahora que cada temporada nueva puede traer altas/bajas/cambios de equipo.
+// jugadoras_femenino/jugadores_masculino también se escriben solas desde la
+// carga de Excel cuando aparece un nombre no reconocido (las dos categorías
+// se comportan igual desde que femenino dejó de tratarse como plantel
+// cerrado). Esta pantalla sigue siendo la forma de editar el plantel a mano
+// sin pasar por SQL — para altas anticipadas antes de la primera fecha,
+// correcciones de nombre/número, o arreglar un duplicado que haya quedado
+// de una carga de Excel con un nombre mal tipeado.
 export default function PlantelManager({ categoria: categoriaProp, setCategoria: setCategoriaProp, foco } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('femenino');
   const categoria    = categoriaProp ?? categoriaLocal;

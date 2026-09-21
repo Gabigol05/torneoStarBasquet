@@ -100,7 +100,7 @@ function formatJugador(j, equipos) {
 const formatJugadorMasc = j => formatJugador(j, equiposMasculino);
 const formatJugadoraFem = j => formatJugador(j, equiposFemenino);
 
-// ─── Resolver jugadora: aliases → fuzzy → (masculino) nuevo jugador ──────────
+// ─── Resolver jugadora: aliases → fuzzy → nuevo jugador ──────────────────────
 const aliasesCache = { femenino: null, masculino: null };
 
 async function cargarAliases(categoria, tablas) {
@@ -157,8 +157,14 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
   const candidatos = [...porId.values()].sort((a,b) => (a.score??1)-(b.score??1));
 
   if (candidatos.length === 0) {
-    // Masculino: si no existe todavía, se crea al publicar (no se descarta).
-    if (categoria === 'masculino' && equipoId) {
+    // Si no existe todavía en el plantel, se crea al publicar (no se
+    // descarta) — antes esto era solo para masculino; femenino se trataba
+    // como plantel cerrado, así que un nombre no reconocido quedaba en
+    // "not_found" sin poder cargarse. Ahora las dos categorías se comportan
+    // igual: si hay error de tipeo o duplicado, Alvaro lo corrige a mano
+    // desde el selector manual de esta misma pantalla (o desde Fusionar
+    // jugadores / Plantel después).
+    if (equipoId) {
       return { jugadora: null, method: 'nuevo', score: 0, nuevoEquipoId: equipoId, equipoId };
     }
     return { jugadora: null, method: 'not_found', score: 1, equipoId };
@@ -622,7 +628,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     todasJugadoras.filter(j => j.equipoId === equipoId).sort((a,b) => a.nombre.localeCompare(b.nombre));
 
   // Reasignar a mano una fila del Excel: a un/a jugador/a puntual del plantel,
-  // o a "crear jugador nuevo" (masculino). Es el escape hatch para cuando el
+  // o a "crear jugador/a nuevo/a" (las dos categorías). Es el escape hatch para cuando el
   // matching automático no puede (o no debe) adivinar solo — típicamente dos
   // compañeros de equipo con nombres parecidos (hermanos, ej. "Peleteiro").
   const aplicarManual = (rowId, valor) => {
@@ -914,8 +920,9 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
       addLog(`   Local:  Q1=${m.local.q1} Q2=${m.local.q2} Q3=${m.local.q3} Q4=${m.local.q4}`);
       addLog(`   Visita: Q1=${m.visit.q1} Q2=${m.visit.q2} Q3=${m.visit.q3} Q4=${m.visit.q4}`);
 
-      // Masculino: crear en la base los jugadores nuevos (method === 'nuevo')
-      // antes de insertar stats, para tener su id real.
+      // Crear en la base los jugadores/as nuevos (method === 'nuevo') antes
+      // de insertar stats, para tener su id real — ya vale para las dos
+      // categorías (antes era solo masculino).
       let jugadorasResueltas = jugadoras;
       const nuevos = jugadoras.filter(j => j.matchMethod === 'nuevo' && !j.jugadora);
       if (nuevos.length > 0) {
@@ -941,8 +948,12 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         // Sumar los recien creados al indice fuzzy en memoria — si no, cargar
         // dos partidos seguidos en la misma sesion (muy probable este fin de
         // semana) no los reconoce en la segunda carga y crea un duplicado.
-        if (categoria === 'masculino' && creadosParaIndice.length > 0) {
-          setJugadoresMasc(prev => [...prev, ...creadosParaIndice.map(formatJugadorMasc)]);
+        if (creadosParaIndice.length > 0) {
+          if (categoria === 'masculino') {
+            setJugadoresMasc(prev => [...prev, ...creadosParaIndice.map(formatJugadorMasc)]);
+          } else {
+            setJugadorasFem(prev => [...prev, ...creadosParaIndice.map(formatJugadoraFem)]);
+          }
         }
       }
 
@@ -1393,9 +1404,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
                                     {cand.nombre}{cand.numero!=null?` (#${cand.numero})`:''}
                                   </option>
                                 ))}
-                                {categoria === 'masculino' && (
-                                  <option value="__nuevo__">🆕 Crear jugador nuevo: "{j.nombreRaw}"</option>
-                                )}
+                                <option value="__nuevo__">🆕 Crear jugador/a nuevo/a: "{j.nombreRaw}"</option>
                               </select>
                             ) : (
                               <div style={{display:'flex',alignItems:'flex-start',gap:4}}>

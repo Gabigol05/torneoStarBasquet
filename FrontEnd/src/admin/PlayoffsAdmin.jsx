@@ -61,11 +61,12 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
     if (!temporadaActivaId) return;
     setLoading(true);
     try {
+      // La zona (A/B) se lee de la tabla de equipos de la categoría elegida —
+      // femenino también la tiene desde que pasó a jugarse por zonas
+      // (add_zonas_femenino.sql), a la par de masculino.
       const [{ data: fechasT, error: fErr }, equiposDbQuery] = await Promise.all([
         supabase.from(tablas.fechas).select('id,numero').eq('temporada_id', temporadaActivaId),
-        categoria === 'masculino'
-          ? supabase.from('equipos_masculino').select('id,zona')
-          : Promise.resolve({ data: null, error: null }),
+        supabase.from(tablas.equipos).select('id,zona'),
       ]);
       if (fErr) throw fErr;
       const { data: equiposDb } = equiposDbQuery;

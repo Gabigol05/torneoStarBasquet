@@ -487,7 +487,9 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     }),
     [equiposFemenino]);
 
-  // Masculino: tabla dividida en Zona A / Zona B (asignación en equipos_masculino.zona)
+  // Tabla dividida en Zona A / Zona B (asignación en equipos_femenino.zona /
+  // equipos_masculino.zona) — femenino y masculino comparten el mismo bloque
+  // de abajo desde que femenino también pasó a jugarse por zonas.
   const zonaA = useMemo(() => equiposOrdenados.filter(t => t.zona === 'A'), [equiposOrdenados]);
   const zonaB = useMemo(() => equiposOrdenados.filter(t => t.zona === 'B'), [equiposOrdenados]);
   // ⚠️ FIX: antes un equipo sin zona asignada en la base (zona !== 'A'/'B')
@@ -672,85 +674,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'tabla' && (
               <div>
-                {isLoadingStats ? <TableSkeleton/> : mode === 'femenino' ? (
-                  <div className="table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
-                          <th>PJ</th><th>G</th><th>P</th>
-                          <th>PF</th><th>PC</th><th>DIF</th><th>%</th>
-                          <th style={{ color: modeColor }}>PTS</th>
-                          <th className="th-racha">Forma</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {equiposOrdenados.flatMap((t, idx) => {
-                          const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
-                          const dif = t.pf - t.pc;
-                          const band = bandFor(idx + 1);
-                          const isBandStart = idx === 0 || idx === 4 || idx === 8;
-                          const rows = [];
-                          if (isBandStart) {
-                            rows.push(
-                              <tr key={`band-${idx}`}>
-                                <td colSpan={9} style={{ padding: '12px 16px 6px', fontFamily: "'Barlow Condensed'", fontSize: 10.5, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: band.color, borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,.08)' }}>
-                                  {band.label}
-                                </td>
-                              </tr>
-                            );
-                          }
-                          rows.push(
-                            <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
-                              style={{ background: `linear-gradient(90deg, ${hexA(t.color ?? band.color, '26')}, transparent 55%), ${band.tint}`, boxShadow: `inset 3px 0 0 ${band.color}` }}>
-                              <td className="team-cell">
-                                <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
-                                <img src={t.logo} alt={t.name} decoding="async"
-                                  style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
-                                  onError={e => { e.target.style.display = 'none'; }}/>
-                                <span className="team-name-txt">{t.name}</span>
-                                {esFavorito(t.id) && <span className="fav-star">*</span>}
-                              </td>
-                              <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
-                              <td>{t.pf}</td><td>{t.pc}</td>
-                              <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
-                              <td className="pct-td">{pct}</td>
-                              <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
-                              <td className="td-racha">
-                                {t.historial?.slice(-5).map((h, i) => (
-                                  <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
-                                    {h.resultado}
-                                  </span>
-                                ))}
-                                {!t.historial?.length && <span className="racha-nd">-</span>}
-                              </td>
-                            </tr>
-                          );
-                          return rows;
-                        })}
-                      </tbody>
-                    </table>
-                    <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
-                          Copa de Oro - 1 a 4
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
-                          Copa de Plata - 5 a 8
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
-                          Copa de Bronce - 9+
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>
-                        Desempate: PTS -&gt; DIF -&gt; PF
-                      </div>
-                    </div>
-                  </div>
-                ) : (
+                {isLoadingStats ? <TableSkeleton/> : (
                   <>
                   {sinZona.length > 0 && (
                     <div style={{

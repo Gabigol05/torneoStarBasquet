@@ -33,10 +33,15 @@ export function sortByStandings(equipos) {
 
 // Arma los 3 pools (oro/plata/bronce) según la posición actual en la tabla,
 // con el mismo corte que ya se usa para las bandas de color (1-4 oro, 5-8
-// plata, resto bronce). En masculino se arma por zona (A/B) y se combinan,
-// igual que la banda por zona que ya se muestra en la tabla de posiciones.
+// plata, resto bronce). Si los equipos que llegan tienen zona asignada (A/B)
+// se arma por zona y se combinan, igual que la banda por zona que ya se
+// muestra en la tabla de posiciones — masculino siempre la tiene, y femenino
+// desde que también pasó a jugarse por zonas (temporada 2026). Si ningún
+// equipo tiene zona (por ejemplo, una temporada archivada de femenino de
+// antes de las zonas) se arma con la tabla general, como se hacía antes.
 export function buildPools(equipos, mode) {
-  if (mode === 'masculino') {
+  const usaZonas = equipos.some(t => t.zona === 'A' || t.zona === 'B');
+  if (usaZonas) {
     const zonaA = sortByStandings(equipos.filter(t => t.zona === 'A'));
     const zonaB = sortByStandings(equipos.filter(t => t.zona === 'B'));
     return {

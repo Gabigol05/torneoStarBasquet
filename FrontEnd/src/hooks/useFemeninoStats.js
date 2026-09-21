@@ -17,6 +17,7 @@ const DEFAULT_STATS = {
 function buildEquiposBase() {
   return equiposFemenino.map(e => ({
     ...e,
+    zona: null,
     pj:0, pg:0, pp:0, pf:0, pc:0,
     historial:[], proximos:[],
     jugadoras: [],
@@ -47,12 +48,18 @@ async function fetchTodo(temporadaId) {
   // se filtran acá abajo contra las fechas ya filtradas — evita una vuelta
   // secuencial extra sin perder el filtro.
   const [
+    { data: equiposRows,   error: e0b },
     { data: jugadorasRows, error: e0 },
     { data: statsRows,     error: e1 },
     { data: partidosRows,  error: e2 },
     { data: fechasRows,    error: e3 },
     { data: statsPartRows, error: e4 },
   ] = await Promise.all([
+    // Solo para la zona (A/B) — el nombre/logo/color siguen viniendo del
+    // archivo estático equiposFemenino, igual que antes. Mismo patrón que
+    // useMasculinoStats.js, para que femenino pueda tener temporada regular
+    // dividida en Zona A/B tal como ya funciona en masculino.
+    supabase.from('equipos_femenino').select('id,zona'),
     supabase.from('jugadoras_femenino').select('*'),
     statsQuery,
     supabase.from('partidos_femenino')
@@ -64,15 +71,18 @@ async function fetchTodo(temporadaId) {
   ]);
 
   // Log errores sin crashear — tablas pueden no existir todavía
+  if (e0b) console.warn('[useFemeninoStats] equipos:', e0b.message);
   if (e0) console.warn('[useFemeninoStats] jugadoras:', e0.message);
   if (e1) console.warn('[useFemeninoStats] estadisticas:', e1.message);
   if (e2) console.warn('[useFemeninoStats] partidos:', e2.message);
   if (e3) console.warn('[useFemeninoStats] fechas:', e3.message);
   if (e4) console.warn('[useFemeninoStats] stats_partido:', e4.message);
 
+  const equiposDb  = equiposRows   ?? [];
   const jugadoras = jugadorasRows ?? [];
   const stats     = statsRows    ?? [];
   const fechas    = fechasRows   ?? [];
+  const zonaMap   = Object.fromEntries(equiposDb.map(r => [r.id, r.zona]));
 
   // Filtrar partidos/stats de partido contra las fechas de la temporada
   // seleccionada (fechasRows ya viene filtrado por fechasQuery de arriba).
@@ -179,6 +189,7 @@ async function fetchTodo(temporadaId) {
     return {
       ...eq,
       ...pos,
+      zona: zonaMap[eq.id] ?? null,
       historial: historialMap[eq.id] ?? [],
       proximos:  proximosMap[eq.id]  ?? [],
       jugadoras: roster.map(j => {
@@ -298,6 +309,7 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
     if (!isConfigured || !supabase) return;
     const channel = supabase
       .channel('torneo-fem-rt')
+      .on('postgres_changes', { event:'*', schema:'public', table:'equipos_femenino'        }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'jugadoras_femenino'      }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'estadisticas_femenino'  }, refresh)
       .on('postgres_changes', { event:'*', schema:'public', table:'partidos_femenino'       }, refresh)

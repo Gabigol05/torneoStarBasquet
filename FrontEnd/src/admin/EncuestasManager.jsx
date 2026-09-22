@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { useTemporada } from '../context/TemporadaContext';
 
 const ROSTER = {
   femenino:  equiposFemenino.map(e => ({ id: e.id, nombre: e.name, color: e.color })),
@@ -157,6 +158,7 @@ export default function EncuestasManager() {
   const [msg, setMsg]       = useState(null);
   const [abiertaId, setAbiertaId] = useState(null);
   const { confirm, ConfirmDialog } = useConfirm();
+  const { temporadaActivaId, temporadas } = useTemporada();
 
   const flash = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 3000); };
 
@@ -171,11 +173,20 @@ export default function EncuestasManager() {
   const handleSave = async () => {
     setLoading(true);
     try {
+      // ⚠️ FIX (reporte Alvaro: viendo el Torneo Apertura archivado
+      // aparecian las votaciones de la Fecha 1 del Clausura) — las encuestas
+      // no estaban atadas a ninguna temporada, asi que se mostraban en
+      // todas al mismo tiempo. Ahora cada encuesta nueva queda atada a la
+      // temporada ACTIVA de la categoria elegida (la que arranque despues
+      // deja de verla). "General" no es de una categoria puntual, asi que
+      // sigue sin temporada — se muestra siempre, en cualquier temporada.
+      const temporada_id = form.categoria === 'general' ? null : (temporadaActivaId[form.categoria] ?? null);
       const { data: enc, error: eErr } = await supabase.from('encuestas').insert({
         categoria: form.categoria,
         pregunta: form.pregunta.trim(),
         subtitulo: form.subtitulo.trim() || null,
         activa: true,
+        temporada_id,
       }).select('id').single();
       if (eErr) throw eErr;
 
@@ -257,6 +268,11 @@ export default function EncuestasManager() {
                     color: enc.activa ? '#22D07A' : '#6B7A99' }}>
                     {enc.activa ? 'ACTIVA' : 'CERRADA'}
                   </span>
+                  {enc.temporada_id != null && (
+                    <span style={{ fontSize: 10, color: '#4A566E' }}>
+                      {temporadas.find(t => t.id === enc.temporada_id)?.nombre ?? `Temporada #${enc.temporada_id}`}
+                    </span>
+                  )}
                   <span style={{ color: '#EEF2F8', fontWeight: 600, fontSize: 14 }}>{enc.pregunta}</span>
                   {enc.subtitulo && <span style={{ color: '#4A566E', fontSize: 12 }}>· {enc.subtitulo}</span>}
 

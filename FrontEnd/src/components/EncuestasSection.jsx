@@ -1,5 +1,6 @@
 import { useEncuestas } from '../hooks/useEncuestas';
 import { useTournament } from '../context/TournamentContext';
+import { useTemporada } from '../context/TemporadaContext';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 
@@ -108,9 +109,25 @@ function EncuestaCard({ encuesta, opciones, votoElegido, onVotar }) {
 
 export function EncuestasSection({ addToast } = {}) {
   const { mode } = useTournament();
+  const { temporadaSeleccionadaId, esTemporadaActiva } = useTemporada();
   const { encuestas, resultados, misVotos, votar, isLoading } = useEncuestas();
 
-  const encuestasVisibles = encuestas.filter(e => e.categoria === mode || e.categoria === 'general');
+  // ⚠️ FIX (reporte Alvaro: mirando el Torneo Apertura archivado aparecían
+  // las votaciones de la Fecha 1 del Clausura) — las encuestas ahora se
+  // etiquetan con la temporada en la que se crearon (ver
+  // fix_encuestas_temporada.sql + EncuestasManager.jsx), así que acá se
+  // muestran solo las de la temporada que se está mirando. "General" no es
+  // de una categoría puntual, así que se sigue mostrando siempre. Una
+  // encuesta vieja sin temporada_id (antes de esta migración) solo se
+  // muestra si se está mirando la temporada activa — nunca en una archivada.
+  const temporadaSelMode = temporadaSeleccionadaId[mode];
+  const activaCategoria = esTemporadaActiva(mode);
+  const encuestasVisibles = encuestas.filter(e => {
+    if (e.categoria === 'general') return true;
+    if (e.categoria !== mode) return false;
+    if (e.temporada_id == null) return activaCategoria;
+    return e.temporada_id === temporadaSelMode;
+  });
 
   if (isLoading && encuestasVisibles.length === 0) return null;
   if (encuestasVisibles.length === 0) return null;

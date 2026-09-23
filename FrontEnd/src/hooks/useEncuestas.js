@@ -92,21 +92,39 @@ export function useEncuestas() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // ⚠️ FIX rendimiento (mismo criterio que useFemeninoStats.js/
+  // useMasculinoStats.js): `encuesta_votos` cambia con CADA voto de
+  // CUALQUIER visitante — en una votación con mucha gente votando casi al
+  // mismo tiempo, cada voto disparaba un refetch completo a todo el mundo
+  // que tuviera la página abierta. Se juntan los que llegan pegados en una
+  // sola espera cortita antes de refrescar de verdad.
+  const debounceRef = useRef(null);
+  const refreshDebounced = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      refresh();
+    }, 900);
+  }, [refresh]);
+
   useEffect(() => {
     if (!isConfigured || !supabase) return;
     const channel = supabase
       .channel('torneo-encuestas-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuestas' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuesta_opciones' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuesta_votos' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuestas' }, refreshDebounced)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuesta_opciones' }, refreshDebounced)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'encuesta_votos' }, refreshDebounced)
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
           const interval = setInterval(refresh, 60_000);
           return () => clearInterval(interval);
         }
       });
-    return () => supabase.removeChannel(channel);
-  }, [refresh]);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [refresh, refreshDebounced]);
 
   // Devuelve { ok:boolean, message?:string }
   const votar = useCallback(async (encuestaId, opcionId) => {

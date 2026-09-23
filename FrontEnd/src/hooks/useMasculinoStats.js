@@ -296,17 +296,37 @@ export function useMasculinoStats(enabled = true, temporadaId = null) {
     refresh();
   }, [refresh, enabled]);
 
+  // ⚠️ FIX rendimiento: cada una de las 6 tablas de abajo dispara `refresh`
+  // (un refetch COMPLETO — 6 consultas en paralelo) por CADA cambio que
+  // reciba. Durante un partido que se está cargando en vivo, jugada por
+  // jugada, eso podía disparar decenas de refetchs completos en pocos
+  // segundos — a cada persona que tuviera la página abierta en ese momento,
+  // no solo al admin. Ahora los cambios que llegan pegados uno al otro se
+  // juntan en uno solo: cada evento reinicia una espera cortita, y recién
+  // cuando pasa un instante sin que llegue nada nuevo se hace el refetch de
+  // verdad. El dato sigue actualizándose solo (sin F5) y casi en vivo — la
+  // diferencia es que una carga de 10 jugadas seguidas termina en 1 refetch,
+  // no en 10.
+  const debounceRef = useRef(null);
+  const refreshDebounced = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      refresh();
+    }, 900);
+  }, [refresh]);
+
   useEffect(() => {
     if (!enabled) return;
     if (!isConfigured || !supabase) return;
     const channel = supabase
       .channel('torneo-masc-rt')
-      .on('postgres_changes', { event:'*', schema:'public', table:'equipos_masculino'       }, refresh)
-      .on('postgres_changes', { event:'*', schema:'public', table:'jugadores_masculino'      }, refresh)
-      .on('postgres_changes', { event:'*', schema:'public', table:'estadisticas_masculino'   }, refresh)
-      .on('postgres_changes', { event:'*', schema:'public', table:'partidos_masculino'       }, refresh)
-      .on('postgres_changes', { event:'*', schema:'public', table:'stats_partido_masculino'  }, refresh)
-      .on('postgres_changes', { event:'*', schema:'public', table:'fechas_masculino'         }, refresh)
+      .on('postgres_changes', { event:'*', schema:'public', table:'equipos_masculino'       }, refreshDebounced)
+      .on('postgres_changes', { event:'*', schema:'public', table:'jugadores_masculino'      }, refreshDebounced)
+      .on('postgres_changes', { event:'*', schema:'public', table:'estadisticas_masculino'   }, refreshDebounced)
+      .on('postgres_changes', { event:'*', schema:'public', table:'partidos_masculino'       }, refreshDebounced)
+      .on('postgres_changes', { event:'*', schema:'public', table:'stats_partido_masculino'  }, refreshDebounced)
+      .on('postgres_changes', { event:'*', schema:'public', table:'fechas_masculino'         }, refreshDebounced)
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
           console.warn('[useMasculinoStats] Realtime error — usando polling fallback');
@@ -314,8 +334,11 @@ export function useMasculinoStats(enabled = true, temporadaId = null) {
           return () => clearInterval(interval);
         }
       });
-    return () => supabase.removeChannel(channel);
-  }, [refresh, enabled]);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [refresh, refreshDebounced, enabled]);
 
   return {
     equipos, partidos, fechas, statsPorPartido,

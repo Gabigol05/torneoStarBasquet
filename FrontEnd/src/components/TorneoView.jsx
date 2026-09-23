@@ -48,7 +48,7 @@ function TableSkeleton() {
 }
 
 import { useTournament }    from '../context/TournamentContext';
-import { useTemporada }     from '../context/TemporadaContext';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import { GameCenterModal }  from './GameCenterModal';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { TeamPageFem }      from './TeamPageFem';
@@ -327,7 +327,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     statsPorPartido = {},
   } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
-  const { esTemporadaActiva } = useTemporada();
   const filterChipsWheelRef = useWheelHorizontal();
   const fechaChipsWheelRef  = useWheelHorizontal();
 
@@ -412,11 +411,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // temporada desde el hook); la zona solo se usa como fallback para que un
   // equipo recién armado con 0 partidos igual aparezca, y únicamente cuando
   // la temporada mirada es la ACTIVA ahora mismo (nunca para una archivada).
-  const activaCategoria = esTemporadaActiva(mode);
-  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
-  const equiposDeTemporada = useMemo(() => equiposFemenino.filter(e =>
-    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
-  ), [equiposFemenino, activaCategoria]);
+  const { equiposDeTemporada, activaCategoria } = useEquiposDeTemporada(equiposFemenino, mode);
 
   const jugadorasFiltradas = useMemo(() => {
     const q = searchJugadoras.toLowerCase();

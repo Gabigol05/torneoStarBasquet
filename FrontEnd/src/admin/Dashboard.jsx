@@ -1066,7 +1066,12 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
           temporadaVerId.masculino != null ? supabase.from(TABLAS.masculino.estadisticas).select('*').eq('temporada_id', temporadaVerId.masculino) : Promise.resolve({ data: [] }),
           supabase.from(TABLAS.femenino.jugadores).select('id,nombre,equipo_id'),
           supabase.from(TABLAS.masculino.jugadores).select('id,nombre,equipo_id'),
-          supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending:false }).limit(1),
+          // ⚠️ FIX: antes traía la encuesta ACTIVA más reciente sin fijarse en
+          // qué temporada se está mirando en este resumen — mismo bug que ya
+          // se arregló en la página pública (EncuestasSection). Se traen unas
+          // pocas candidatas y abajo se elige la primera que corresponda a la
+          // temporada de su categoría (o sin temporada asignada => general).
+          supabase.from('encuestas').select('*').eq('activa', true).order('creado_en', { ascending:false }).limit(5),
         ]);
         if (cancelado) return;
         const primerError = pfErr ?? pmErr ?? sfErr ?? smErr ?? jfErr ?? jmErr;
@@ -1088,11 +1093,23 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
         // guardaba el primero) — ver ProximosCard.
         const proximosTop = proximos.slice(0, 4);
 
+        // Encuesta relevante para las temporadas que se están mirando ahora
+        // mismo en el resumen — una encuesta sin `temporada_id` (categoría
+        // "general", o encuestas viejas de antes de esta columna) siempre
+        // cuenta; una de femenino/masculino solo si su temporada coincide
+        // con la que este resumen tiene elegida para esa categoría.
+        const encActRow = (encAct ?? []).find(e => {
+          if (e.temporada_id == null) return true;
+          if (e.categoria === 'femenino') return e.temporada_id === temporadaVerId.femenino;
+          if (e.categoria === 'masculino') return e.temporada_id === temporadaVerId.masculino;
+          return true;
+        }) ?? null;
+
         let encuesta = null;
-        if (encAct?.[0]) {
-          const { data: res } = await supabase.from('v_encuesta_resultados').select('votos').eq('encuesta_id', encAct[0].id);
+        if (encActRow) {
+          const { data: res } = await supabase.from('v_encuesta_resultados').select('votos').eq('encuesta_id', encActRow.id);
           const totalVotos = (res ?? []).reduce((s, r) => s + Number(r.votos || 0), 0);
-          encuesta = { pregunta: encAct[0].pregunta, votos: totalVotos };
+          encuesta = { pregunta: encActRow.pregunta, votos: totalVotos };
         }
 
         setKpis({ jugados, pendientes, proximo, proximos: proximosTop, encuesta });

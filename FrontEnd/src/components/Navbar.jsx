@@ -5,6 +5,7 @@ import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 
 function dispatchTabChange(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
@@ -16,6 +17,12 @@ export function Navbar() {
   const activeSection = useActiveSection();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  // ⚠️ FIX: el buscador global recibía `equipos` sin filtrar por temporada —
+  // buscando mientras se mira una temporada archivada, podía devolver un
+  // equipo que solo juega en la otra temporada (y su plantel actual, no el
+  // de esa temporada vieja). Mismo criterio que ya usan la tabla de
+  // posiciones y los KPIs (ver useEquiposDeTemporada).
+  const { equiposDeTemporada } = useEquiposDeTemporada(equipos, mode);
 
   const closeMobile = () => setIsMobileOpen(false);
 
@@ -96,7 +103,7 @@ export function Navbar() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <GlobalSearch
-            equipos={equipos}
+            equipos={equiposDeTemporada}
             onSelectPlayer={setSelectedPlayer}
             onSelectTeam={() => {
               document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });

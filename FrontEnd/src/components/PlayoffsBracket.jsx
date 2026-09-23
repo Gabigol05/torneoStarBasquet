@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
-import { useTemporada } from '../context/TemporadaContext';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import { useStats } from '../context/StatsContext';
 import { GameCenterModal } from './GameCenterModal';
 import { MatchResultCard, FixtureCard, buildJugadorasMap } from './TorneoView.jsx';
@@ -477,7 +477,6 @@ function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasM
 export function PlayoffsBracket() {
   const { mode } = useTournament();
   const { equipos, partidos, fechas } = useStats();
-  const { esTemporadaActiva } = useTemporada();
   // Click en un resultado o próximo cruce de playoff abre el mismo Game
   // Center (marcador, parciales, box score por jugadora/jugador) que se abre
   // desde "Resultados" — mismo patrón que ya usa TorneoView.jsx.
@@ -491,11 +490,7 @@ export function PlayoffsBracket() {
   // cuadro de Copa de Bronce). Se usa la participación real (pj/historial
   // dentro de ESA temporada) y la zona solo entra como fallback cuando la
   // temporada mirada es la ACTIVA ahora mismo.
-  const activaCategoria = esTemporadaActiva(mode);
-  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
-  const equiposDeTemporada = useMemo(() => (equipos ?? []).filter(e =>
-    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
-  ), [equipos, activaCategoria]);
+  const { equiposDeTemporada, activaCategoria } = useEquiposDeTemporada(equipos, mode);
 
   // `zona` (A/B) es un valor GLOBAL/actual, no algo guardado por temporada —
   // para la temporada ACTIVA coincide con la realidad, pero para una

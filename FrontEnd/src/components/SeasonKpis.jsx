@@ -1,10 +1,9 @@
 ﻿import { useTournament } from '../context/TournamentContext';
-import { useTemporada } from '../context/TemporadaContext';
 import { CounterUp } from './CounterUp';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 
 export function SeasonKpis({ equipos = [], partidos = [] }) {
   const { mode } = useTournament();
-  const { esTemporadaActiva } = useTemporada();
 
   if (mode === 'masculino') {
     const MASC = [
@@ -30,11 +29,7 @@ export function SeasonKpis({ equipos = [], partidos = [] }) {
   // otra temporada (archivada) lo confiable es si el equipo tiene
   // partidos/historial dentro de ESA temporada — `equipos` ya viene
   // filtrado por temporada desde el hook. Mismo criterio que Hero.jsx.
-  const activaCategoria = esTemporadaActiva(mode);
-  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
-  const equiposActivos = equipos.filter(e =>
-    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
-  );
+  const { equiposDeTemporada: equiposActivos } = useEquiposDeTemporada(equipos, mode);
   const numJugadoras = equiposActivos.reduce((a, e) => a + (e.jugadoras?.length ?? 0), 0);
   const numEquipos   = equiposActivos.length;
   const fechasJug    = new Set(finalizados.map(p => p.fecha_id).filter(Boolean)).size;

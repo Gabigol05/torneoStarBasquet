@@ -7,7 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg"],
+      // ⚠️ FIX: el manifest generado por este plugin (el que realmente se
+      // sirve en producción como manifest.webmanifest, no public/manifest.json
+      // que queda sin usar) apuntaba solo a icon.svg — así, el sitio
+      // instalado como app podía no cumplir los requisitos de ícono de
+      // algunos Android/Chrome. Ahora usa los mismos PNG reales (192/512)
+      // que ya existían en public/, igual que public/manifest.json.
+      includeAssets: ["icon.svg", "favicon-16x16.png", "favicon-32x32.png", "apple-touch-icon.png"],
       manifest: {
         name: "Torneo Star Básquet",
         short_name: "Torneo Star",
@@ -15,12 +21,19 @@ export default defineConfig({
         theme_color: "#08101a",
         background_color: "#08101a",
         display: "standalone",
+        start_url: "/",
         icons: [
           {
-            src: "/icon.svg",
-            sizes: "192x192 512x512",
-            type: "image/svg+xml",
-            purpose: "any maskable"
+            src: "/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any"
+          },
+          {
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any"
           }
         ]
       }

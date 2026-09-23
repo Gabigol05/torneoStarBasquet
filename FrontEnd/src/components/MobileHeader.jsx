@@ -3,9 +3,15 @@ import { GlobalSearch } from './GlobalSearch';
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { useState } from 'react';
 import { useStats } from '../context/StatsContext';
+import { useTournament } from '../context/TournamentContext';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 
 export function MobileHeader({ onRefresh } = {}) {
   const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
+  const { mode } = useTournament();
+  // ⚠️ FIX: mismo problema que en Navbar.jsx — el buscador de la versión
+  // mobile recibía los equipos sin filtrar por temporada.
+  const { equiposDeTemporada } = useEquiposDeTemporada(equipos, mode);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -41,7 +47,7 @@ export function MobileHeader({ onRefresh } = {}) {
         </div>
 
         <div className="mh-actions">
-          <GlobalSearch equipos={equipos} onSelectPlayer={setSelectedPlayer} />
+          <GlobalSearch equipos={equiposDeTemporada} onSelectPlayer={setSelectedPlayer} />
           <button
             type="button"
             onClick={handleRefreshClick}

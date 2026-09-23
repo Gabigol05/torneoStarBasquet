@@ -2,6 +2,7 @@
 import { CounterUp } from './CounterUp';
 import { useTournament } from '../context/TournamentContext';
 import { useTemporada } from '../context/TemporadaContext';
+import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import logoTorneo from '../assets/logo_torneo.jpg';
 import sponsorAustral from '../assets/sponsor_austral_bar.png';
 import sponsorLening from '../assets/sponsor_lening.png';
@@ -66,11 +67,7 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
   // confiable es si el equipo tiene partidos/historial dentro de ESA
   // temporada (`equipos` ya viene filtrado por temporada desde el hook) —
   // eso es lo único que dice de verdad "este equipo jugó esta temporada".
-  const activaCategoria = esTemporadaActiva(mode);
-  const jugoEstaTemporada = e => (e.pj > 0) || (e.historial && e.historial.length > 0);
-  const equiposActivos = equipos.filter(e =>
-    jugoEstaTemporada(e) || (activaCategoria && (e.zona === 'A' || e.zona === 'B'))
-  );
+  const { equiposDeTemporada: equiposActivos, activaCategoria } = useEquiposDeTemporada(equipos, mode);
 
   const heroFemenino = useMemo(() => {
     const fechasJugadas = fechas.filter(f =>

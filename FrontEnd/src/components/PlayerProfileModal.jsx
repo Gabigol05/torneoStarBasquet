@@ -1,6 +1,17 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 import { labelPartidoCorto } from '../lib/fechaLabel';
+import { edadDesde } from '../lib/edad';
+import { useTemporada } from '../context/TemporadaContext';
+import { supabase, isConfigured } from '../lib/supabase';
+
+// Qué tabla/columna consultar según la categoría del jugador — mismos
+// nombres que usan useFemeninoStats.js/useMasculinoStats.js.
+const TABLAS_POR_MODO = {
+  femenino:  { estadisticas: 'estadisticas_femenino',  fechas: 'fechas_femenino',  partidos: 'partidos_femenino',  statsPartido: 'stats_partido_femenino',  idCol: 'jugadora_id' },
+  masculino: { estadisticas: 'estadisticas_masculino', fechas: 'fechas_masculino', partidos: 'partidos_masculino', statsPartido: 'stats_partido_masculino', idCol: 'jugador_id' },
+};
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en el
 // resto de las tarjetas con color de equipo) — evita color-mix()/variables
@@ -200,22 +211,228 @@ function TiroRow({ label, conv, fall, pct, color, promConv }) {
   );
 }
 
+// ─── Chip de temporada (dentro del modal) ──────────────────────────────────────
+// Pedido de Alvaro: una jugadora/jugador que disputó más de una temporada
+// tiene que poder ver las stats/gráfico de CADA una desde el propio perfil,
+// sin salir del modal ni tocar el selector global del resto del sitio. Mismo
+// patrón visual/de portal que TemporadaChip.jsx (para no repetir el bug ya
+// reportado de "se ve cortado" con un dropdown recortado por un padre con
+// overflow), pero en versión chica para entrar en la card del perfil.
+function ModalTemporadaChip({ temporadas, mode, valor, onElegir, accent }) {
+  const [abierto, setAbierto] = useState(false);
+  const [coords, setCoords] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const deLaCategoria = useMemo(
+    () => [...(temporadas ?? [])].filter(t => t.categoria === mode).sort((a, b) => b.id - a.id),
+    [temporadas, mode]
+  );
+
+  const actualizarPosicion = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setCoords({ top: r.bottom + 6, left: r.left, minWidth: Math.max(r.width, 180) });
+  };
+
+  useEffect(() => {
+    if (!abierto) return;
+    actualizarPosicion();
+    const onScrollOrResize = () => actualizarPosicion();
+    const onClickFuera = e => {
+      if (btnRef.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setAbierto(false);
+    };
+    const onEsc = e => { if (e.key === 'Escape') setAbierto(false); };
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    document.addEventListener('mousedown', onClickFuera);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+      document.removeEventListener('mousedown', onClickFuera);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [abierto]);
+
+  if (deLaCategoria.length <= 1) return null;
+
+  const seleccionada = deLaCategoria.find(t => t.id === valor) ?? deLaCategoria[0];
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setAbierto(a => !a)}
+        aria-expanded={abierto}
+        aria-haspopup="listbox"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px',
+          borderRadius: 999, border: `1px solid ${hexA(accent, '55')}`, background: hexA(accent, '14'),
+          color: accent, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+          fontSize: 12.5, letterSpacing: .3, cursor: 'pointer',
+        }}
+      >
+        📅 {seleccionada?.nombre ?? 'Temporada'}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="3"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+
+      {abierto && coords && createPortal(
+        <div
+          ref={menuRef}
+          role="listbox"
+          style={{
+            position: 'fixed', top: coords.top, left: coords.left,
+            minWidth: coords.minWidth, maxWidth: 'calc(100vw - 16px)',
+            zIndex: 10000, overflow: 'hidden', padding: 5,
+            borderRadius: 12, border: '1px solid #1C2535', background: '#0E1420',
+            boxShadow: '0 18px 40px rgba(0,0,0,.55)',
+          }}
+        >
+          {deLaCategoria.map(t => {
+            const sel = t.id === (seleccionada?.id ?? valor);
+            return (
+              <div
+                key={t.id}
+                role="option"
+                aria-selected={sel}
+                onClick={() => { onElegir(t.id); setAbierto(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px',
+                  minHeight: 40, borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: sel ? hexA(accent, '1f') : 'transparent',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: sel ? accent : 'transparent' }} />
+                <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 14, color: sel ? accent : '#EEF2F8' }}>
+                  {t.nombre}
+                </span>
+              </div>
+            );
+          })}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 // ─── Modal principal ──────────────────────────────────────────────────────────
-export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, partidos, fechas, addToast }) {
+export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, partidos, fechas, addToast, mode = 'femenino' }) {
   // ⚠️ FIX: los hooks tienen que llamarse SIEMPRE, en el mismo orden, sin
   // importar isOpen/player — por eso van antes del "return null" de abajo
   // (este componente queda montado de forma persistente y solo cambia isOpen).
+
+  // ── Chip de temporada DENTRO del modal (pedido de Alvaro) ──────────────
+  // `partidos`/`fechas`/`statsPorPartido`/`player` que llegan por props ya
+  // vienen scopeados a la temporada elegida en el resto del sitio (el chip
+  // global) — eso es la temporada "de casa" de este modal. Acá adentro se
+  // puede mirar OTRA sin que eso mueva el chip global ni el resto del sitio:
+  // cuando se elige una distinta, se pide aparte (una sola vez, se cachea)
+  // la foto de esa jugadora/jugador en esa temporada puntual.
+  const { temporadas, temporadaSeleccionadaId } = useTemporada();
+  const temporadaHomeId = temporadaSeleccionadaId[mode];
+  const [temporadaVerId, setTemporadaVerId] = useState(temporadaHomeId);
+  const [cachePorTemporada, setCachePorTemporada] = useState({});
+
+  // Al abrir el modal (o cambiar de jugadora, o si el chip global cambió
+  // mientras el modal estaba cerrado) siempre arranca de nuevo en la
+  // temporada "de casa" — si no, podría quedar mostrando por accidente la
+  // temporada vieja que se había elegido para OTRA jugadora.
+  useEffect(() => {
+    if (isOpen) setTemporadaVerId(temporadaHomeId);
+  }, [isOpen, player?.id, temporadaHomeId]);
+
+  const esTemporadaHome = temporadaVerId === temporadaHomeId || temporadaVerId == null;
+
+  useEffect(() => {
+    if (!isOpen || !player?.id || esTemporadaHome) return;
+    if (!isConfigured) return;
+    if (cachePorTemporada[temporadaVerId]) return; // ya cargada (u ocurrió error) — no repetir
+    const tablas = TABLAS_POR_MODO[mode] ?? TABLAS_POR_MODO.femenino;
+    let cancelado = false;
+    (async () => {
+      setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: { loading: true } }));
+      try {
+        const [{ data: estRows, error: eErr }, { data: fechasRows, error: fErr }] = await Promise.all([
+          supabase.from(tablas.estadisticas).select('*').eq(tablas.idCol, player.id).eq('temporada_id', temporadaVerId),
+          supabase.from(tablas.fechas).select('*').eq('temporada_id', temporadaVerId).order('numero', { ascending: true }),
+        ]);
+        if (cancelado) return;
+        if (eErr || fErr) throw new Error((eErr ?? fErr).message);
+
+        const fechasDeEsa = fechasRows ?? [];
+        const fechaIds = fechasDeEsa.map(f => f.id);
+        let partidosDeEsa = [];
+        if (fechaIds.length && player.equipoId != null) {
+          const { data: partidosRows, error: pErr } = await supabase.from(tablas.partidos).select('*')
+            .in('fecha_id', fechaIds)
+            .or(`equipo_local_id.eq.${player.equipoId},equipo_visit_id.eq.${player.equipoId}`)
+            .eq('estado', 'finalizado');
+          if (pErr) throw pErr;
+          partidosDeEsa = partidosRows ?? [];
+        }
+        if (cancelado) return;
+
+        const statsPorPartidoDeEsa = {};
+        if (partidosDeEsa.length) {
+          const partidoIds = partidosDeEsa.map(p => p.id);
+          const { data: spRows, error: spErr } = await supabase.from(tablas.statsPartido).select('*')
+            .eq(tablas.idCol, player.id)
+            .in('partido_id', partidoIds);
+          if (spErr) throw spErr;
+          for (const r of (spRows ?? [])) {
+            if (!statsPorPartidoDeEsa[r.partido_id]) statsPorPartidoDeEsa[r.partido_id] = {};
+            statsPorPartidoDeEsa[r.partido_id][player.id] = r;
+          }
+        }
+        if (cancelado) return;
+
+        // El resto del jugador (nombre, equipo, color, foto) es identidad y
+        // no cambia por temporada — solo se pisan los números de stats con
+        // los de estadisticas_X de ESA temporada puntual (o en cero si
+        // todavía no jugó ninguna fecha de esa temporada).
+        const estRow = (estRows ?? [])[0] ?? null;
+        setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: {
+          loading: false,
+          player: { ...player, ...(estRow ?? { pj: 0 }) },
+          partidos: partidosDeEsa,
+          fechas: fechasDeEsa,
+          statsPorPartido: statsPorPartidoDeEsa,
+        } }));
+      } catch (err) {
+        console.error('[PlayerProfileModal] cambio de temporada:', err);
+        if (!cancelado) setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: { loading: false, error: err.message } }));
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [isOpen, temporadaVerId, esTemporadaHome, player?.id, player?.equipoId, mode]);
+
+  const vistaOtraTemporada = !esTemporadaHome ? cachePorTemporada[temporadaVerId] : null;
+  const cargandoOtraTemporada = !esTemporadaHome && (vistaOtraTemporada?.loading ?? true);
+  const effectivePlayer         = (!esTemporadaHome && vistaOtraTemporada?.player) ? vistaOtraTemporada.player : player;
+  const effectivePartidos       = !esTemporadaHome ? (vistaOtraTemporada?.partidos ?? [])       : partidos;
+  const effectiveFechas         = !esTemporadaHome ? (vistaOtraTemporada?.fechas ?? [])         : fechas;
+  const effectiveStatsPorPartido = !esTemporadaHome ? (vistaOtraTemporada?.statsPorPartido ?? {}) : statsPorPartido;
+
   const historialGrafico = useMemo(() => {
-    if (!player || !statsPorPartido || !partidos || !fechas) return [];
-    return partidos
+    if (!player || !effectiveStatsPorPartido || !effectivePartidos || !effectiveFechas) return [];
+    return effectivePartidos
       .filter(p =>
         p.estado === 'finalizado' &&
         (p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId)
       )
       .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0))
       .map(p => {
-        const st    = statsPorPartido?.[p.id]?.[player.id];
-        const fecha = fechas.find(f => f.id === p.fecha_id);
+        const st    = effectiveStatsPorPartido?.[p.id]?.[player.id];
+        const fecha = effectiveFechas.find(f => f.id === p.fecha_id);
         return {
           // Playoffs: "Semifinal Oro" en vez de "F11" — la instancia/copa
           // viven en el partido, no en la fecha (ver lib/fechaLabel.js).
@@ -231,50 +448,62 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         };
       })
       .filter(d => d.pts > 0 || d.reb > 0 || d.ast > 0);
-  }, [statsPorPartido, partidos, fechas, player?.id, player?.equipoId]);
+  }, [effectiveStatsPorPartido, effectivePartidos, effectiveFechas, player?.id, player?.equipoId]);
 
   const mejorPartido = useMemo(() => {
     if (!historialGrafico.length) return null;
     return historialGrafico.reduce((b, r) => (r.pts > (b?.pts ?? -1) ? r : b), null);
   }, [historialGrafico]);
 
+  // ⚠️ Accesibilidad: cerrar con Escape (antes solo se podía con el click
+  // afuera o el botón ✕ — no funcionaba nada con el teclado).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = e => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !player) return null;
 
-  // Stats promedios — con fallbacks seguros
-  const pts      = player.pts_prom  ?? player.pts ?? 0;
-  const reb      = player.reb_prom  ?? player.reb ?? 0;
-  const ast      = player.ast_prom  ?? player.ast ?? 0;
-  const rob      = player.rob_prom  ?? player.rob ?? 0;
-  const tap      = player.tap_prom  ?? player.tap ?? 0;
-  const per      = player.per_prom  ?? 0;
-  const val      = player.val_prom  ?? 0;
-  const pj       = player.pj        ?? 0;
-  const mejorPts = player.mejor_pts ?? 0;
+  // Stats promedios — con fallbacks seguros. Usan effectivePlayer: el mismo
+  // `player` de siempre mientras se mira la temporada "de casa", o los
+  // números pisados por la temporada que se eligió con el chip de acá
+  // adentro (ver más arriba).
+  const pts      = effectivePlayer.pts_prom  ?? effectivePlayer.pts ?? 0;
+  const reb      = effectivePlayer.reb_prom  ?? effectivePlayer.reb ?? 0;
+  const ast      = effectivePlayer.ast_prom  ?? effectivePlayer.ast ?? 0;
+  const rob      = effectivePlayer.rob_prom  ?? effectivePlayer.rob ?? 0;
+  const tap      = effectivePlayer.tap_prom  ?? effectivePlayer.tap ?? 0;
+  const per      = effectivePlayer.per_prom  ?? 0;
+  const val      = effectivePlayer.val_prom  ?? 0;
+  const pj       = effectivePlayer.pj        ?? 0;
+  const mejorPts = effectivePlayer.mejor_pts ?? 0;
 
   // Totales acumulados — dato principal en el ranking/mérito
-  const ptsTotal = player.pts_total ?? 0;
-  const rebTotal = player.reb_total ?? 0;
-  const astTotal = player.ast_total ?? 0;
-  const robTotal = player.rob_total ?? 0;
-  const tapTotal = player.tap_total ?? 0;
-  const perTotal = player.per_total ?? 0;
-  const valTotal = player.val_total ?? 0;
+  const ptsTotal = effectivePlayer.pts_total ?? 0;
+  const rebTotal = effectivePlayer.reb_total ?? 0;
+  const astTotal = effectivePlayer.ast_total ?? 0;
+  const robTotal = effectivePlayer.rob_total ?? 0;
+  const tapTotal = effectivePlayer.tap_total ?? 0;
+  const perTotal = effectivePlayer.per_total ?? 0;
+  const valTotal = effectivePlayer.val_total ?? 0;
 
   // Porcentajes
-  const pctSimp = player.pct_simples ?? player.tlp ?? 0;
-  const pctDob  = player.pct_dobles  ?? player.fgp ?? 0;
-  const pctTrip = player.pct_triples ?? player.tpp ?? 0;
+  const pctSimp = effectivePlayer.pct_simples ?? effectivePlayer.tlp ?? 0;
+  const pctDob  = effectivePlayer.pct_dobles  ?? effectivePlayer.fgp ?? 0;
+  const pctTrip = effectivePlayer.pct_triples ?? effectivePlayer.tpp ?? 0;
 
   // Totales de tiros
-  const scTotal = player.sc_total ?? 0;
-  const sfTotal = player.sf_total ?? 0;
-  const dcTotal = player.dc_total ?? 0;
-  const dfTotal = player.df_total ?? 0;
-  const tcTotal = player.tc_total ?? 0;
-  const tfTotal = player.tf_total ?? 0;
-  const scProm  = player.sc_prom  ?? 0;
-  const dcProm  = player.dc_prom  ?? 0;
-  const tcProm  = player.tc_prom  ?? 0;
+  const scTotal = effectivePlayer.sc_total ?? 0;
+  const sfTotal = effectivePlayer.sf_total ?? 0;
+  const dcTotal = effectivePlayer.dc_total ?? 0;
+  const dfTotal = effectivePlayer.df_total ?? 0;
+  const tcTotal = effectivePlayer.tc_total ?? 0;
+  const tfTotal = effectivePlayer.tf_total ?? 0;
+  const scProm  = effectivePlayer.sc_prom  ?? 0;
+  const dcProm  = effectivePlayer.dc_prom  ?? 0;
+  const tcProm  = effectivePlayer.tc_prom  ?? 0;
 
   const hayStats = pj > 0;
 
@@ -304,8 +533,18 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
           <div className="pp-name">{player.name}</div>
           <div className="pp-team" style={{ color: player.color ?? 'var(--fem2)' }}>{player.team}</div>
 
-          {player.fechaNac && player.fechaNac !== '-' && (
-            <div className="pp-dob">🎂 {player.fechaNac}</div>
+          <ModalTemporadaChip
+            temporadas={temporadas}
+            mode={mode}
+            valor={temporadaVerId}
+            onElegir={setTemporadaVerId}
+            accent={player.color ?? '#FF4FA3'}
+          />
+
+          {/* ⚠️ Privacidad: se muestra solo la edad, no la fecha de
+              nacimiento completa (ver lib/edad.js) — dato público. */}
+          {edadDesde(player.fechaNac) != null && (
+            <div className="pp-dob">🎂 {edadDesde(player.fechaNac)} años</div>
           )}
 
           {/* Stats principales */}
@@ -329,7 +568,13 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
 
         {/* ── Cuerpo ── */}
         <div className="pp-body">
-          {hayStats ? (
+          {cargandoOtraTemporada ? (
+            <div className="pp-no-stats">
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+              <div className="pp-no-stats-title">Cargando temporada…</div>
+              <div className="pp-no-stats-sub">Trayendo las estadísticas de esa temporada</div>
+            </div>
+          ) : hayStats ? (
             <>
               {/* Resumen general */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>

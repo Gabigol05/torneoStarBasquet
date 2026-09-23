@@ -2,6 +2,7 @@
 import { PlayerProfileModal } from './PlayerProfileModal';
 import { GameCenterModal } from './GameCenterModal';
 import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
+import { edadDesde } from '../lib/edad';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
 // tarjetas de fixture/resultado/lider/bracket) — evita color-mix()/variables
@@ -89,6 +90,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+        mode={mode}
       />
 
       <GameCenterModal
@@ -240,7 +242,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                             <line x1="8"  y1="2" x2="8"  y2="6"/>
                             <line x1="3"  y1="10" x2="21" y2="10"/>
                           </svg>
-                          {j.fechaNac ?? 'Sin datos'}
+                          {/* ⚠️ Privacidad: edad en vez de la fecha de
+                              nacimiento completa (ver lib/edad.js) */}
+                          {edadDesde(j.fechaNac) != null ? `${edadDesde(j.fechaNac)} años` : 'Sin datos'}
                         </div>
                       </div>
 

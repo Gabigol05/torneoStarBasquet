@@ -164,6 +164,15 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
     return () => { ignore = true; };
   }, [isOpen, partidoId, mode]);
 
+  // ⚠️ Accesibilidad: cerrar con Escape (antes solo se podía con el click
+  // afuera o el botón ✕ — no funcionaba nada con el teclado).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = e => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   // Columnas ordenables de la tabla de estadisticas — 'sc'/'dc'/'tc' son los
   // convertidos de TL/2P/3P (lo que se ve en pantalla es "convertidos/intentados",
   // pero para ordenar tiene mas sentido comparar por lo que realmente metio).

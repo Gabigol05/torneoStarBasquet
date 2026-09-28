@@ -111,14 +111,33 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
     setFechaPorId(prev => ({ ...prev, ...Object.fromEntries((fechasRows ?? []).map(f => [f.id, f.numero])) }));
     if (fechaIds.length === 0) { setSinStats([]); setLoadingSinStats(false); return; }
 
-    const [{ data: partidosRows }, { data: statsRows }] = await Promise.all([
-      supabase.from(tablas.partidos)
-        .select('id,equipo_local_id,equipo_visit_id,puntos_local,puntos_visit,fecha_id')
-        .eq('estado', 'finalizado')
-        .in('fecha_id', fechaIds),
-      supabase.from(tablas.stats).select('partido_id'),
-    ]);
-    const conStats = new Set((statsRows ?? []).map(r => r.partido_id));
+    const { data: partidosRows } = await supabase.from(tablas.partidos)
+      .select('id,equipo_local_id,equipo_visit_id,puntos_local,puntos_visit,fecha_id')
+      .eq('estado', 'finalizado')
+      .in('fecha_id', fechaIds);
+
+    // ⚠️ FIX: antes esto traía TODA la tabla de stats sin filtro
+    // (`select('partido_id')` sobre stats_partido_* completa, de todas las
+    // fechas y temporadas que existen desde que arrancó el torneo). Supabase
+    // devuelve como mucho 1000 filas por consulta si no se pide explícito lo
+    // contrario — con el volumen acumulado de varias fechas, esa tabla ya
+    // tiene más de 1000 filas, así que la respuesta quedaba CORTADA. Un
+    // partido recién resubido crea sus filas de stats de nuevo (ids nuevos,
+    // al final de la tabla) y esas filas quedaban justo afuera del recorte,
+    // así que el partido seguía apareciendo acá como "sin estadísticas"
+    // aunque las stats estuvieran perfectamente guardadas — pasara lo que
+    // pasara con "↻ Actualizar", porque el problema no era una vista vieja,
+    // era que la consulta nunca llegaba a ver esas filas. Ahora se filtra
+    // stats por los partido_id de esta temporada (siempre bien por debajo
+    // de las 1000 filas), así no se corta nunca.
+    const partidoIds = (partidosRows ?? []).map(p => p.id);
+    let conStats = new Set();
+    if (partidoIds.length > 0) {
+      const { data: statsRows } = await supabase.from(tablas.stats)
+        .select('partido_id')
+        .in('partido_id', partidoIds);
+      conStats = new Set((statsRows ?? []).map(r => r.partido_id));
+    }
     setSinStats((partidosRows ?? []).filter(p => !conStats.has(p.id)));
     setLoadingSinStats(false);
   };

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
+import { useTemporada } from '../context/TemporadaContext';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 
 export default function UploadHistory({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
@@ -13,49 +14,68 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
   const roster  = categoria === 'masculino' ? equiposMasculino : equiposFemenino;
   const { confirm, ConfirmDialog } = useConfirm();
 
+  // ⚠️ FIX (reporte Alvaro: "entro al historial estando en Clausura y me
+  // sale toda la información de Apertura"). Esta pantalla no filtraba NADA
+  // por temporada — traía las últimas 30 cargas de la tabla entera, mezclando
+  // todos los torneos. Como partidos_femenino/masculino NO tienen
+  // temporada_id propio (cuelga de fechas_femenino/masculino.temporada_id,
+  // igual que en los hooks del sitio público), acá se resuelve buscando
+  // primero las fechas de la temporada elegida y filtrando todo lo demás
+  // (upload_log, partidos finalizados) contra esos fecha_id.
+  const { temporadas, temporadaActivaId } = useTemporada();
+  const temporadasCategoria = temporadas
+    .filter(t => t.categoria === categoria)
+    .sort((a, b) => (b.id) - (a.id));
+  const [temporadaFiltroId, setTemporadaFiltroId] = useState(null);
+
+  // Al cambiar de categoría (o la primera vez que se sabe cuál es la activa),
+  // arranca mirando la ACTIVA de esa categoría — es "el torneo en curso",
+  // que es lo que casi siempre se quiere ver acá. Si Alvaro elige a mano otra
+  // temporada, esto no la pisa de vuelta mientras siga en la misma categoría.
+  useEffect(() => {
+    setTemporadaFiltroId(temporadaActivaId[categoria] ?? null);
+  }, [categoria, temporadaActivaId[categoria]]);
+
   const [logs,    setLogs]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [justDeleted, setJustDeleted] = useState(false);
 
-  // ⚠️ Antes esta pantalla solo mostraba equipos/archivo/cantidad de
-  // jugadoras — no el marcador ni si esas estadísticas siguen realmente en
-  // la base HOY (podían haberse borrado después con Fusionar Jugadores u
-  // otra carga). Ahora se cruza cada carga contra el partido y contra
-  // stats_partido en vivo, para que "¿este partido tiene stats o no?" se
-  // vea de un vistazo sin tener que entrar a cada uno.
+  // Marcador/estado en vivo de cada partido logueado, y cuántas filas tiene
+  // HOY stats_partido para ese partido (puede diferir de jugadoras_ok, que
+  // quedó fijo en el momento de esa carga puntual, si después se borró/
+  // fusionó algo).
   const [partidoPorId,     setPartidoPorId]     = useState({});
   const [statsCountPorId,  setStatsCountPorId]  = useState({});
 
-  // ⚠️ NUEVO: partidos marcados "finalizado" que HOY no tienen ni una fila
-  // en stats_partido — el síntoma exacto reportado (marcador bien, tabla de
-  // jugadoras vacía). Esto agarra CUALQUIER partido en ese estado, tenga o
-  // no una carga en el Historial (si se cargó el resultado a mano desde
-  // Partidos, por ejemplo, nunca aparece en el Historial de Cargas porque
-  // esa pantalla no pasa por acá — por eso esta lista se arma aparte,
-  // cruzando directo partidos × stats_partido).
+  // Partidos "finalizado" de ESTA temporada que hoy no tienen ni una fila en
+  // stats_partido — el síntoma exacto reportado (marcador bien, plantilla de
+  // jugadoras vacía). Agarra cualquier partido en ese estado, tenga o no una
+  // carga en el Historial (si el resultado se tipeó a mano desde Partidos,
+  // nunca aparece en el Historial de Cargas porque esa pantalla no pasa por
+  // acá — por eso esta lista se arma aparte, cruzando partidos × stats).
   const [sinStats,        setSinStats]        = useState([]);
   const [loadingSinStats, setLoadingSinStats] = useState(true);
   const [fechaPorId,      setFechaPorId]      = useState({});
 
   const load = async () => {
+    if (temporadaFiltroId == null) { setLogs([]); setPartidoPorId({}); setStatsCountPorId({}); setLoading(false); return; }
     setLoading(true);
+
+    const { data: fechasRows } = await supabase
+      .from(tablas.fechas).select('id,numero').eq('temporada_id', temporadaFiltroId);
+    const fechaIds = (fechasRows ?? []).map(f => f.id);
+    setFechaPorId(prev => ({ ...prev, ...Object.fromEntries((fechasRows ?? []).map(f => [f.id, f.numero])) }));
+
+    if (fechaIds.length === 0) { setLogs([]); setPartidoPorId({}); setStatsCountPorId({}); setLoading(false); return; }
+
     const { data, error } = await supabase
       .from(tablas.uploadLog)
-      .select(`*, ${tablas.fechas}(numero)`)
+      .select('*')
+      .in('fecha_id', fechaIds)
       .order('cargado_en', { ascending: false })
       .limit(30);
-    let logsCargados = [];
-    if (error) {
-      // Fallback por si el embed falla (relación no detectada): traer sin join.
-      const { data: plain } = await supabase
-        .from(tablas.uploadLog)
-        .select('*')
-        .order('cargado_en', { ascending: false })
-        .limit(30);
-      logsCargados = plain ?? [];
-    } else {
-      logsCargados = data ?? [];
-    }
+    if (error) console.warn('[UploadHistory] uploadLog:', error.message);
+    const logsCargados = data ?? [];
     setLogs(logsCargados);
 
     // Marcador + estado del partido de cada carga (para mostrar el resultado
@@ -68,9 +88,6 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
         .in('id', partidoIds);
       setPartidoPorId(Object.fromEntries((partidosRows ?? []).map(p => [p.id, p])));
 
-      // Cantidad de filas que TIENE HOY stats_partido para esos partidos —
-      // puede diferir de jugadoras_ok (que quedó fijo en el momento de esa
-      // carga puntual) si después se borró/fusionó algo.
       const { data: statsRows } = await supabase
         .from(tablas.stats)
         .select('partido_id')
@@ -86,21 +103,27 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
   };
 
   const loadSinStats = async () => {
+    if (temporadaFiltroId == null) { setSinStats([]); setLoadingSinStats(false); return; }
     setLoadingSinStats(true);
-    const [{ data: fechasRows }, { data: partidosRows }, { data: statsRows }] = await Promise.all([
-      supabase.from(tablas.fechas).select('id,numero'),
+    const { data: fechasRows } = await supabase
+      .from(tablas.fechas).select('id,numero').eq('temporada_id', temporadaFiltroId);
+    const fechaIds = (fechasRows ?? []).map(f => f.id);
+    setFechaPorId(prev => ({ ...prev, ...Object.fromEntries((fechasRows ?? []).map(f => [f.id, f.numero])) }));
+    if (fechaIds.length === 0) { setSinStats([]); setLoadingSinStats(false); return; }
+
+    const [{ data: partidosRows }, { data: statsRows }] = await Promise.all([
       supabase.from(tablas.partidos)
         .select('id,equipo_local_id,equipo_visit_id,puntos_local,puntos_visit,fecha_id')
-        .eq('estado', 'finalizado'),
+        .eq('estado', 'finalizado')
+        .in('fecha_id', fechaIds),
       supabase.from(tablas.stats).select('partido_id'),
     ]);
-    setFechaPorId(Object.fromEntries((fechasRows ?? []).map(f => [f.id, f.numero])));
     const conStats = new Set((statsRows ?? []).map(r => r.partido_id));
     setSinStats((partidosRows ?? []).filter(p => !conStats.has(p.id)));
     setLoadingSinStats(false);
   };
 
-  useEffect(() => { load(); loadSinStats(); }, [categoria]);
+  useEffect(() => { load(); loadSinStats(); }, [categoria, temporadaFiltroId]);
 
   const handleDelete = async (id, partidoId) => {
     const ok = await confirm('¿Eliminar esta carga? Se borrarán las stats del partido asociado.');
@@ -116,13 +139,30 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
     loadSinStats();
   };
 
-  const numeroFecha = l => l[tablas.fechas]?.numero ?? l.fecha_id ?? '?';
+  const numeroFecha = l => fechaPorId[l.fecha_id] ?? l.fecha_id ?? '?';
   const equipoPorId = id => roster.find(e => e.id === id);
 
   return (
     <div>
       <h2 style={s.title}>🗂️ Historial de cargas</h2>
       <p style={s.hint}>Cada partido subido queda registrado. Podés ver warnings y eliminar cargas erróneas.</p>
+
+      {/* Selector de temporada — todo lo de abajo queda filtrado a esta
+          temporada puntual, para no mezclar Apertura con Clausura (ni con
+          ninguna otra) como pasaba antes. */}
+      {temporadasCategoria.length > 0 && (
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+          {temporadasCategoria.map(t => {
+            const esActiva = t.id === temporadaActivaId[categoria];
+            const elegida  = t.id === temporadaFiltroId;
+            return (
+              <button key={t.id} onClick={() => setTemporadaFiltroId(t.id)} style={s.temporadaChip(elegida)}>
+                {t.nombre}{esActiva ? ' (activa)' : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <button onClick={() => { load(); loadSinStats(); }} style={s.btnRefresh}>↻ Actualizar</button>
 
@@ -171,7 +211,7 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
       ) : logs.length === 0 ? (
         <div style={s.empty}>
           <div style={{ fontSize:40, marginBottom:12 }}>📭</div>
-          <p>Todavía no se cargó ningún partido.</p>
+          <p>Todavía no se cargó ningún partido en esta temporada.</p>
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:16 }}>
@@ -269,6 +309,13 @@ const s = {
   subtitle:   { color:'#EEF2F8', fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:.5, marginBottom:6 },
   hint:       { color:'#6B7A99', fontSize:13, marginBottom:16, lineHeight:1.6 },
   btnRefresh: { padding:'8px 16px', background:'transparent', border:'1px solid #1C2535', borderRadius:8, color:'#6B7A99', cursor:'pointer', fontSize:13, marginBottom:4 },
+  temporadaChip: (activa) => ({
+    padding:'6px 14px', borderRadius:100, cursor:'pointer', fontSize:12.5, fontWeight:700,
+    fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5,
+    border: activa ? '1px solid #F0B429' : '1px solid #1C2535',
+    background: activa ? 'rgba(240,180,41,.14)' : 'transparent',
+    color: activa ? '#F0B429' : '#6B7A99',
+  }),
   empty:      { textAlign:'center', padding:'3rem', color:'#6B7A99' },
   card:       { background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10, padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start' },
   cardAlert:  { background:'linear-gradient(160deg,#1C1420,#0B111C)', border:'1px solid rgba(240,64,96,.35)', borderRadius:10, padding:'10px 14px', display:'flex', gap:10, alignItems:'center' },

@@ -88,10 +88,17 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
         .in('id', partidoIds);
       setPartidoPorId(Object.fromEntries((partidosRows ?? []).map(p => [p.id, p])));
 
+      // ⚠️ Mismo límite de 1000 filas de Supabase que en loadSinStats más
+      // abajo (ver el comentario grande ahí) — acá pega distinto: aunque
+      // partidoIds sea chico (como mucho las últimas 30 cargas), cada
+      // partido trae UNA FILA POR JUGADOR/A, no una fila por partido, así
+      // que la respuesta igual puede pasarse de 1000 filas. `.limit()`
+      // explícito para no depender del tope por defecto.
       const { data: statsRows } = await supabase
         .from(tablas.stats)
         .select('partido_id')
-        .in('partido_id', partidoIds);
+        .in('partido_id', partidoIds)
+        .limit(20000);
       const counts = {};
       for (const r of (statsRows ?? [])) counts[r.partido_id] = (counts[r.partido_id] ?? 0) + 1;
       setStatsCountPorId(counts);
@@ -116,26 +123,31 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
       .eq('estado', 'finalizado')
       .in('fecha_id', fechaIds);
 
-    // ⚠️ FIX: antes esto traía TODA la tabla de stats sin filtro
-    // (`select('partido_id')` sobre stats_partido_* completa, de todas las
-    // fechas y temporadas que existen desde que arrancó el torneo). Supabase
-    // devuelve como mucho 1000 filas por consulta si no se pide explícito lo
-    // contrario — con el volumen acumulado de varias fechas, esa tabla ya
-    // tiene más de 1000 filas, así que la respuesta quedaba CORTADA. Un
-    // partido recién resubido crea sus filas de stats de nuevo (ids nuevos,
-    // al final de la tabla) y esas filas quedaban justo afuera del recorte,
-    // así que el partido seguía apareciendo acá como "sin estadísticas"
-    // aunque las stats estuvieran perfectamente guardadas — pasara lo que
-    // pasara con "↻ Actualizar", porque el problema no era una vista vieja,
-    // era que la consulta nunca llegaba a ver esas filas. Ahora se filtra
-    // stats por los partido_id de esta temporada (siempre bien por debajo
-    // de las 1000 filas), así no se corta nunca.
+    // ⚠️ FIX (parte 1, ya resuelta): antes esto traía TODA la tabla de stats
+    // sin filtro (`select('partido_id')` sobre stats_partido_* completa, de
+    // todas las fechas y temporadas que existen desde que arrancó el
+    // torneo) — Supabase no devuelve más de 1000 filas por consulta si no
+    // se le pide lo contrario, y esa tabla ya superaba las 1000 filas hace
+    // rato. Filtrar por los partido_id de esta temporada (abajo) arregló el
+    // femenino.
+    //
+    // ⚠️ FIX (parte 2, la que faltaba — reporte de Alvaro: "en masculino
+    // sigue apareciendo"): filtrar por partido_id NO alcanza solo, porque
+    // stats_partido_* tiene UNA FILA POR JUGADOR, no una fila por partido.
+    // El masculino tiene bastantes más equipos/partidos que el femenino, así
+    // que aun filtrando SOLO a los partidos finalizados de esta temporada
+    // (~70 partidos × ~15-24 jugadores cada uno), la respuesta terminaba
+    // juntando más de 1000 filas igual y se volvía a cortar — por eso
+    // funcionaba en femenino (menos partidos, la cuenta nunca llegaba a
+    // 1000) y en masculino no. Con `.limit()` explícito bien por encima de
+    // cualquier volumen realista, ya no depende del tope por defecto.
     const partidoIds = (partidosRows ?? []).map(p => p.id);
     let conStats = new Set();
     if (partidoIds.length > 0) {
       const { data: statsRows } = await supabase.from(tablas.stats)
         .select('partido_id')
-        .in('partido_id', partidoIds);
+        .in('partido_id', partidoIds)
+        .limit(20000);
       conStats = new Set((statsRows ?? []).map(r => r.partido_id));
     }
     setSinStats((partidosRows ?? []).filter(p => !conStats.has(p.id)));

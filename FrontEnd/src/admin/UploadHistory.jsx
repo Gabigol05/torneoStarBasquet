@@ -1,3 +1,6 @@
+// (sin cambios funcionales — commit vacío a propósito para forzar que Vercel
+// vuelva a buildear y desplegar, el deploy anterior no había levantado el
+// último fix)
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';

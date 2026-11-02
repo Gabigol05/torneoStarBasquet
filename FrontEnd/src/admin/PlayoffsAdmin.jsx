@@ -446,6 +446,31 @@ function destinoGanador(instancia, i) {
   return null;
 }
 
+// Color del equipo para degradés — solo si es un hex #RRGGBB (se le
+// concatena el alfa, igual que en las tarjetas del sitio).
+function colorEquipo(t) {
+  return /^#[0-9a-f]{6}$/i.test(t?.color ?? '') ? t.color : '#5A6B85';
+}
+
+// Escudo redondo con anillo y resplandor del color del equipo — mismo
+// tratamiento que los escudos del cuadro público (PlayoffsBracket).
+function EscudoEquipo({ t, size }) {
+  const c = colorEquipo(t);
+  const estilo = {
+    width: size, height: size, borderRadius: '50%', flexShrink: 0, objectFit: 'cover',
+    border: `2px solid ${c}`, boxShadow: `0 0 10px ${c}59`, background: '#0B111C',
+  };
+  if (!t?.logo) {
+    return (
+      <span style={{ ...estilo, display: 'grid', placeItems: 'center', color: c,
+        fontFamily: "'Bebas Neue',sans-serif", fontSize: size * 0.45 }}>
+        {(t?.name ?? '?').slice(0, 1)}
+      </span>
+    );
+  }
+  return <img src={t.logo} alt="" draggable={false} style={estilo} onError={e => { e.currentTarget.style.visibility = 'hidden'; }} />;
+}
+
 // ─── Editor de cruces (arrastrar y soltar) ───────────────────────────────────
 // Pedido de Alvaro: poder armar o corregir los cruces de playoff a mano desde
 // el panel, por si la sugerencia automática tiene un error o el organizador
@@ -547,40 +572,68 @@ function EditorCruces({
   const casillero = (i, s) => {
     const id = draft[i][s];
     const t = id ? equipoMap[id] : null;
+    const c = colorEquipo(t);
     const lock = bloqueado(i);
+    const visita = s === 1;
     const seleccionado = sel?.tipo === 'slot' && sel.i === i && sel.s === s;
-    const resaltado = sobre === `${i}-${s}` || (sel && !lock && !seleccionado);
-    return (
-      <div
-        key={`${i}-${s}`}
-        draggable={!!id && !lock}
-        onDragStart={onDragStart({ tipo: 'slot', i, s })}
-        onDragOver={e => { if (!lock) { e.preventDefault(); setSobre(`${i}-${s}`); } }}
-        onDragLeave={() => setSobre(null)}
-        onDrop={onDropSlot(i, s)}
-        onClick={() => !lock && tocarSlot(i, s)}
-        style={{
-          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7,
-          padding: '8px 10px', borderRadius: 8, minHeight: 38,
-          cursor: lock ? 'not-allowed' : (id ? 'grab' : 'pointer'),
-          background: seleccionado ? `${accent}26` : t ? '#101826' : 'transparent',
-          border: `1px ${t ? 'solid' : 'dashed'} ${seleccionado ? accent : resaltado ? `${accent}99` : '#2A3650'}`,
-          opacity: lock ? 0.55 : 1, transition: 'border-color .12s, background .12s',
+    const destino = sobre === `${i}-${s}` || (sel && !lock && !seleccionado);
+    const comunes = {
+      key: `${i}-${s}`,
+      draggable: !!id && !lock,
+      onDragStart: onDragStart({ tipo: 'slot', i, s }),
+      onDragOver: e => { if (!lock) { e.preventDefault(); setSobre(`${i}-${s}`); } },
+      onDragLeave: () => setSobre(null),
+      onDrop: onDropSlot(i, s),
+      onClick: () => !lock && tocarSlot(i, s),
+    };
+
+    if (!t) {
+      return (
+        <div {...comunes} className="pe-slot" style={{
+          flex: 1, minWidth: 0, minHeight: 54, borderRadius: 10, cursor: lock ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          border: `1.5px dashed ${destino ? accent : '#2A3650'}`,
+          background: destino ? `${accent}14` : 'rgba(8,12,18,.6)',
+          color: destino ? accent : '#4A566E', fontSize: 12.5,
         }}>
-        <span style={{ fontSize: 10, color: '#4A566E', fontWeight: 700, minWidth: 12 }}>{s === 0 ? 'L' : 'V'}</span>
-        {t ? (
-          <>
-            {t.logo && <img src={t.logo} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
-            <span style={{ fontSize: 11, color: accent, fontWeight: 700, flexShrink: 0 }}>{etiquetaPorId[id]}</span>
-            <span style={{ fontSize: 13.5, color: '#EEF2F8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
-            {ocupados[id] && <span title={`Ya juega en ${ocupados[id]}`} style={{ fontSize: 12 }}>⚠️</span>}
-            {!lock && (
-              <button onClick={e => { e.stopPropagation(); quitar(i, s); }} title="Sacar del cruce"
-                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6B7A99', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
-            )}
-          </>
-        ) : (
-          <span style={{ fontSize: 12.5, color: '#4A566E' }}>Soltá un equipo acá</span>
+          <span style={{ width: 26, height: 26, borderRadius: '50%', border: '1.5px dashed currentColor', opacity: .6 }} />
+          {visita ? 'Visitante' : 'Local'} · soltá un equipo acá
+        </div>
+      );
+    }
+
+    return (
+      <div {...comunes} className={`pe-slot${visita ? ' pe-slot-v' : ''}`} style={{
+        flex: 1, minWidth: 0, minHeight: 54, borderRadius: 10, padding: '8px 10px',
+        display: 'flex', flexDirection: visita ? 'row-reverse' : 'row', alignItems: 'center', gap: 10,
+        cursor: lock ? 'not-allowed' : 'grab',
+        background: `linear-gradient(${visita ? 260 : 100}deg, ${c}33, #0B111C 72%)`,
+        border: `1px solid ${seleccionado || destino ? accent : `${c}55`}`,
+        boxShadow: seleccionado ? `0 0 0 2px ${accent}55` : destino ? `0 0 0 1px ${accent}55` : 'none',
+        opacity: lock ? 0.6 : 1,
+      }}>
+        <EscudoEquipo t={t} size={32} />
+        <div className="pe-slot-txt" style={{ minWidth: 0, flex: 1, textAlign: visita ? 'right' : 'left' }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 15.5, color: '#EEF2F8',
+            lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {t.name}{ocupados[id] && <span title={`Ya juega en ${ocupados[id]}`} style={{ fontSize: 12, marginLeft: 5 }}>⚠️</span>}
+          </div>
+          <div style={{ marginTop: 3, display: 'flex', gap: 5, justifyContent: visita ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
+            <span style={{
+              fontSize: 10.5, fontWeight: 700, color: c, background: `${c}1f`, border: `1px solid ${c}40`,
+              borderRadius: 100, padding: '1px 7px', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: .5,
+            }}>{etiquetaPorId[id] ?? '—'}</span>
+            <span style={{ fontSize: 10, color: '#4A566E', fontWeight: 700, letterSpacing: 1 }}>{visita ? 'VISITANTE' : 'LOCAL'}</span>
+          </div>
+        </div>
+        {!lock && (
+          <button className="pe-x" onClick={e => { e.stopPropagation(); quitar(i, s); }} title="Sacar del cruce"
+            style={{
+              width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', padding: 0,
+              background: 'rgba(8,12,18,.7)', border: '1px solid #2A3650', color: '#6B7A99', fontSize: 11, lineHeight: '20px',
+            }}>✕</button>
         )}
       </div>
     );
@@ -588,62 +641,132 @@ function EditorCruces({
 
   return (
     <div>
-      <p style={{ color: '#6B7A99', fontSize: 12.5, margin: '0 0 12px', lineHeight: 1.5 }}>
+      {/* Hover y ajustes de celular (los estilos inline no pueden :hover ni @media). */}
+      <style>{`
+        .pe-chip { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+        .pe-chip:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+        .pe-chip:active { cursor: grabbing; }
+        .pe-slot { transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
+        .pe-x:hover { color: #F04060 !important; border-color: #F0406088 !important; }
+        .pe-lv:hover { color: ${accent} !important; border-color: ${accent}88 !important; }
+        .pe-lv-corto { display: none; }
+        @media (max-width: 560px) {
+          .pe-row { flex-direction: column; align-items: stretch !important; }
+          .pe-row .pe-vs { align-self: center; margin: -4px 0; }
+          .pe-slot-v { flex-direction: row !important; }
+          .pe-lv-largo { display: none; }
+          .pe-lv-corto { display: inline; }
+          .pe-slot-v .pe-slot-txt { text-align: left !important; }
+          .pe-slot-v .pe-slot-txt > div:last-child { justify-content: flex-start !important; }
+        }
+      `}</style>
+
+      <p style={{ color: '#6B7A99', fontSize: 12.5, margin: '0 0 14px', lineHeight: 1.5 }}>
         Arrastrá un equipo a un casillero (o tocá el equipo y después el casillero). Entre dos casilleros se intercambian.
-        L = local, V = visitante.
       </p>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        {/* Cruces */}
-        <div style={{ flex: '1 1 380px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {draft.map((_, i) => (
-            <div key={i} style={{ padding: '10px 12px', borderRadius: 10, background: '#080C12', border: '1px solid #1C2535' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, fontSize: 11, color: '#6B7A99', fontWeight: 700, letterSpacing: .5 }}>
-                CRUCE {i + 1}
-                {destinoGanador(instancia, i) && <span style={{ color: '#4A566E', fontWeight: 600 }}>· ganador → {destinoGanador(instancia, i)}</span>}
-                {bloqueado(i) && <span style={{ color: '#22D07A' }}>· ya jugado</span>}
-                {!bloqueado(i) && (
-                  <button onClick={() => invertir(i)} title="Invertir local / visitante"
-                    style={{ marginLeft: 'auto', background: 'none', border: '1px solid #2A3650', borderRadius: 6, color: '#8899BB', cursor: 'pointer', fontSize: 11, padding: '2px 8px' }}>
-                    ⇄ L/V
-                  </button>
-                )}
+        {/* Cruces — mismo lenguaje visual que las tarjetas de partido del
+            sitio: borde y fondo con degradé de los colores de los dos equipos. */}
+        <div style={{ flex: '1 1 420px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {draft.map((par, i) => {
+            const cL = colorEquipo(equipoMap[par[0]]);
+            const cV = colorEquipo(equipoMap[par[1]]);
+            const destinoTxt = destinoGanador(instancia, i);
+            return (
+              <div key={i} style={{ padding: 1, borderRadius: 14, background: `linear-gradient(115deg, ${cL}55, #1C2535 40%, ${cV}55)` }}>
+                <div style={{ borderRadius: 13, padding: '10px 12px 12px', background: `linear-gradient(135deg, ${cL}1a, #0B111C 45%, ${cV}1a)` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, letterSpacing: 1.5, color: '#EEF2F8', whiteSpace: 'nowrap' }}>
+                      Cruce {i + 1}
+                    </span>
+                    {destinoTxt && (
+                      <span style={{
+                        fontSize: 10.5, fontWeight: 700, letterSpacing: .8, textTransform: 'uppercase',
+                        color: accent, background: `${accent}14`, border: `1px solid ${accent}33`, borderRadius: 100, padding: '2px 9px', whiteSpace: 'nowrap',
+                        fontFamily: "'Barlow Condensed',sans-serif",
+                      }}>Ganador → {destinoTxt}</span>
+                    )}
+                    {bloqueado(i) && (
+                      <span style={{
+                        fontSize: 10.5, fontWeight: 700, color: '#22D07A', background: 'rgba(34,208,122,.1)',
+                        border: '1px solid rgba(34,208,122,.3)', borderRadius: 100, padding: '2px 9px',
+                      }}>✓ Ya jugado</span>
+                    )}
+                    {!bloqueado(i) && (
+                      <button className="pe-lv" onClick={() => invertir(i)} title="Invertir local / visitante"
+                        style={{
+                          marginLeft: 'auto', background: 'rgba(8,12,18,.6)', border: '1px solid #2A3650', borderRadius: 100,
+                          color: '#8899BB', cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: '3px 10px',
+                          fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: .5, whiteSpace: 'nowrap',
+                        }}>
+                        ⇄ <span className="pe-lv-largo">Local / Visitante</span><span className="pe-lv-corto">L/V</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="pe-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {casillero(i, 0)}
+                    <span className="pe-vs" style={{
+                      width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+                      background: '#080C12', border: '1px solid #2A3650', color: '#8899BB',
+                      fontFamily: "'Bebas Neue',sans-serif", fontSize: 13, letterSpacing: 1,
+                    }}>VS</span>
+                    {casillero(i, 1)}
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {casillero(i, 0)}
-                <span style={{ color: '#4A566E', fontSize: 11, flexShrink: 0 }}>vs</span>
-                {casillero(i, 1)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Equipos para arrastrar */}
         <div onDragOver={e => e.preventDefault()} onDrop={onDropBanco}
           onClick={e => { if (e.target === e.currentTarget && sel?.tipo === 'slot') { quitar(sel.i, sel.s); setSel(null); } }}
-          style={{ flex: '1 1 260px', padding: 12, borderRadius: 10, background: '#080C12', border: '1px solid #1C2535', maxHeight: 460, overflowY: 'auto' }}>
+          style={{
+            flex: '1 1 300px', padding: 14, borderRadius: 14, background: 'linear-gradient(160deg,#101826,#0B111C)',
+            border: '1px solid #1C2535', maxHeight: 520, overflowY: 'auto',
+          }}>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, letterSpacing: 1.5, color: '#EEF2F8', marginBottom: 2 }}>
+            Equipos
+          </div>
+          <div style={{ fontSize: 11.5, color: '#4A566E', marginBottom: 12 }}>
+            Los que ya están en un cruce aparecen atenuados con su número (C1, C2…).
+          </div>
           {bancoPorZona.map(g => (
-            <div key={g.titulo} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10.5, color: '#4A566E', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>{g.titulo}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            <div key={g.titulo} style={{ marginBottom: 14 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                fontSize: 10.5, color: '#6B7A99', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase',
+              }}>
+                {g.titulo}
+                <span style={{ flex: 1, height: 1, background: '#1C2535' }} />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {g.equipos.map(t => {
                   const en = ubicacion[t.id];
                   const elegido = sel?.tipo === 'banco' && sel.id === t.id;
+                  const c = colorEquipo(t);
                   return (
-                    <div key={t.id} draggable onDragStart={onDragStart({ tipo: 'banco', id: t.id })}
+                    <div key={t.id} className="pe-chip" draggable onDragStart={onDragStart({ tipo: 'banco', id: t.id })}
                       onClick={() => tocarEquipo(t.id)}
                       title={en ? `Está en el cruce ${en.i + 1}` : ocupados[t.id] ? `Ya juega en ${ocupados[t.id]}` : 'Arrastralo a un casillero'}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 100, cursor: 'grab',
-                        fontSize: 12, userSelect: 'none',
-                        background: elegido ? `${accent}33` : '#101826',
-                        border: `1px solid ${elegido ? accent : en ? `${accent}55` : '#1C2535'}`,
-                        color: en ? '#6B7A99' : '#CBD5E8',
+                        display: 'flex', alignItems: 'center', gap: 7, padding: '4px 11px 4px 4px', borderRadius: 100,
+                        cursor: 'grab', userSelect: 'none',
+                        background: elegido ? `${accent}2e` : `linear-gradient(90deg, ${c}2a, #0E1420 75%)`,
+                        border: `1px solid ${elegido ? accent : `${c}50`}`,
+                        boxShadow: elegido ? `0 0 0 2px ${accent}44` : 'none',
+                        opacity: en && !elegido ? 0.45 : 1,
                       }}>
-                      <span style={{ color: accent, fontWeight: 700, fontSize: 10.5 }}>{etiquetaPorId[t.id]}</span>
-                      {t.name}
-                      {en && <span style={{ fontSize: 10, color: '#4A566E' }}>· C{en.i + 1}</span>}
-                      {!en && ocupados[t.id] && <span style={{ fontSize: 10 }}>⚠️</span>}
+                      <EscudoEquipo t={t} size={24} />
+                      <span style={{ color: c, fontWeight: 700, fontSize: 10.5, fontFamily: "'Barlow Condensed',sans-serif" }}>{etiquetaPorId[t.id]}</span>
+                      <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600, fontSize: 13, color: '#EEF2F8', whiteSpace: 'nowrap' }}>{t.name}</span>
+                      {en && (
+                        <span style={{ fontSize: 9.5, fontWeight: 700, color: '#0B111C', background: '#8899BB', borderRadius: 100, padding: '0 5px' }}>
+                          C{en.i + 1}
+                        </span>
+                      )}
+                      {!en && ocupados[t.id] && <span title={`Ya juega en ${ocupados[t.id]}`} style={{ fontSize: 10 }}>⚠️</span>}
                     </div>
                   );
                 })}

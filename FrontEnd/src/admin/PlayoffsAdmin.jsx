@@ -5,7 +5,7 @@ import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
 import { useTemporada } from '../context/TemporadaContext';
 import { useConfirm } from '../components/ConfirmModal.jsx';
-import { buildPools, bracketSizeFor, resolveWinner, primeraRonda, sortByStandings } from '../components/PlayoffsBracket.jsx';
+import { buildPools, bracketSizeFor, resolveWinner, primeraRonda, sortByStandings, semisPorTablaGeneral } from '../components/PlayoffsBracket.jsx';
 import { INSTANCIA_LABEL } from '../lib/fechaLabel';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
@@ -165,10 +165,13 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
           // Ronda siguiente: sembrada con los GANADORES reales de la ronda anterior.
           const rondaPrevia = rondas[i - 1];
           if (instancia === 'semifinal') {
-            // viene de cuartos (size 8): llave1=g(c1)vs g(c2), llave2=g(c3)vs g(c4)
+            // Viene de cuartos (size 8). Regla del organizador: los 4
+            // ganadores se ordenan por TABLA GENERAL y se cruzan 1° vs 4° y
+            // 2° vs 3° (no ganador llave 1 vs ganador llave 2) — misma función
+            // que usa el cuadro público.
             const g = [1,2,3,4].map(ll => resolveWinner(buscar('cuartos', ll), equipoMap));
             if (g.some(x => !x)) return { estado: 'esperando', pool, size, rondaEsperada: rondaPrevia };
-            pares = [[g[0], g[1]], [g[2], g[3]]];
+            pares = semisPorTablaGeneral(g);
           } else { // final
             const nSemis = size === 8 ? 2 : 2;
             const g = Array.from({ length: nSemis }, (_, k) => resolveWinner(buscar('semifinal', k + 1), equipoMap));
@@ -314,7 +317,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
   // la tabla general si no hay zonas). Y la lista de equipos que se pueden
   // arrastrar: todos los que jugaron esta temporada, sin importar a qué copa
   // clasificaron — el organizador puede pasar un equipo de copa si quiere.
-  const { etiquetaPorId, bancoPorZona } = useMemo(() => {
+  const { etiquetaPorId, etiquetaGralPorId, bancoPorZona } = useMemo(() => {
     const jugaron = equipos.filter(e => e.pj > 0);
     const base = jugaron.length ? jugaron : equipos;
     const etiquetas = {};
@@ -333,7 +336,13 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
       lista.forEach((e, i) => { etiquetas[e.id] = `${i + 1}°`; });
       grupos.push({ titulo: 'Tabla general', equipos: lista });
     }
-    return { etiquetaPorId: etiquetas, bancoPorZona: grupos };
+    // Para las semis (que se cruzan por tabla general) se muestra también el
+    // puesto en la tabla general: "1°A · 3° gral".
+    const etiquetasGral = {};
+    sortByStandings(base).forEach((e, i) => {
+      etiquetasGral[e.id] = zonas.length ? `${etiquetas[e.id] ?? '—'} · ${i + 1}° gral` : `${i + 1}° gral`;
+    });
+    return { etiquetaPorId: etiquetas, etiquetaGralPorId: etiquetasGral, bancoPorZona: grupos };
   }, [equipos]);
 
   return (
@@ -345,7 +354,8 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
         <p style={{ color: '#6B7A99', fontSize: 13, margin: '4px 0 0' }}>
           Arma los cruces de playoff automáticamente según la tabla de posiciones actual de{' '}
           <strong style={{ color: '#F0B429' }}>{temporadaActiva?.nombre ?? 'la temporada activa'}</strong> —
-          misma siembra que se ve en el cuadro público (con zonas: 1°A vs 4°B, 2°A vs 3°B y al revés).
+          misma siembra que se ve en el cuadro público (cuartos con zonas: 1°A vs 4°B, 2°A vs 3°B y al revés;
+          semifinales por tabla general entre los 4 ganadores: 1° vs 4° y 2° vs 3°).
           Antes de generar podés reacomodar los cruces a mano arrastrando equipos. Cada ronda siguiente
           se habilita sola cuando la anterior está 100% finalizada.
         </p>
@@ -415,6 +425,17 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
                   </span>
                 </div>
 
+                {info.size === 8 && (
+                  <div style={{
+                    marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12.5, lineHeight: 1.5,
+                    background: `${cup.color}0f`, border: `1px solid ${cup.color}33`, color: '#C9D3E3',
+                  }}>
+                    📋 <b style={{ color: cup.color }}>Semifinales por tabla general:</b> cuando terminen los cuartos, los
+                    4 ganadores se ordenan por la tabla general (las dos zonas juntas) y se cruzan <b>1° vs 4°</b> y{' '}
+                    <b>2° vs 3°</b>. La sugerencia de semis ya viene armada así.
+                  </div>
+                )}
+
                 {info.estado === 'sin-equipos' && (
                   <p style={{ color: '#4A566E', fontSize: 13, margin: 0 }}>
                     No hay equipos suficientes en este pool todavía para armar un cruce.
@@ -442,7 +463,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
                         textoConfirmar="💾 GUARDAR CAMBIOS"
                         accent={cup.color}
                         equipoMap={equipoMap}
-                        etiquetaPorId={etiquetaPorId}
+                        etiquetaPorId={info.rondaEsperada === 'semifinal' && info.size === 8 ? etiquetaGralPorId : etiquetaPorId}
                         bancoPorZona={bancoPorZona}
                         ocupados={ocupadosEnOtrasCopas(cup.key)}
                         ocupado={generando === cup.key}
@@ -483,7 +504,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
                     textoConfirmar={`🏆 GENERAR ${INSTANCIA_LABEL[info.siguienteRonda]?.toUpperCase()}`}
                     accent={cup.color}
                     equipoMap={equipoMap}
-                    etiquetaPorId={etiquetaPorId}
+                    etiquetaPorId={info.siguienteRonda === 'semifinal' && info.size === 8 ? etiquetaGralPorId : etiquetaPorId}
                     bancoPorZona={bancoPorZona}
                     ocupados={ocupadosEnOtrasCopas(cup.key)}
                     ocupado={generando === cup.key}
@@ -507,11 +528,13 @@ const btnSecundario = {
 };
 
 // A qué ronda va el ganador de cada cruce — se muestra en el editor para que
-// quien arma a mano sepa cómo se encadena el cuadro (cuartos 1-2 → Semi 1,
-// 3-4 → Semi 2; semis → Final). Es el mismo encadenamiento que usan el
+// quien arma a mano sepa cómo se encadena el cuadro (cuartos → semis por
+// tabla general; semis → Final). Es el mismo encadenamiento que usan el
 // cuadro público y la generación automática de la ronda siguiente.
 function destinoGanador(instancia, i) {
-  if (instancia === 'cuartos') return i < 2 ? 'Semi 1' : 'Semi 2';
+  // Las semis se cruzan por tabla general entre los 4 ganadores (regla del
+  // torneo), así que un cuarto no tiene una semi fija.
+  if (instancia === 'cuartos') return 'Semis (por tabla general)';
   if (instancia === 'semifinal') return 'Final';
   return null;
 }

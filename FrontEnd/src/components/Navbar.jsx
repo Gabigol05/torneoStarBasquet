@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { GlobalSearch } from './GlobalSearch';
 import { useStats } from '../context/StatsContext';
-import { PlayerProfileModal } from './PlayerProfileModal';
+import { PlayerProfileModal } from './LazyModals';
 import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';

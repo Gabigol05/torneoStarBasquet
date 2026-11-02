@@ -1,6 +1,6 @@
 ﻿import logo from '../assets/logo_torneo.jpg';
 import { GlobalSearch } from './GlobalSearch';
-import { PlayerProfileModal } from './PlayerProfileModal';
+import { PlayerProfileModal } from './LazyModals';
 import { useState } from 'react';
 import { useStats } from '../context/StatsContext';
 import { useTournament } from '../context/TournamentContext';

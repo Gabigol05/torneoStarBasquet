@@ -26,7 +26,7 @@ export async function recalcularTodos(onLog, tablas, categoria = 'femenino') {
     let from = 0;
     const PAGE = 1000;
     while (true) {
-      const { data, error } = await supabase.from(tabla).select(columnas).range(from, from + PAGE - 1);
+      const { data, error } = await supabase.from(tabla).select(columnas).order('id', { ascending: true }).range(from, from + PAGE - 1); // orden fijo: sin él, las páginas pueden saltear o repetir filas
       if (error) throw new Error(error.message);
       if (!data?.length) break;
       filas = filas.concat(data);

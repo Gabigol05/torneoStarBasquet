@@ -141,21 +141,46 @@ export function Hero({ equipos = [], partidos = [], fechas = [] }) {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion || !canvasRef.current || !rootRef.current) return undefined;
 
+    // ⚠️ Rendimiento (revisión general): la pelota 3D (~125 KB de three.js +
+    // armar texturas) se cargaba apenas se abría la página, compitiendo con
+    // los datos del torneo. Ahora:
+    //  - si el celular pidió "ahorro de datos" o tiene muy poca memoria, no se
+    //    carga (queda el fondo estático del hero);
+    //  - si no, se carga cuando el navegador queda libre (después de mostrar
+    //    tabla y resultados), no antes.
+    const conn = navigator.connection;
+    const ahorroDatos = !!conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? '');
+    const pocaMemoria = typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 2;
+    if (ahorroDatos || pocaMemoria) return undefined;
+
     let cancelled = false;
-    import('../three/basketballScene').then(({ createBasketballScene }) => {
-      if (cancelled || !canvasRef.current || !rootRef.current) return;
-      sceneRef.current = createBasketballScene({
-        canvas: canvasRef.current,
-        container: rootRef.current,
-        initialMode: mode,
-        modeColors: MODE_COLORS,
+    const arrancar = () => {
+      import('../three/basketballScene').then(({ createBasketballScene }) => {
+        if (cancelled || !canvasRef.current || !rootRef.current) return;
+        sceneRef.current = createBasketballScene({
+          canvas: canvasRef.current,
+          container: rootRef.current,
+          initialMode: mode,
+          modeColors: MODE_COLORS,
+        });
+        // Si para cuando terminó de cargar el hero ya no se ve (scrolleaste) o
+        // la pestaña está oculta, arranca pausada — antes giraba igual hasta
+        // el próximo cambio de visibilidad.
+        const r = rootRef.current.getBoundingClientRect();
+        const visible = r.bottom > 0 && r.top < window.innerHeight;
+        if (!visible || document.visibilityState !== 'visible') sceneRef.current?.pause();
+      }).catch(() => {
+        // WebGL unsupported/blocked
       });
-    }).catch(() => {
-      // WebGL unsupported/blocked
-    });
+    };
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(arrancar, { timeout: 2500 })
+      : window.setTimeout(arrancar, 1200);
 
     return () => {
       cancelled = true;
+      if (window.cancelIdleCallback && window.requestIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
       sceneRef.current?.destroy();
       sceneRef.current = null;
     };

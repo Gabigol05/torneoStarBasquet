@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
+import { recalcularPromedios } from '../lib/recalcularPromedios';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -647,7 +648,9 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
       </p>
 
       {/* Agregar partido */}
-      {partidos.length < 10 && (
+      {/* El tope era 10, pero el masculino tiene 24 equipos = 12 partidos por
+          fecha — una fecha completa no entraba de una sola vez. */}
+      {partidos.length < Math.max(10, Math.floor(equipos.length / 2)) && (
         <button onClick={addPartido} style={{ ...F.btnSec, marginBottom:16, display:'flex', alignItems:'center', gap:6 }}>
           ➕ Agregar partido
         </button>
@@ -798,7 +801,15 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
   const flash = (text, ok=true) => { setMsg({text,ok}); setTimeout(()=>setMsg(null),3000); };
 
+  // Evita guardar dos veces con un doble click (antes el botón seguía
+  // habilitado mientras se verificaba si había duplicados).
+  const guardandoRef = useRef(false);
   const handleSave = async () => {
+    if (guardandoRef.current) return;
+    guardandoRef.current = true;
+    try { await handleSaveInterno(); } finally { guardandoRef.current = false; }
+  };
+  const handleSaveInterno = async () => {
     if (!form.equipo_local_id || !form.equipo_visit_id) { flash('Seleccioná ambos equipos',false); return; }
     if (form.equipo_local_id === form.equipo_visit_id)   { flash('Los equipos no pueden ser iguales',false); return; }
 
@@ -891,17 +902,39 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
   const handleDelete = async (id) => {
     if (!(await confirm('¿Eliminar este partido y todas sus estadísticas?'))) return;
+    // Quiénes tenían stats en este partido (para recalcular sus promedios).
+    const { data: statsPartido } = await supabase.from(tablas.stats).select(tablas.jugadorIdField).eq('partido_id', id);
+    const afectados = [...new Set((statsPartido ?? []).map(r => r[tablas.jugadorIdField]))];
     const { error: logErr } = await supabase.from(tablas.uploadLog).delete().eq('partido_id', id);
     if (logErr) { flash(`Error borrando log de carga: ${logErr.message}`, false); return; }
     const { error: statsErr } = await supabase.from(tablas.stats).delete().eq('partido_id', id);
     if (statsErr) { flash(`Error borrando stats: ${statsErr.message}`, false); return; }
     const { error } = await supabase.from(tablas.partidos).delete().eq('id',id);
     if (error) { flash(`Error: ${error.message}`, false); return; }
-    setJustDeleted(true);
-    await loadAll(); flash('✅ Eliminado');
+    // La encuesta "¿Quién gana?" de ese partido quedaba abierta para siempre
+    // (no está atada al partido en la base) — se cierra.
+    await supabase.from('encuestas').update({ activa: false }).eq('partido_id', id).eq('categoria', categoria);
+    // Antes había que acordarse de ir a "Recalcular Stats": ahora se
+    // recalculan solos los promedios de quienes jugaron ese partido.
+    let recalcOk = true;
+    if (afectados.length) {
+      try { await recalcularPromedios(afectados, tablas, temporadaActivaId); }
+      catch (e) { recalcOk = false; console.warn('[PartidosManager] recalcular:', e.message); }
+    }
+    setJustDeleted(!recalcOk);
+    await loadAll(); flash(recalcOk ? '✅ Eliminado (promedios actualizados)' : '✅ Eliminado — no se pudieron recalcular los promedios, andá a Recalcular Stats');
   };
 
   const handleEstado = async (id, estado) => {
+    // Mismo control que el formulario: un partido no se puede dar por
+    // finalizado sin resultado o empatado (contaba como victoria del visitante).
+    if (estado === 'finalizado') {
+      const p = partidos.find(x => x.id === id);
+      if (p && (p.puntos_local ?? 0) === (p.puntos_visit ?? 0)) {
+        flash('Ese partido no tiene un resultado cargado (o está empatado) — cargá el marcador antes de finalizarlo', false);
+        return;
+      }
+    }
     const { error } = await supabase.from(tablas.partidos).update({ estado }).eq('id',id);
     if (error) { flash(`❌ No se pudo cambiar el estado: ${error.message}`, false); return; }
     await loadAll();

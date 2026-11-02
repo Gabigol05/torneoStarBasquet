@@ -13,6 +13,22 @@ export default defineConfig({
       // instalado como app podía no cumplir los requisitos de ícono de
       // algunos Android/Chrome. Ahora usa los mismos PNG reales (192/512)
       // que ya existían en public/, igual que public/manifest.json.
+      // ⚡ El service worker descargaba de antemano TODO el sitio para cada
+      // visitante, incluido el panel de admin y la librería de Excel (~0,5 MB
+      // que el público nunca usa). Ahora esos archivos quedan afuera: el
+      // panel los pide recién cuando un admin entra, como cualquier página.
+      // Lo mismo con la pelota 3D (three.js, ~0,5 MB): en celulares viejos o
+      // con ahorro de datos no se muestra, así que no tiene sentido bajarla.
+      workbox: {
+        globIgnores: [
+          "**/three-*.js",
+          "**/basketballScene-*.js",
+          "**/xlsx-*.js",
+          "**/AdminPanel-*.js",
+          "**/AdminLogin-*.js",
+          "**/ExcelUpload-*.js",
+        ],
+      },
       includeAssets: ["icon.svg", "favicon-16x16.png", "favicon-32x32.png", "apple-touch-icon.png"],
       manifest: {
         name: "Torneo Star Básquet",

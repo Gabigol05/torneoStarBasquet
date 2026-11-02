@@ -7,6 +7,7 @@ import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
 import { COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
 import { useTemporada } from '../context/TemporadaContext';
+import { recalcularPromedios } from '../lib/recalcularPromedios';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
@@ -103,9 +104,24 @@ const formatJugadoraFem = j => formatJugador(j, equiposFemenino);
 // ─── Resolver jugadora: aliases → fuzzy → nuevo jugador ──────────────────────
 const aliasesCache = { femenino: null, masculino: null };
 
+// Trae TODAS las filas (en bloques de 1000 — Supabase no devuelve más de
+// 1000 por consulta). Los alias y el plantel ya rondan las 500 filas por
+// categoría y siguen creciendo: sin paginar, pasado ese límite se perdían
+// en silencio y aparecían jugadores/as duplicados/as.
+async function traerTodo(tabla) {
+  let desde = 0, out = [];
+  for (;;) {
+    const { data, error } = await supabase.from(tabla).select('*').order('id', { ascending: true }).range(desde, desde + 999);
+    if (error) return { data: null, error };
+    out = out.concat(data ?? []);
+    if ((data ?? []).length < 1000) return { data: out, error: null };
+    desde += 1000;
+  }
+}
+
 async function cargarAliases(categoria, tablas) {
   if (aliasesCache[categoria]) return aliasesCache[categoria];
-  const { data, error } = await supabase.from(tablas.aliases).select('*');
+  const { data, error } = await traerTodo(tablas.aliases);
   if (error) {
     // No cachear un fallo — si se cachea un [] acá, el resto de la sesión
     // queda "sin aliases" sin ninguna pista de que en realidad la consulta
@@ -215,13 +231,17 @@ async function resolverJugadora(nombreRaw, equipoHint, numeroJugadora, ctx) {
 // invisible: el partido se publicaba igual, pero el alias nunca quedaba
 // guardado y el mismo nombre volvía a pedir revisión cada semana sin ninguna
 // pista de por qué "no aprendía".
-async function guardarAlias(alias, jugadoraId, equipoId, ctx) {
+// `sobrescribir`: para una reasignación MANUAL (✏️). Antes siempre se usaba
+// ignoreDuplicates, así que si un alias viejo apuntaba a la persona
+// equivocada, corregirlo a mano no se guardaba nunca y el error volvía a
+// pasar en la carga siguiente.
+async function guardarAlias(alias, jugadoraId, equipoId, ctx, sobrescribir = false) {
   const { categoria, tablas } = ctx;
   const aliasNorm = normStr(alias);
   const { error } = await supabase.from(tablas.aliases).upsert({
     alias, alias_norm: aliasNorm, [tablas.jugadorIdField]: jugadoraId,
     equipo_id: equipoId, confirmado: true,
-  }, { onConflict: 'alias_norm,equipo_id', ignoreDuplicates: true });
+  }, { onConflict: 'alias_norm,equipo_id', ignoreDuplicates: !sobrescribir });
   if (error) return error;
   aliasesCache[categoria] = null; // invalidar cache
   return null;
@@ -339,7 +359,15 @@ function parsearExcel(wb) {
       // cambio de equipo visitante, y todas sus jugadoras quedaban
       // etiquetadas con el equipo local — buscando (y a veces matcheando
       // mal) contra el roster equivocado.
-      if (canonEquipo(eq)===canonEquipo(res.equipoLocal)||canonEquipo(eq)===canonEquipo(res.equipoVisit)) equipoActual=eq;
+      // ⚠️ FIX (revisión general): antes solo se cambiaba de equipo si el
+      // texto coincidía con el del marcador — si la planilla escribía el
+      // equipo con un apodo en el bloque de stats (cargado en Alias de
+      // Equipos), los/las visitantes quedaban como del equipo local y se
+      // creaban como jugadores/as nuevos/as del equipo equivocado. Ahora el
+      // nombre que aparece en la columna Equipo SIEMPRE marca el comienzo del
+      // bloque de ese equipo; qué equipo es se resuelve después con los alias
+      // del panel (buscarEquipo), igual que el marcador.
+      equipoActual = eq;
     }
     const nombre = r[C.nombre];
     const numero = r[C.numero];
@@ -404,45 +432,8 @@ async function resolverJugadoras(bruto, ctx) {
 // temporada, que es como se relacionan esas tablas), se manda temporada_id,
 // se usa el onConflict compuesto real, y un error acá corta la publicación
 // en vez de mentir que salió bien.
-async function recalcularPromedios(jugadorIds, tablas, temporadaId) {
-  const idField = tablas.jugadorIdField;
-  const { data: fechasTemp, error: errFechas } = await supabase
-    .from(tablas.fechas).select('id').eq('temporada_id', temporadaId);
-  if (errFechas) throw new Error(`Recalculando (fechas de la temporada): ${errFechas.message}`);
-  const fechaIds = (fechasTemp ?? []).map(f => f.id);
-  if (fechaIds.length === 0) return;
-  const { data: partidosTemp, error: errPartidos } = await supabase
-    .from(tablas.partidos).select('id').in('fecha_id', fechaIds);
-  if (errPartidos) throw new Error(`Recalculando (partidos de la temporada): ${errPartidos.message}`);
-  const partidoIds = (partidosTemp ?? []).map(p => p.id);
-  if (partidoIds.length === 0) return;
-
-  for (const jugId of [...new Set(jugadorIds)]) {
-    const { data, error: errRead } = await supabase
-      .from(tablas.stats)
-      .select('pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')
-      .eq(idField, jugId)
-      .in('partido_id', partidoIds);
-    if (errRead) throw new Error(`Recalculando promedios de "${jugId}": ${errRead.message}`);
-    if (!data?.length) continue;
-    const k=data.length, sum=key=>data.reduce((a,r)=>a+(r[key]??0),0), avg=key=>+(sum(key)/k).toFixed(1);
-    const tsc=sum('sc'),tsf=sum('sf'),tdc=sum('dc'),tdf=sum('df'),ttc=sum('tc'),ttf=sum('tf');
-    const { error: errUpsert } = await supabase.from(tablas.estadisticas).upsert({
-      [idField]:jugId, temporada_id:temporadaId, pj:k,
-      pts_prom:avg('pts'), reb_prom:+((sum('rd')+sum('ro'))/k).toFixed(1),
-      ast_prom:avg('as_'), rob_prom:avg('rb'), tap_prom:avg('tp'),
-      per_prom:avg('pe'), val_prom:avg('val'),
-      pct_simples: tsc+tsf>0?+((tsc/(tsc+tsf))*100).toFixed(1):0,
-      pct_dobles:  tdc+tdf>0?+((tdc/(tdc+tdf))*100).toFixed(1):0,
-      pct_triples: ttc+ttf>0?+((ttc/(ttc+ttf))*100).toFixed(1):0,
-      sc_total:tsc, sf_total:tsf, dc_total:tdc, df_total:tdf, tc_total:ttc, tf_total:ttf,
-      pts_total:sum('pts'), reb_total:sum('rd')+sum('ro'), ast_total:sum('as_'),
-      rob_total:sum('rb'), tap_total:sum('tp'), val_total:sum('val'), per_total:sum('pe'),
-      mejor_pts:Math.max(...data.map(r=>r.pts??0)), updated_at:new Date().toISOString(),
-    }, { onConflict:`${idField},temporada_id` });
-    if (errUpsert) throw new Error(`Guardando promedios de "${jugId}": ${errUpsert.message}`);
-  }
-}
+// (recalcularPromedios ahora vive en lib/recalcularPromedios.js — la usa
+// también Partidos al borrar un partido.)
 
 // ─── UI: logo de equipo con fallback a iniciales (mismo criterio que
 // TeamAvatar en Dashboard.jsx — si el equipo no tiene logo cargado, o la
@@ -539,16 +530,25 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   // silencio, y cada nombre del Excel aparecía como "no encontrado" sin
   // ninguna pista de que la causa real era que no se pudo traer el plantel.
   const [errorPlantel, setErrorPlantel] = useState('');
+  // Hasta que el plantel no esté cargado no se deja soltar un Excel: con el
+  // índice vacío, cada fila se tomaba como jugador/a NUEVO/A y se creaban
+  // duplicados de todo el equipo.
+  const [plantelListo, setPlantelListo] = useState(false);
   useEffect(() => {
+    // Al entrar a esta pantalla se descarta la caché de alias (pudieron
+    // cambiar en Alias / Fusionar jugadores mientras tanto).
+    aliasesCache[categoria] = null;
     (async () => {
       setErrorPlantel('');
-      const { data, error } = await supabase.from(tablas.jugadores).select('*');
+      setPlantelListo(false);
+      const { data, error } = await traerTodo(tablas.jugadores);
       if (error) {
         setErrorPlantel(`No se pudo traer el plantel de ${categoria}: ${error.message} — el buscador de nombres del Excel va a fallar hasta que esto se resuelva. Recargá la página o probá de nuevo en un momento.`);
         return;
       }
       if (categoria === 'masculino') setJugadoresMasc(data.map(formatJugadorMasc));
       else setJugadorasFem(data.map(formatJugadoraFem));
+      setPlantelListo(true);
     })();
   }, [categoria, tablas.jugadores]);
 
@@ -710,6 +710,10 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
   const handleFile = async (e) => {
     const file = (e.dataTransfer?.files ?? e.target.files)[0];
     if (!file) return;
+    if (!plantelListo) {
+      setParsed({ errores:[errorPlantel || 'Todavía se está cargando el plantel — esperá un segundo y volvé a soltar el Excel.'], warnings:[], jugadorasBruto:[], jugadoras:[] });
+      return;
+    }
     resetParaNuevoArchivo();
     setFileName(file.name);
     const reader = new FileReader();
@@ -781,10 +785,31 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
     return { ...data[0], fecha: fechaMap[data[0].fecha_id] };
   };
 
+  // ⚠️ REESCRITO (revisión general — "todo o nada"). Antes se iban escribiendo
+  // cosas en la base a medida que se avanzaba (fecha → partido con el
+  // resultado → jugadores nuevos → stats) y recién en el medio se validaban
+  // cosas como los nombres duplicados. Si algo fallaba a mitad de camino, el
+  // partido quedaba publicado con resultado pero SIN estadísticas (lo que pasó
+  // con Rejunte vs Dead Cow), y al reintentar se podía duplicar o perder la
+  // marca de playoff. Además "Sobreescribir" BORRABA el partido viejo antes de
+  // crear el nuevo, así que un error en el medio lo perdía del todo.
+  // Ahora:
+  //   1) se valida TODO antes de escribir nada (equipos, empate, nombres
+  //      repetidos, incluidos los jugadores/as nuevos/as);
+  //   2) cada escritura guarda cómo deshacerse; si cualquier paso hasta las
+  //      estadísticas falla, se deshace todo y la base queda como estaba;
+  //   3) "Sobreescribir" actualiza el MISMO partido (no lo borra): conserva su
+  //      id, su historial y sus marcas de playoff;
+  //   4) un jugador/a "nuevo/a" cuyo id ya existía no se pisa (antes le
+  //      cambiaba nombre/número a una persona existente).
+  // Lo que viene DESPUÉS de guardar las estadísticas (alias, MVP, promedios,
+  // historial) ya no deshace nada: si falla, avisa y el partido queda bien.
   const handlePublish = async (forceOverwrite = false, attachPartido = null, skipPendienteCheck = false) => {
     if (!parsed || !jornada) { alert('Ingresá el número de fecha'); return; }
     setStep('publicando');
     setLog([]);
+    const deshacer = [];
+    let pd, fd, jugOk, jugSkip, statsRows, idsPrevios = [], creados = [], jugadorasResueltas = jugadoras;
     try {
       // Resolver equipos (alias del panel -> alias hardcodeados tipo "Ene
       // Ene"->"NN" -> fuzzy, en ese orden — ver buscarEquipo)
@@ -805,84 +830,95 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         addLog('✅ Ningún partido pendiente coincide — se va a crear uno nuevo');
       }
 
-      let fd;
-      if (attachPartido) {
-        fd = attachPartido.fecha ?? { id: attachPartido.fecha_id };
-        addLog(`📎 Publicando en el partido pendiente ya agendado (ID ${attachPartido.id})...`);
-      } else {
-        // Check duplicado
-        if (!forceOverwrite) {
-          addLog('🔍 Verificando duplicados...');
-          const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
-          if (dupe) { setDuplicate(dupe); setStep('duplicado'); return; }
-          addLog('✅ Sin duplicados');
-        } else {
-          const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
-          if (dupe) {
-            const { error: delErr } = await supabase.from(tablas.partidos).delete().eq('id', dupe.id);
-            if (delErr) throw new Error(`No se pudo borrar el partido anterior (ID ${dupe.id}) antes de sobreescribir: ${delErr.message}`);
-            addLog(`🗑️ Partido anterior (ID ${dupe.id}) eliminado`);
-          }
-        }
-
-        // Fecha
-        addLog('📅 Creando fecha...');
-        // OJO: antes esto era un upsert con descripcion:`Fecha ${jornada}` a
-        // secas — si la fecha ya existía (ej: ya se le había puesto "Playoffs
-        // - Semifinal" a mano desde el fixture masivo), esta carga se la pisaba
-        // de vuelta a "Fecha N" en cada Excel que se subiera para esa jornada.
-        // Ahora: si ya existe, no se toca su descripción.
-        // La búsqueda se limita a la temporada ACTIVA — el número de fecha se
-        // reinicia en cada temporada nueva, así que "Fecha 1" de este torneo y
-        // "Fecha 1" de uno anterior son filas distintas.
-        const { data:fechaExistente } = await supabase
-          .from(tablas.fechas).select('id')
-          .eq('numero', Number(jornada))
-          .eq('temporada_id', temporadaActivaId)
-          .maybeSingle();
-        if (fechaExistente) {
-          fd = fechaExistente;
-        } else {
-          const { data:fdNueva, error:fErr } = await supabase
-            .from(tablas.fechas)
-            .insert({ numero:Number(jornada), descripcion:`Fecha ${jornada}`, temporada_id: temporadaActivaId })
-            .select('id').single();
-          if (fErr) throw new Error(`Fecha: ${fErr.message}`);
-          fd = fdNueva;
-        }
-        addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
-      }
-
-      // Partido
-      addLog(attachPartido ? '🏀 Actualizando partido...' : '🏀 Insertando partido...');
+      // ── 1. Validaciones (nada se escribió todavía) ─────────────────────
       // BUG REAL (reporte de Alvaro, dos partidos seguidos con el ganador
       // invertido pese a que "las estadísticas están bien"): el Excel arma
-      // "local"/"visit" según el ORDEN de las filas del marcador (la fila de
-      // arriba es local, la de abajo es visit) — un criterio que no tiene por
-      // qué coincidir con qué equipo quedó cargado como local/visitante
-      // cuando el partido se agendó de antemano (Publicar fecha/Playoffs).
-      // buscarPendiente() ya buscaba el partido agendado SIN importar el
-      // orden (por eso "adjuntar" encontraba el partido igual), pero el
-      // UPDATE de acá abajo nunca comparaba: escribía q1_local/q1_visit tal
-      // cual los daba el Excel, así que si el Excel esa vez tenía las filas
-      // al revés respecto de cómo había quedado agendado, el marcador se
-      // guardaba invertido — mientras que los jugadores (con equipo propio,
-      // no un "local"/"visit" de este partido puntual) quedaban bien, que es
-      // justo lo que reportó Alvaro ("las stats están bien pero marca mal
-      // quien ganó"). Si estamos ADJUNTANDO a un partido ya agendado, hay que
-      // alinear el marcador/porcentajes del Excel a como quedó agendado ese
-      // partido, no al orden en que vinieron las filas esta vez.
+      // "local"/"visit" según el ORDEN de las filas del marcador — que no
+      // tiene por qué coincidir con cómo quedó agendado el partido. Si estamos
+      // ADJUNTANDO a uno ya agendado, se alinea el marcador a ese orden.
       const invertido = !!attachPartido && attachPartido.equipo_local_id === eqVId && attachPartido.equipo_visit_id === eqLId;
-      const m = invertido
-        ? { local: parsed.marcador.visit, visit: parsed.marcador.local }
-        : parsed.marcador;
-      const p = invertido
-        ? { local: parsed.pct.visit, visit: parsed.pct.local }
-        : parsed.pct;
+      const m = invertido ? { local: parsed.marcador.visit, visit: parsed.marcador.local } : parsed.marcador;
+      const p = invertido ? { local: parsed.pct.visit, visit: parsed.pct.local } : parsed.pct;
       if (invertido) addLog('↔️ El Excel traía los equipos en el orden inverso al ya agendado — se acomoda el marcador antes de guardar.');
       if (m.local.total === m.visit.total) {
         throw new Error(`El Excel da un empate ${m.local.total}-${m.visit.total} — el básquet no admite empates, revisá la planilla antes de publicar.`);
       }
+
+      // Id definitivo de cada fila (incluidos los/las nuevos/as, cuyo id se
+      // arma igual que al crearlos). Dos filas con el mismo id = la misma
+      // persona cargada dos veces en la planilla → se frena ANTES de escribir.
+      // OJO: el número de camiseta NO va en el id — si un Excel lo trae y otro
+      // no, se partían las estadísticas de una misma persona en dos.
+      const idNuevo = nj => `${nj.nuevoEquipoId}_${normStr(nj.nombreRaw).replace(/\s+/g, '_')}`;
+      const idFila = j => j.jugadora?.id ?? (j.matchMethod === 'nuevo' && j.nuevoEquipoId ? idNuevo(j) : null);
+      const porId = {};
+      for (const j of jugadoras) {
+        const id = idFila(j);
+        if (!id) continue;
+        (porId[id] ??= []).push(j);
+      }
+      const colisiones = Object.entries(porId).filter(([, arr]) => arr.length > 1);
+      if (colisiones.length > 0) {
+        const detalle = colisiones.map(([, arr]) =>
+          `"${arr[0].jugadora?.nombre ?? arr[0].nombreRaw}" <- [${arr.map(x => `"${x.nombreRaw}"`).join(', ')}]`
+        ).join(' | ');
+        throw new Error(`Hay una misma persona cargada dos veces en la planilla: ${detalle}. Usá el ✏️ en esas filas para reasignarlas (o sacá la fila repetida del Excel) antes de publicar. No se guardó nada.`);
+      }
+
+      // ── 2. Partido destino: adjuntar / sobreescribir / nuevo ───────────
+      let objetivo = attachPartido ?? null;
+      if (!attachPartido) {
+        addLog('🔍 Verificando duplicados...');
+        const dupe = await checkDuplicate(eqLId, eqVId, Number(jornada));
+        if (dupe && !forceOverwrite) { setDuplicate(dupe); setStep('duplicado'); return; }
+        if (dupe) {
+          objetivo = dupe;
+          addLog(`♻️ Se va a sobreescribir el partido existente (ID ${dupe.id}) — se actualiza en el lugar, no se borra.`);
+        } else {
+          addLog('✅ Sin duplicados');
+        }
+      }
+
+      let antes = null, statsAntes = [];
+      if (objetivo) {
+        // Foto de cómo está ahora, para poder volver atrás si algo falla.
+        const { data: filaAntes, error: aErr } = await supabase.from(tablas.partidos).select('*').eq('id', objetivo.id).single();
+        if (aErr) throw new Error(`Leyendo el partido ${objetivo.id}: ${aErr.message}`);
+        const { data: sAntes, error: sAErr } = await supabase.from(tablas.stats).select('*').eq('partido_id', objetivo.id);
+        if (sAErr) throw new Error(`Leyendo las stats del partido ${objetivo.id}: ${sAErr.message}`);
+        antes = filaAntes; statsAntes = sAntes ?? [];
+        idsPrevios = statsAntes.map(r => r[tablas.jugadorIdField]);
+        fd = attachPartido?.fecha ?? { id: antes.fecha_id };
+        if (attachPartido) addLog(`📎 Publicando en el partido pendiente ya agendado (ID ${attachPartido.id})...`);
+      } else {
+        // Fecha — si ya existe en la temporada activa no se toca su
+        // descripción (ej: "Playoffs - Semifinal" puesta a mano); el número de
+        // fecha se reinicia en cada temporada, por eso se busca solo en la activa.
+        addLog('📅 Buscando la fecha...');
+        const { data: fechaExistente, error: feErr } = await supabase
+          .from(tablas.fechas).select('id')
+          .eq('numero', Number(jornada))
+          .eq('temporada_id', temporadaActivaId)
+          .maybeSingle();
+        if (feErr) throw new Error(`Fecha: ${feErr.message}`);
+        if (fechaExistente) {
+          fd = fechaExistente;
+        } else {
+          const { data: fdNueva, error: fErr } = await supabase
+            .from(tablas.fechas)
+            .insert({ numero: Number(jornada), descripcion: `Fecha ${jornada}`, temporada_id: temporadaActivaId })
+            .select('id').single();
+          if (fErr) throw new Error(`Fecha: ${fErr.message}`);
+          fd = fdNueva;
+          deshacer.push(async () => { await supabase.from(tablas.fechas).delete().eq('id', fdNueva.id); });
+        }
+        addLog(`✅ Fecha ${jornada} (ID ${fd.id})`);
+      }
+
+      // Al adjuntar a un partido agendado, o al sobreescribir uno de playoff
+      // sin haber tildado "Es Playoff" en esta carga, NO se tocan es_playoff/
+      // copa/instancia/llave — así publicar nunca borra una marca de Playoffs.
+      const tocarPlayoff = !attachPartido && !(antes?.es_playoff && !esPlayoff);
       const camposResultado = {
         q1_local:m.local.q1, q2_local:m.local.q2, q3_local:m.local.q3,
         q4_local:m.local.q4, ot_local:m.local.ot,
@@ -890,119 +926,125 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         q4_visit:m.visit.q4, ot_visit:m.visit.ot,
         pct_simples_local:p.local.simples, pct_dobles_local:p.local.dobles, pct_triples_local:p.local.triples,
         pct_simples_visit:p.visit.simples, pct_dobles_visit:p.visit.dobles, pct_triples_visit:p.visit.triples,
-        lugar:lugar||null, fecha_partido:fechaPartido||null, estado:'finalizado',
-        // Si estamos ADJUNTANDO a un partido ya agendado, es_playoff/copa/
-        // instancia/llave NO se tocan — se dejan tal cual estaban (por eso no
-        // van acá abajo). Es la única forma de garantizar que publicar un
-        // resultado nunca borre una marca de Playoffs ya bien puesta.
-        ...(attachPartido ? {} : {
+        lugar:lugar||antes?.lugar||null, fecha_partido:fechaPartido||antes?.fecha_partido||null, estado:'finalizado',
+        ...(tocarPlayoff ? {
           es_playoff: esPlayoff,
           copa:       esPlayoff ? (copaPO || null) : null,
           instancia:  esPlayoff ? (instanciaPO || null) : null,
           llave:      esPlayoff && llavePO ? Number(llavePO) : null,
-        }),
+        } : {}),
       };
 
-      let pd;
-      if (attachPartido) {
+      addLog(objetivo ? '🏀 Actualizando partido...' : '🏀 Insertando partido...');
+      if (objetivo) {
         const { data, error } = await supabase.from(tablas.partidos)
-          .update(camposResultado).eq('id', attachPartido.id).select('id').single();
+          .update(camposResultado).eq('id', objetivo.id).select('id').single();
         if (error) throw new Error(`Partido: ${error.message}`);
         pd = data;
+        const fotoAntes = antes, statsFoto = statsAntes;
+        deshacer.push(async () => {
+          await supabase.from(tablas.stats).delete().eq('partido_id', fotoAntes.id);
+          const restaurar = {};
+          for (const k of [...Object.keys(camposResultado), tablas.mvpField]) restaurar[k] = fotoAntes[k] ?? null;
+          const { error: rErr } = await supabase.from(tablas.partidos).update(restaurar).eq('id', fotoAntes.id);
+          if (rErr) throw rErr;
+          if (statsFoto.length) {
+            const { error: sErr } = await supabase.from(tablas.stats).insert(statsFoto.map(({ id: _id, ...r }) => r));
+            if (sErr) throw sErr;
+          }
+        });
+        // Stats viejas afuera (las de esta planilla las reemplazan; si alguien
+        // estaba en la carga anterior y no en esta, no debe quedar).
+        if (statsAntes.length) {
+          const { error: dErr } = await supabase.from(tablas.stats).delete().eq('partido_id', objetivo.id);
+          if (dErr) throw new Error(`Borrando las stats anteriores: ${dErr.message}`);
+        }
       } else {
         const { data, error } = await supabase.from(tablas.partidos)
           .insert({ fecha_id:fd.id, equipo_local_id:eqLId, equipo_visit_id:eqVId, ...camposResultado })
           .select('id').single();
         if (error) throw new Error(`Partido: ${error.message}`);
         pd = data;
+        deshacer.push(async () => { await supabase.from(tablas.partidos).delete().eq('id', data.id); });
       }
       addLog(`✅ Partido ID ${pd.id} — ${m.local.total}-${m.visit.total}`);
       addLog(`   Local:  Q1=${m.local.q1} Q2=${m.local.q2} Q3=${m.local.q3} Q4=${m.local.q4}`);
       addLog(`   Visita: Q1=${m.visit.q1} Q2=${m.visit.q2} Q3=${m.visit.q3} Q4=${m.visit.q4}`);
 
-      // Crear en la base los jugadores/as nuevos (method === 'nuevo') antes
-      // de insertar stats, para tener su id real — ya vale para las dos
-      // categorías (antes era solo masculino).
-      let jugadorasResueltas = jugadoras;
-      const nuevos = jugadoras.filter(j => j.matchMethod === 'nuevo' && !j.jugadora);
+      // ── 3. Jugadores/as nuevos/as ───────────────────────────────────────
+      const nuevos = jugadoras.filter(j => j.matchMethod === 'nuevo' && !j.jugadora && j.nuevoEquipoId);
       if (nuevos.length > 0) {
-        addLog(`🆕 Creando ${nuevos.length} jugador(es) nuevo(s)...`);
-        const creadosParaIndice = [];
-        for (const nj of nuevos) {
-          // OJO: el numero de camiseta NO va en el id — si un Excel lo trae
-          // y otro no (o cambia de una fecha a otra), un id que dependiera
-          // del numero generaba una fila NUEVA para la misma persona real,
-          // partiendo sus estadisticas en dos jugadores distintos.
-          const idGenerado = `${nj.nuevoEquipoId}_${normStr(nj.nombreRaw).replace(/\s+/g,'_')}`;
-          const { data: creado, error: cErr } = await supabase
-            .from(tablas.jugadores)
-            .upsert({ id: idGenerado, equipo_id: nj.nuevoEquipoId, nombre: nj.nombreRaw, numero: nj.numero }, { onConflict:'id' })
-            .select('*').single();
-          if (cErr) throw new Error(`Creando jugador "${nj.nombreRaw}": ${cErr.message}`);
-          jugadorasResueltas = jugadorasResueltas.map(j =>
-            j === nj ? { ...j, jugadora: { id: creado.id, nombre: creado.nombre, equipoId: creado.equipo_id } } : j
-          );
-          creadosParaIndice.push(creado);
+        const ids = nuevos.map(idNuevo);
+        const { data: yaExisten, error: yeErr } = await supabase.from(tablas.jugadores).select('*').in('id', ids);
+        if (yeErr) throw new Error(`Buscando jugadores/as nuevos/as: ${yeErr.message}`);
+        const existentes = Object.fromEntries((yaExisten ?? []).map(r => [r.id, r]));
+        const aCrear = nuevos.filter(nj => !existentes[idNuevo(nj)]);
+        if (aCrear.length) {
+          addLog(`🆕 Creando ${aCrear.length} jugador(es) nuevo(s)...`);
+          const { data: ins, error: cErr } = await supabase.from(tablas.jugadores)
+            .insert(aCrear.map(nj => ({ id: idNuevo(nj), equipo_id: nj.nuevoEquipoId, nombre: nj.nombreRaw, numero: nj.numero })))
+            .select('*');
+          if (cErr) throw new Error(`Creando jugadores/as nuevos/as: ${cErr.message}`);
+          creados = ins ?? [];
+          const idsCreados = creados.map(c => c.id);
+          deshacer.push(async () => { await supabase.from(tablas.jugadores).delete().in('id', idsCreados); });
         }
-        setJugadoras(jugadorasResueltas);
-        // Sumar los recien creados al indice fuzzy en memoria — si no, cargar
-        // dos partidos seguidos en la misma sesion (muy probable este fin de
-        // semana) no los reconoce en la segunda carga y crea un duplicado.
-        if (creadosParaIndice.length > 0) {
-          if (categoria === 'masculino') {
-            setJugadoresMasc(prev => [...prev, ...creadosParaIndice.map(formatJugadorMasc)]);
-          } else {
-            setJugadorasFem(prev => [...prev, ...creadosParaIndice.map(formatJugadoraFem)]);
-          }
-        }
+        if (aCrear.length < nuevos.length) addLog(`ℹ️ ${nuevos.length - aCrear.length} "nuevo/a" ya existía en el plantel — se usa el registro existente sin modificarlo.`);
+        const porIdBase = { ...existentes, ...Object.fromEntries(creados.map(c => [c.id, c])) };
+        jugadorasResueltas = jugadoras.map(j => {
+          if (!nuevos.includes(j)) return j;
+          const r = porIdBase[idNuevo(j)];
+          return r ? { ...j, jugadora: { id: r.id, nombre: r.nombre, equipoId: r.equipo_id } } : j;
+        });
       }
 
-      // Stats
-      const jugOk   = jugadorasResueltas.filter(j => j.jugadora);
-      const jugSkip = jugadorasResueltas.filter(j => !j.jugadora);
-      addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length>0?` (${jugSkip.length} no resueltas)`:''}...`);
-
-      // Detectar colisiones: dos filas del Excel resueltas a la MISMA jugadora real.
-      // Esto rompería el upsert (ON CONFLICT no puede afectar la misma fila 2 veces).
-      const porJugadora = {};
-      for (const j of jugOk) {
-        if (!porJugadora[j.jugadora.id]) porJugadora[j.jugadora.id] = [];
-        porJugadora[j.jugadora.id].push(j);
-      }
-      const colisiones = Object.values(porJugadora).filter(arr => arr.length > 1);
-      if (colisiones.length > 0) {
-        const detalle = colisiones.map(arr =>
-          `"${arr[0].jugadora.nombre}" <- [${arr.map(x=>`"${x.nombreRaw}"`).join(', ')}]`
-        ).join(' | ');
-        throw new Error(`Nombres duplicados resueltos a la misma jugadora: ${detalle}. Usá el ✏️ en cada fila del preview para reasignar manualmente a la persona correcta antes de publicar.`);
-      }
-      if (jugOk.length > 0) {
-        const statsRows = jugOk.map(j => ({
-          partido_id:pd.id, [tablas.jugadorIdField]:j.jugadora.id, equipo_id:j.jugadora.equipoId,
-          numero:j.numero, sc:j.sc, sf:j.sf, dc:j.dc, df:j.df,
-          tc:j.tc, tf:j.tf, as_:j.as_,
-          rd:j.rd, ro:j.ro, fp:j.fp, ft:j.ft, fa:j.fa,
-          rb:j.rb, tp:j.tp, pe:j.pe, ca:j.ca, pts:j.pts, val:j.val,
-        }));
-        const { error:sErr } = await supabase
+      // ── 4. Estadísticas ─────────────────────────────────────────────────
+      jugOk   = jugadorasResueltas.filter(j => j.jugadora);
+      jugSkip = jugadorasResueltas.filter(j => !j.jugadora);
+      addLog(`📊 Insertando stats de ${jugOk.length} jugadoras${jugSkip.length > 0 ? ` (${jugSkip.length} no resueltas)` : ''}...`);
+      statsRows = jugOk.map(j => ({
+        partido_id:pd.id, [tablas.jugadorIdField]:j.jugadora.id, equipo_id:j.jugadora.equipoId,
+        numero:j.numero, sc:j.sc, sf:j.sf, dc:j.dc, df:j.df,
+        tc:j.tc, tf:j.tf, as_:j.as_,
+        rd:j.rd, ro:j.ro, fp:j.fp, ft:j.ft, fa:j.fa,
+        rb:j.rb, tp:j.tp, pe:j.pe, ca:j.ca, pts:j.pts, val:j.val,
+      }));
+      if (statsRows.length > 0) {
+        const { error: sErr } = await supabase
           .from(tablas.stats)
           .upsert(statsRows, { onConflict:`partido_id,${tablas.jugadorIdField}` });
         if (sErr) throw new Error(`Stats: ${sErr.message}`);
+      }
+    } catch (err) {
+      if (deshacer.length) {
+        addLog('↩️ Deshaciendo lo que se alcanzó a guardar de esta carga...');
+        for (const paso of [...deshacer].reverse()) {
+          try { await paso(); } catch (e) { addLog(`⚠️ No se pudo deshacer un paso: ${e.message ?? e} — revisá el partido en Partidos.`); }
+        }
+        addLog('↩️ Listo: la base quedó como estaba antes de intentar publicar.');
+      }
+      addLog(`❌ ERROR: ${err.message}`);
+      setStep('preview');
+      return;
+    }
 
-        // Guardar como alias confirmado cualquier match por fuzzy/numero que se
-        // haya publicado — antes solo se guardaba si el puntaje daba mejor que
-        // 0.35, así que un nombre que quedaba en "confianza media" (0.35-0.38)
-        // pedía revisión cada semana para siempre, aunque el mismo match ya se
-        // hubiera publicado bien antes. El propio acto de publicar (después de
-        // ver la vista previa con el color de advertencia) YA es la confirmación
-        // del admin — de acá en adelante ese nombre entra directo sin advertencia.
-        // No se guarda alias para un nombre que en el Excel vino como una
-        // sola palabra (ej: solo el apellido) si esa fila pasó por el
-        // desambiguador de compañeros con nombre parecido (wasAmbiguous) —
-        // ese texto solo, sin la aclaración manual/número de esta carga
-        // puntual, es intrínsecamente ambiguo entre esas mismas personas y
-        // guardarlo como alias fijo reproduciría el mismo problema la
-        // próxima vez que aparezca (ej: "Peleteiro" solo, sin nombre).
+    // Recién ahora (las stats ya quedaron guardadas) se actualiza la pantalla
+    // y el índice de nombres en memoria con los/las recién creados/as — si se
+    // hiciera antes y la carga se deshiciera, el índice quedaba apuntando a
+    // personas que ya no existen y el reintento fallaba.
+    setJugadoras(jugadorasResueltas);
+    if (creados.length > 0) {
+      if (categoria === 'masculino') setJugadoresMasc(prev => [...prev, ...creados.map(formatJugadorMasc)]);
+      else setJugadorasFem(prev => [...prev, ...creados.map(formatJugadoraFem)]);
+    }
+
+    // ── 5. Después de guardar (no deshace: si falla, avisa) ─────────────
+    try {
+      if (statsRows.length > 0) {
+        // Guardar como alias confirmado cada match por fuzzy/número/manual que
+        // se publicó — el propio acto de publicar es la confirmación del admin.
+        // No se guarda alias para un nombre de UNA sola palabra que pasó por el
+        // desambiguador (ej. "Peleteiro" solo): es ambiguo por naturaleza.
         const fuzzyMatches = jugOk.filter(j => {
           const esCandidato = j.matchMethod==='fuzzy' || j.matchMethod==='numero' || j.matchMethod==='manual';
           if (!esCandidato) return false;
@@ -1011,7 +1053,9 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
         });
         let aliasesFallidos = 0;
         for (const j of fuzzyMatches) {
-          const errAlias = await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx);
+          // Una reasignación MANUAL tiene que poder corregir un alias viejo
+          // equivocado (antes se ignoraba y el error se repetía cada semana).
+          const errAlias = await guardarAlias(j.nombreRaw, j.jugadora.id, j.jugadora.equipoId, ctx, j.matchMethod === 'manual');
           if (errAlias) aliasesFallidos++;
         }
         if (fuzzyMatches.length - aliasesFallidos > 0) addLog(`💾 ${fuzzyMatches.length - aliasesFallidos} aliases guardados para futuras cargas`);
@@ -1025,40 +1069,50 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           if (mvpErr) addLog(`⚠️ No se pudo guardar el MVP (${mvpNombre}): ${mvpErr.message}`);
           else addLog(`⭐ MVP: ${mvpNombre} (VAL ${mvp.val})`);
         }
-
-        addLog('🔄 Recalculando promedios...');
-        await recalcularPromedios(statsRows.map(r=>r[tablas.jugadorIdField]), tablas, temporadaActivaId);
-        addLog('✅ Promedios actualizados');
       }
 
-      // Log de carga — esto NO afecta el partido/stats ya publicados (esos ya
-      // están guardados y en vivo en el sitio), solo el registro que se ve en
-      // "Historial de cargas". Antes un fallo acá era invisible: el partido
-      // quedaba publicado bien pero jamás aparecía en el Historial, sin
-      // ningún aviso — exactamente el síntoma reportado con la fecha 1 de
-      // masculino.
+      // Promedios: los de esta planilla y, si se sobreescribió, también los
+      // de quienes estaban en la carga anterior y ya no.
+      const idsRecalc = [...new Set([...(statsRows ?? []).map(r => r[tablas.jugadorIdField]), ...idsPrevios])];
+      if (idsRecalc.length) {
+        addLog('🔄 Recalculando promedios...');
+        try {
+          await recalcularPromedios(idsRecalc, tablas, temporadaActivaId);
+          addLog('✅ Promedios actualizados');
+        } catch (e) {
+          addLog(`⚠️ El partido quedó publicado, pero no se pudieron recalcular los promedios (${e.message}). Andá a "Recalcular Stats" para dejarlos al día.`);
+        }
+      }
+
+      // Log de carga — solo el registro de "Historial de cargas".
       const { error: logErr } = await supabase.from(tablas.uploadLog).insert({
         fecha_id:fd.id, partido_id:pd.id, archivo_nombre:fileName,
         equipo_local:parsed.equipoLocal, equipo_visit:parsed.equipoVisit,
         jugadoras_ok:jugOk.length, jugadoras_skip:jugSkip.length,
         warnings:[...(parsed.warnings??[]), ...jugSkip.map(j=>`Sin resolver: "${j.nombreRaw}"`)],
       });
-      if (logErr) {
-        addLog(`⚠️ El partido se publicó bien, pero no quedó registrado en "Historial de cargas": ${logErr.message}`);
-      } else {
-        addLog('📁 Carga registrada en Historial');
-      }
-
-      addLog('🎉 ¡Publicado! El sitio ya está actualizado.');
-      setStep('listo');
-    } catch(err) {
-      addLog(`❌ ERROR: ${err.message}`);
-      setStep('preview');
+      if (logErr) addLog(`⚠️ El partido se publicó bien, pero no quedó registrado en "Historial de cargas": ${logErr.message}`);
+      else addLog('📁 Carga registrada en Historial');
+    } catch (err) {
+      addLog(`⚠️ El partido quedó publicado, pero falló un paso final: ${err.message}`);
     }
+
+    addLog('🎉 ¡Publicado! El sitio ya está actualizado.');
+    setStep('listo');
   };
 
-  const localJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoLocal);
-  const visitJugs = jugadoras.filter(j => j.equipoRaw === parsed?.equipoVisit);
+  // ⚠️ FIX: antes cada tabla del preview mostraba solo las filas cuyo texto
+  // de equipo coincidía EXACTO con el del marcador — una fila con el equipo
+  // escrito distinto (tilde, mayúscula, apodo) no aparecía en ninguna tabla,
+  // pero se publicaba igual (y si estaba "ambigua" bloqueaba el botón sin
+  // forma de arreglarla). Ahora se agrupa por el equipo YA RESUELTO, y lo que
+  // no encaje en ninguno de los dos va a la tabla del local con su texto a la
+  // vista, para que nada quede escondido.
+  const idLocalPrev = parsed ? buscarEquipo(parsed.equipoLocal, fuseEq, roster, equipoAliasMap)?.id : null;
+  const idVisitPrev = parsed ? buscarEquipo(parsed.equipoVisit, fuseEq, roster, equipoAliasMap)?.id : null;
+  const equipoDeFila = j => j.equipoIdResuelto ?? (j.equipoRaw === parsed?.equipoVisit ? idVisitPrev : idLocalPrev);
+  const visitJugs = jugadoras.filter(j => idVisitPrev && equipoDeFila(j) === idVisitPrev);
+  const localJugs = jugadoras.filter(j => !visitJugs.includes(j));
   const jugOkCount = jugadoras.filter(j => j.jugadora || j.matchMethod === 'nuevo').length;
   const jugAmbiguoCount = jugadoras.filter(j => j.matchMethod === 'ambiguo').length;
   const jugNoCount = jugadoras.filter(j => !j.jugadora && j.matchMethod !== 'nuevo' && j.matchMethod !== 'ambiguo').length;
@@ -1280,7 +1334,7 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
           {log.some(l => l.startsWith('❌')) && (
             <div style={s.errBox}>
               <p style={{margin:'0 0 4px',fontWeight:700}}>El intento de publicar anterior fallo:</p>
-              {log.filter(l => l.startsWith('❌')).map((l,i)=><p key={i} style={{margin:'4px 0'}}>{l}</p>)}
+              {log.filter(l => l.startsWith('❌') || l.startsWith('↩️') || l.startsWith('⚠️ No se pudo deshacer')).map((l,i)=><p key={i} style={{margin:'4px 0'}}>{l}</p>)}
             </div>
           )}
           {/* Marcador */}
@@ -1541,12 +1595,12 @@ export default function ExcelUpload({ categoria: categoriaProp, setCategoria: se
             </div>
           </div>
           <p style={{color:'#F04060',fontSize:13,marginBottom:20}}>
-            Si sobreescribís, se borran el partido anterior y todas sus estadísticas.
+            Si sobreescribís, se actualiza ese mismo partido con el resultado y las estadísticas de esta planilla (se reemplazan las anteriores). Si algo falla, queda como estaba.
           </p>
           <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
             <button className="xlu-btn-publish" onClick={()=>handlePublish(true)}
               style={{...s.btnPublish,background:'linear-gradient(135deg,#F04060,#B91C1C)',maxWidth:220}}>
-              🗑️ SOBREESCRIBIR
+              ♻️ SOBREESCRIBIR
             </button>
             <button className="xlu-btn-cancel" onClick={()=>setStep('preview')} style={s.btnCancel}>
               ← Volver al preview

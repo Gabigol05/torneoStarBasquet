@@ -178,7 +178,6 @@ nav {
   top: 0;
   z-index: 200;
   background: rgba(8, 12, 18, 0.97);
-  backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   height: clamp(56px, 8vh, 68px);
   display: flex;
@@ -2355,7 +2354,6 @@ body.theme-femenino {
     left: 0;
     right: 0;
     background: rgba(8, 12, 18, 0.98);
-    backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-direction: column;
     padding: var(--spacing-lg);
@@ -3852,6 +3850,17 @@ body.theme-femenino {
   will-change: backdrop-filter;
   isolation: isolate;
 }
+/* ⚡ Celulares: el desenfoque detrás del menú fijo obligaba a re-desenfocar
+   la página en cada cuadro del scroll (lo más caro de pintar en un celular).
+   Con el fondo casi opaco se ve igual y el scroll queda fluido. */
+@media (max-width: 767px) {
+  .navbar-sticky {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(8, 12, 18, 0.96);
+    will-change: auto;
+  }
+}
 body.theme-femenino .navbar-sticky {
   border-bottom-color: rgba(232, 24, 122, 0.15);
 }
@@ -4105,8 +4114,6 @@ table tbody tr:hover {
     bottom: 0; left: 0; right: 0;
     z-index: 150;
     background: rgba(8,12,18,0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid rgba(255,255,255,0.08);
     padding: 6px 0 max(6px, env(safe-area-inset-bottom));
     justify-content: space-around;
@@ -4571,8 +4578,6 @@ table tbody tr:hover {
   height: 56px;
   overflow: hidden;
   background: rgba(8, 12, 18, 0.97);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 
@@ -4679,8 +4684,6 @@ table tbody tr:hover {
     bottom: 0; left: 0; right: 0;
     z-index: 190;
     background: rgba(10, 14, 22, 0.97);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid rgba(255,255,255,0.08);
     padding: 6px 4px max(10px, env(safe-area-inset-bottom));
     justify-content: space-around;
@@ -5127,11 +5130,14 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .bottom-nav {
     display: flex !important;
     position: fixed;
+    /* 🐛 La regla general "nav { top: 0 }" también le pegaba a esta barra
+       (es un <nav>): con top y bottom a la vez gana top, así que en el
+       celular quedaba ARRIBA tapando el encabezado (lupa de búsqueda,
+       actualizar, YouTube, Instagram). top: auto la deja abajo. */
+    top: auto;
     bottom: 0; left: 0; right: 0;
     z-index: 400;
     background: rgba(8, 12, 18, 0.98);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid rgba(255,255,255,0.1);
     padding: 0 0 max(8px, env(safe-area-inset-bottom));
     justify-content: space-around;
@@ -6081,24 +6087,30 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   background: var(--bg-main, transparent);
   opacity: 0.5;
 }
-.wave-bg svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+/* Cada onda es una capa HTML del 125% del ancho que se corre un 20% de su
+   ancho (= un periodo de la onda) y vuelve a empezar: se mueve con la placa
+   de video, sin redibujar el SVG en cada cuadro. */
 .wave-bg .wv {
+  position: absolute;
+  left: 0;
+  width: 125%;
+  will-change: transform;
   animation-name: wave-bg-scroll;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+.wave-bg .wv svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 .wave-bg.is-paused .wv {
   animation-play-state: paused;
 }
 @keyframes wave-bg-scroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-200px); }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-20%, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .wave-bg .wv { animation: none; }

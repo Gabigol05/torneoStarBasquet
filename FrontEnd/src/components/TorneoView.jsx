@@ -49,9 +49,7 @@ function TableSkeleton() {
 
 import { useTournament }    from '../context/TournamentContext';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
-import { GameCenterModal }  from './GameCenterModal';
-import { PlayerProfileModal } from './PlayerProfileModal';
-import { TeamPageFem }      from './TeamPageFem';
+import { GameCenterModal, PlayerProfileModal, TeamPageFem } from './LazyModals';
 import { FavoritoCard }     from './FavoritoCard';
 import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';

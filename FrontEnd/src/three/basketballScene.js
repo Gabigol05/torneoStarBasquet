@@ -34,11 +34,18 @@ function drawSeams(x, strokeStyle, lineWidth) {
   x.stroke();
 }
 
-function makeBallTexture() {
+// ⚠️ Rendimiento (revisión general): en celulares las texturas de la pelota se
+// dibujan a la mitad de resolución (512×256) y con la cuarta parte de
+// "granitos" — antes eran 16.000 círculos/gradientes sobre lienzos de
+// 1024×512 al cargar la página, una tarea larga que trababa los celulares
+// de gama media justo cuando la página se está mostrando. A la escala en
+// que se ve la pelota, no hay diferencia visible.
+function makeBallTexture(s = 1) {
   const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 512;
+  c.width = 1024 * s;
+  c.height = 512 * s;
   const x = c.getContext('2d');
+  x.setTransform(s, 0, 0, s, 0, 0);
 
   const g = x.createLinearGradient(0, 0, 0, 512);
   g.addColorStop(0, '#d97a3d');
@@ -48,7 +55,7 @@ function makeBallTexture() {
   x.fillRect(0, 0, 1024, 512);
 
   // pebbled leather grain
-  for (let i = 0; i < 9000; i++) {
+  for (let i = 0; i < 9000 * s * s; i++) {
     const shade = Math.random() > 0.5
       ? `rgba(70,30,8,${Math.random() * 0.16})`
       : `rgba(255,200,140,${Math.random() * 0.10})`;
@@ -75,15 +82,16 @@ function makeBallTexture() {
   return tex;
 }
 
-function makeBallBumpMap() {
+function makeBallBumpMap(s = 1) {
   const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 512;
+  c.width = 1024 * s;
+  c.height = 512 * s;
   const x = c.getContext('2d');
+  x.setTransform(s, 0, 0, s, 0, 0);
   x.fillStyle = '#808080';
   x.fillRect(0, 0, 1024, 512);
 
-  for (let i = 0; i < 7000; i++) {
+  for (let i = 0; i < 7000 * s * s; i++) {
     const px = Math.random() * 1024;
     const py = Math.random() * 512;
     const r = Math.random() * 1.4 + 0.7;
@@ -133,7 +141,10 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.75 : 2));
+  // Densidad de píxeles más baja: en celulares cada punto extra de densidad
+  // multiplica el trabajo de la GPU (y la batería) sin mejorar algo visible
+  // en una pelota con fondo difuso.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.25 : 1.5));
   renderer.setSize(W, H);
 
   const scene = new THREE.Scene();
@@ -148,10 +159,10 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
   const mood = colorObj[mode].clone();
 
   const ball = new THREE.Mesh(
-    new THREE.SphereGeometry(BALL_RADIUS, 64, 64),
+    new THREE.SphereGeometry(BALL_RADIUS, isMobile ? 40 : 64, isMobile ? 40 : 64),
     new THREE.MeshStandardMaterial({
-      map: makeBallTexture(),
-      bumpMap: makeBallBumpMap(),
+      map: makeBallTexture(isMobile ? 0.5 : 1),
+      bumpMap: makeBallBumpMap(isMobile ? 0.5 : 1),
       bumpScale: 0.028,
       roughness: 0.58,
       metalness: 0.04,
@@ -245,6 +256,9 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
     canvas.style.cursor = 'grabbing';
   };
   const onPointerMove = (e) => {
+    // Pausada (fuera de pantalla / pestaña oculta): no calcular nada en cada
+    // movimiento del mouse.
+    if (paused && !dragging) return;
     if (dragging) {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
@@ -273,11 +287,17 @@ export function createBasketballScene({ canvas, container, initialMode, modeColo
   let raf = null;
   let last = performance.now();
 
+  // En celulares se dibuja a ~30 cuadros por segundo (la mitad): el giro
+  // lento de la pelota se ve igual y se ahorra la mitad de batería/GPU.
+  const minFrameMs = isMobile ? 1000 / 31 : 0;
+  let lastRender = 0;
   const loop = () => {
     if (disposed) return;
     if (paused) { raf = null; return; }
     raf = requestAnimationFrame(loop);
     const now = performance.now();
+    if (minFrameMs && now - lastRender < minFrameMs) return;
+    lastRender = now;
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
 

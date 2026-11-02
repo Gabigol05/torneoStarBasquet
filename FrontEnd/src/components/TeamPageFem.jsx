@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
-import { PlayerProfileModal } from './PlayerProfileModal';
-import { GameCenterModal } from './GameCenterModal';
+import { PlayerProfileModal, GameCenterModal } from './LazyModals';
 import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
 import { edadDesde } from '../lib/edad';
 

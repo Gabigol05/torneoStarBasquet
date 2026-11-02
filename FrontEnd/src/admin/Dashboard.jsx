@@ -6,6 +6,12 @@ import { equiposMasculino } from '../data/masculinoData';
 import { labelFecha, esPartidoPlayoff, labelInstanciaCorta } from '../lib/fechaLabel';
 import { useTemporada } from '../context/TemporadaContext';
 
+// "Hoy" como YYYY-MM-DD en hora local (no UTC).
+function hoyLocalISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // ── Íconos ──────────────────────────────────────────────────────────────────
 // Set de íconos de líneas (mismo trazo/tamaño) en vez de emoji sueltos —
 // un emoji por tarjeta nunca termina de leerse "prolijo" porque cada uno
@@ -124,7 +130,7 @@ function buildExtra(partidosCat, fechaMap) {
   const maxDia = Math.max(...porDia);
   const diaTop = maxDia > 0 ? DIA_LABELS[porDia.indexOf(maxDia)] : null;
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocalISO(); // fecha de HOY en Argentina (toISOString daba la de UTC: después de las 21 ya era 'mañana')
   const jugadosHoy = conFecha.filter(p => p.effDate === hoy && p.estado === 'finalizado').length;
 
   const lunesActual = lunesDeSemana(hoy);
@@ -1084,7 +1090,7 @@ export default function Dashboard({ irACargarPartido, onNavigate, categoria: cat
         const jugados    = partidos.filter(p => p.estado === 'finalizado').length;
         const pendientes = partidos.filter(p => p.estado === 'pendiente').length;
 
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = hoyLocalISO(); // fecha de HOY en Argentina (toISOString daba la de UTC: después de las 21 ya era 'mañana')
         const proximos = partidos
           .filter(p => p.estado === 'pendiente' && p.fecha_partido && p.fecha_partido >= hoy)
           .sort((a, b) => (a.fecha_partido + (a.hora_inicio ?? '')).localeCompare(b.fecha_partido + (b.hora_inicio ?? '')));

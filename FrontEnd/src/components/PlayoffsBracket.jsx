@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import { useStats } from '../context/StatsContext';
-import { GameCenterModal } from './GameCenterModal';
+import { GameCenterModal } from './LazyModals';
 import { MatchResultCard, FixtureCard, buildJugadorasMap } from './TorneoView.jsx';
 
 const CUPS = [
@@ -102,9 +102,8 @@ export function etiquetaSiembra(team, fallbackNum) {
 // clasificado de la otra, el 2° contra el anteúltimo, etc. Con 4 por zona:
 //   llave 1: 1°A vs 4°B      llave 3: 1°B vs 4°A
 //   llave 2: 2°B vs 3°A      llave 4: 2°A vs 3°B
-// Las llaves 1 y 2 se cruzan en la Semi 1, y 3 y 4 en la Semi 2 (así lo
-// arman tanto este cuadro como PlayoffsAdmin) — los dos primeros de zona
-// quedan en mitades distintas y solo se pueden encontrar en la Final.
+// Las semis NO salen de llaves vecinas: se vuelven a cruzar por tabla
+// general entre los 4 ganadores (ver semisPorTablaGeneral más abajo).
 // Con 2 por zona (semis directo): 1°A vs 2°B y 1°B vs 2°A. Con 1: 1°A vs 1°B.
 // El local es siempre el mejor ubicado.
 //
@@ -144,6 +143,30 @@ export function primeraRonda(pool, size) {
     sobrantes: lista.slice(size),
     cruzaZonas: false,
   };
+}
+
+// Semifinales cuando vienen de cuartos (regla del organizador del torneo):
+// NO se cruzan los ganadores de llaves vecinas (llave 1 vs llave 2), sino que
+// los 4 equipos que ganaron cuartos se ordenan por la TABLA GENERAL de la
+// fase regular (las dos zonas juntas: PTS -> DIF -> PF) y se cruzan
+//   Semi 1: 1° vs 4°      Semi 2: 2° vs 3°
+// con el mejor ubicado de local. Hasta que no estén los 4 ganadores no se
+// puede saber quién juega con quién -> devuelve null.
+// La usan el cuadro público y el panel (PlayoffsAdmin) para generar las semis.
+export function semisPorTablaGeneral(ganadores) {
+  if (!ganadores || ganadores.length !== 4 || ganadores.some(g => !g)) return null;
+  const o = sortByStandings(ganadores);
+  return [[o[0], o[3]], [o[1], o[2]]];
+}
+
+// Aviso que se muestra debajo del título "Semifinal" cuando las semis salen
+// de cuartos.
+function NotaTablaGeneral() {
+  return (
+    <div style={{ marginTop: 4, fontSize: 10, letterSpacing: 1, color: 'var(--gold)', opacity: .85 }}>
+      Cruce por tabla general
+    </div>
+  );
 }
 
 // Devuelve el equipo GANADOR de un partido real de playoff ya finalizado, o
@@ -322,7 +345,7 @@ function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
   );
 }
 
-function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido }) {
+function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido, posGeneral }) {
   const size = bracketSizeFor(pool.length);
   if (size === 0) return <BracketVacio accentColor={accentColor} />;
 
@@ -339,7 +362,11 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
     const ganadoresCuartos = pairs.map((_, i) =>
       resolveWinner(buscarPartidoSlot(partidosCopa, 'cuartos', i + 1), equipoMap)
     );
-    const semisSlots = [[0,1],[2,3]];
+    // Semis por tabla general entre los 4 ganadores (ver semisPorTablaGeneral):
+    // mientras falte algún resultado de cuartos se muestran "Por definir".
+    const semis = semisPorTablaGeneral(ganadoresCuartos);
+    const etiqGral = t => (t && posGeneral?.[t.id] ? `${posGeneral[t.id]}° gral` : null);
+    const semisSlots = [0, 1];
     const ganadoresSemis = semisSlots.map((_, i) =>
       resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', i + 1), equipoMap)
     );
@@ -357,15 +384,14 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
             ))}
           </div>
           <div className="bracket-round">
-            <div className="bracket-round-label">Semifinal</div>
-            <div style={{ marginTop: 'var(--po-mt-semi1, 32px)' }}>
-              <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={1}
-                fallbackA={ganadoresCuartos[0]} fallbackB={ganadoresCuartos[1]}/>
-            </div>
-            <div style={{ marginTop: 'var(--po-mt-semi2, 48px)' }}>
-              <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={2}
-                fallbackA={ganadoresCuartos[2]} fallbackB={ganadoresCuartos[3]}/>
-            </div>
+            <div className="bracket-round-label">Semifinal<NotaTablaGeneral/></div>
+            {semisSlots.map(i => (
+              <div key={i} style={{ marginTop: i === 0 ? 'var(--po-mt-semi1, 32px)' : 'var(--po-mt-semi2, 48px)' }}>
+                <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
+                  fallbackA={semis?.[i][0]} fallbackB={semis?.[i][1]}
+                  seedA={etiqGral(semis?.[i][0])} seedB={etiqGral(semis?.[i][1])}/>
+              </div>
+            ))}
           </div>
           <div className="bracket-round">
             <div className="bracket-round-label">Final</div>
@@ -458,7 +484,7 @@ function BracketVacio({ accentColor }) {
           ))}
         </div>
         <div className="bracket-round">
-          <div className="bracket-round-label">Semifinal</div>
+          <div className="bracket-round-label">Semifinal<NotaTablaGeneral/></div>
           <div className="bracket-match" style={{ marginTop: 32 }}>
             <div className="bracket-team tbd">TBD</div>
             <div className="bracket-team tbd">TBD</div>
@@ -513,7 +539,7 @@ function TercerPuesto({ partido, equipos, jugadorasMap, fechas, onAbrirPartido, 
   );
 }
 
-function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido }) {
+function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido, posGeneral }) {
   const partidosCopa = useMemo(
     () => partidosPlayoff.filter(p => p.copa === cup.key),
     [partidosPlayoff, cup.key]
@@ -530,8 +556,23 @@ function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasM
         <span style={{ width: 12, height: 12, borderRadius: 3, background: cup.color, display: 'inline-block' }}/>
         {cup.label}
       </div>
+      {/* Regla del torneo: las semis no son "ganador de la llave 1 vs ganador
+          de la llave 2" — se vuelven a cruzar por tabla general. Solo aplica
+          cuando la copa arranca en cuartos (cuadro de 8). */}
+      {(bracketSizeFor(pool?.length ?? 0) === 8 || (pool?.length ?? 0) === 0) && (
+        <div style={{
+          marginBottom: 16, padding: '9px 13px', borderRadius: 10, maxWidth: 720,
+          border: `1px solid ${hexA(cup.color, '40')}`, background: hexA(cup.color, '0f'),
+          fontFamily: "'Barlow Condensed'", fontSize: 13, lineHeight: 1.45, color: '#C9D3E3',
+        }}>
+          <b style={{ color: cup.color }}>Semifinales por tabla general:</b> los 4 que ganen los cuartos se ordenan
+          por la tabla general (las dos zonas juntas) y se cruzan <b>1° vs 4°</b> y <b>2° vs 3°</b>. No juegan entre
+          sí los ganadores de las llaves de al lado.
+        </div>
+      )}
       <BracketProyectado pool={pool} accentColor={cup.color} partidosCopa={partidosCopa} equipoMap={equipoMap}
-        equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={onAbrirPartido}/>
+        equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={onAbrirPartido}
+        posGeneral={posGeneral}/>
       <TercerPuesto partido={tercerPuesto} equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas}
         onAbrirPartido={onAbrirPartido} accentColor={cup.color}/>
     </div>
@@ -570,6 +611,12 @@ export function PlayoffsBracket() {
   );
 
   const pools = useMemo(() => buildPools(equiposParaPools, mode), [equiposParaPools, mode]);
+  // Puesto de cada equipo en la tabla general (las dos zonas juntas) — es el
+  // que define los cruces de semifinal.
+  const posGeneral = useMemo(
+    () => Object.fromEntries(sortByStandings(equiposParaPools).map((t, i) => [t.id, i + 1])),
+    [equiposParaPools]
+  );
   const equipoMap = useMemo(() => Object.fromEntries(equiposDeTemporada.map(t => [t.id, t])), [equiposDeTemporada]);
   const jugadorasMap = useMemo(() => buildJugadorasMap(equiposDeTemporada), [equiposDeTemporada]);
   // Solo partidos de playoff (cargados desde el admin con "¿Es Playoff?"
@@ -610,7 +657,8 @@ export function PlayoffsBracket() {
 
         {CUPS.map(cup => (
           <CupBracket key={cup.key} cup={cup} pool={pools[cup.key]} partidosPlayoff={partidosPlayoff} equipoMap={equipoMap}
-            equipos={equiposDeTemporada} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={setSelectedMatch}/>
+            equipos={equiposDeTemporada} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={setSelectedMatch}
+            posGeneral={posGeneral}/>
         ))}
       </section>
     </>

@@ -163,8 +163,8 @@ export function semisPorTablaGeneral(ganadores) {
 // de cuartos.
 function NotaTablaGeneral() {
   return (
-    <div style={{ marginTop: 4, fontSize: 10, letterSpacing: 1, color: 'var(--gold)', opacity: .85 }}>
-      Cruce por tabla general
+    <div style={{ marginTop: 6, fontSize: 'clamp(12px, 1.4vw, 14px)', letterSpacing: 1.5, color: 'var(--gold)' }}>
+      Cruces por tabla general
     </div>
   );
 }
@@ -556,20 +556,6 @@ function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasM
         <span style={{ width: 12, height: 12, borderRadius: 3, background: cup.color, display: 'inline-block' }}/>
         {cup.label}
       </div>
-      {/* Regla del torneo: las semis no son "ganador de la llave 1 vs ganador
-          de la llave 2" — se vuelven a cruzar por tabla general. Solo aplica
-          cuando la copa arranca en cuartos (cuadro de 8). */}
-      {(bracketSizeFor(pool?.length ?? 0) === 8 || (pool?.length ?? 0) === 0) && (
-        <div style={{
-          marginBottom: 16, padding: '9px 13px', borderRadius: 10, maxWidth: 720,
-          border: `1px solid ${hexA(cup.color, '40')}`, background: hexA(cup.color, '0f'),
-          fontFamily: "'Barlow Condensed'", fontSize: 13, lineHeight: 1.45, color: '#C9D3E3',
-        }}>
-          <b style={{ color: cup.color }}>Semifinales por tabla general:</b> los 4 que ganen los cuartos se ordenan
-          por la tabla general (las dos zonas juntas) y se cruzan <b>1° vs 4°</b> y <b>2° vs 3°</b>. No juegan entre
-          sí los ganadores de las llaves de al lado.
-        </div>
-      )}
       <BracketProyectado pool={pool} accentColor={cup.color} partidosCopa={partidosCopa} equipoMap={equipoMap}
         equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={onAbrirPartido}
         posGeneral={posGeneral}/>
@@ -622,7 +608,6 @@ export function PlayoffsBracket() {
   // Solo partidos de playoff (cargados desde el admin con "¿Es Playoff?"
   // tildado) — el resto de partidos de temporada regular no entra acá.
   const partidosPlayoff = useMemo(() => (partidos ?? []).filter(p => p.es_playoff), [partidos]);
-  const hayResultadosReales = partidosPlayoff.length > 0;
 
   return (
     <>
@@ -635,25 +620,7 @@ export function PlayoffsBracket() {
       />
       <section className="page-section" id="bracket">
         <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Postemporada</p>
-        <h2 className="section-heading">Playoffs <span className="gold">2026</span></h2>
-
-        {mode === 'femenino' && (
-          <div style={{ marginBottom: 8, fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700,
-            letterSpacing: 3, textTransform: 'uppercase', color: 'var(--fem2)' }}>
-            Torneo Femenino
-          </div>
-        )}
-        {mode === 'masculino' && (
-          <div style={{ marginBottom: 8, fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700,
-            letterSpacing: 3, textTransform: 'uppercase', color: 'var(--masc2)' }}>
-            Torneo Masculino
-          </div>
-        )}
-        <div style={{ marginBottom: 24, fontFamily: "'Barlow Condensed'", fontSize: 12, color: 'var(--gray)' }}>
-          {hayResultadosReales
-            ? 'Los cruces con resultado ya cargado muestran el marcador real y quién avanza — tocalos para ver el partido completo. El resto sigue proyectado por la posición actual en la tabla, y se completa solo apenas se carga cada partido.'
-            : 'Cruces proyectados según la posición actual en la tabla — se actualizan solos a medida que se cargan resultados de playoffs.'}
-        </div>
+        <h2 className="section-heading" style={{ marginBottom: 28 }}>Playoffs <span className="gold">2026</span></h2>
 
         {CUPS.map(cup => (
           <CupBracket key={cup.key} cup={cup} pool={pools[cup.key]} partidosPlayoff={partidosPlayoff} equipoMap={equipoMap}

@@ -105,35 +105,73 @@ export function PageHome() {
 
   // Chequea si hay una version nueva publicada (comparando el bundle actual
   // contra el que esta realmente sirviendo el servidor ahora mismo). Si
-  // encuentra una version distinta, recarga y devuelve true. Se usa tanto al
-  // entrar a la app como al deslizar para refrescar (clave para cuando la
-  // app se abre desde el icono de "agregar a inicio", sin boton nativo).
+  // encuentra una version distinta, recarga y devuelve true. Se usa al
+  // entrar, al deslizar para refrescar y al volver a la app (ver abajo).
+  //
+  // 🔄 FIX (pedido de Alvaro: "la app instalada a veces abre la versión
+  // vieja"): antes el pedido de "/" lo contestaba la copia guardada del
+  // service worker, así que este chequeo nunca veía la versión nueva. Ahora
+  // se pide con un parámetro que ninguna caché tiene guardado (va sí o sí a
+  // internet), y antes de recargar se espera a que el service worker nuevo
+  // quede instalado, para que la recarga ya abra la versión nueva.
   const checkForUpdate = useCallback(async () => {
     try {
-      const res = await fetch('/', { cache: 'no-store' });
+      if (!navigator.onLine) return false;
+      const res = await fetch(`/?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return false;
       const html = await res.text();
-      const match = html.match(/<script[^>]+src="([^"]+\.js)"/);
-      const latest = match?.[1];
+      const latest = html.match(/src="([^"]*\/assets\/index-[^"]+\.js)"/)?.[1];
       if (!latest) return false;
 
-      // ⚠️ FIX: antes se comparaba contra lo último guardado en
-      // localStorage, no contra el código que realmente está corriendo — así,
-      // después de cada deploy, la app instalada (que ya se actualizaba sola)
-      // recargaba una segunda vez de gusto. Ahora se compara contra el script
-      // que está cargado en esta página, y como máximo se recarga una vez por
-      // versión (por si el navegador sigue sirviendo la vieja desde caché).
+      // Se compara contra el script que realmente está corriendo, y como
+      // máximo se recarga una vez por versión (evita recargas en bucle).
       const actual = document.querySelector('script[type="module"][src*="/assets/index-"]')?.getAttribute('src');
       if (!actual || actual === latest) return false;
       let yaIntentado = null;
       try { yaIntentado = sessionStorage.getItem('star_basquet_reload_to'); } catch { /* sin storage */ }
       if (yaIntentado === latest) return false;
       try { sessionStorage.setItem('star_basquet_reload_to', latest); } catch { /* sin storage */ }
+
+      // Que el service worker nuevo termine de instalarse (máx. 4 s) antes
+      // de recargar — si no, el viejo podría volver a servir la versión vieja.
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration();
+        if (reg) {
+          await reg.update().catch(() => {});
+          const nuevo = reg.installing || reg.waiting;
+          if (nuevo) {
+            await new Promise(resolve => {
+              const t = setTimeout(resolve, 4000);
+              const ver = () => {
+                if (nuevo.state === 'activated' || nuevo.state === 'redundant') { clearTimeout(t); resolve(); }
+              };
+              nuevo.addEventListener('statechange', ver);
+              ver();
+            });
+          }
+        }
+      } catch { /* sin service worker: se recarga igual */ }
+
       window.location.reload();
       return true;
     } catch {
       return false;
     }
   }, []);
+
+  // La app instalada queda abierta "de fondo" días enteros: al volver a
+  // ella (después de 30 s o más afuera) se vuelve a chequear si hay versión
+  // nueva, igual que si se abriera de cero.
+  useEffect(() => {
+    let ocultaDesde = document.hidden ? Date.now() : null;
+    const onVis = () => {
+      if (document.hidden) { ocultaDesde = Date.now(); return; }
+      if (ocultaDesde && Date.now() - ocultaDesde > 30000) checkForUpdate();
+      ocultaDesde = null;
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [checkForUpdate]);
 
   const handlePullRefresh = useCallback(async () => {
     const reloaded = await checkForUpdate();

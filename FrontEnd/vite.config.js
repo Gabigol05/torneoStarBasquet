@@ -20,7 +20,27 @@ export default defineConfig({
       // Lo mismo con la pelota 3D (three.js, ~0,5 MB): en celulares viejos o
       // con ahorro de datos no se muestra, así que no tiene sentido bajarla.
       workbox: {
+        // 🔄 App instalada = igual que la web (pedido de Alvaro): antes la
+        // página principal (index.html) se guardaba en el celular y la app
+        // instalada SIEMPRE arrancaba con la versión guardada; la nueva
+        // recién aparecía la vez siguiente que se abría. Ahora, al abrir, la
+        // página se pide primero a internet (lo nuevo al instante) y solo si
+        // no hay conexión (o tarda más de 4 s) se usa la copia guardada.
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "paginas",
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 5 },
+            },
+          },
+        ],
+        cleanupOutdatedCaches: true,
         globIgnores: [
+          "**/index.html",
           "**/three-*.js",
           "**/basketballScene-*.js",
           "**/xlsx-*.js",

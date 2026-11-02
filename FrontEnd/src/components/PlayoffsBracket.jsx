@@ -55,6 +55,10 @@ export function buildPools(equipos, mode) {
     const zonaB = sortByStandings(equipos.filter(t => t.zona === 'B'));
     const gA = Math.ceil(zonaA.length / 3);
     const gB = Math.ceil(zonaB.length / 3);
+    // posZona = puesto del equipo DENTRO de su zona (1°A, 2°B, ...) — lo usa
+    // primeraRonda() para cruzar zonas y para rotular cada casillero.
+    zonaA.forEach((t, i) => { zonaA[i] = { ...t, posZona: i + 1 }; });
+    zonaB.forEach((t, i) => { zonaB[i] = { ...t, posZona: i + 1 }; });
     return {
       oro:    sortByStandings([...zonaA.slice(0, gA),      ...zonaB.slice(0, gB)]),
       plata:  sortByStandings([...zonaA.slice(gA, gA * 2), ...zonaB.slice(gB, gB * 2)]),
@@ -85,6 +89,63 @@ export function bracketSizeFor(n) {
   return 0;
 }
 
+// Etiqueta de siembra de un equipo: "1°A" si viene de una zona, o el número
+// de la tabla general si no hay zonas.
+export function etiquetaSiembra(team, fallbackNum) {
+  if (team?.zona && team?.posZona) return `${team.posZona}°${team.zona}`;
+  return fallbackNum != null ? `${fallbackNum}°` : null;
+}
+
+// Cruces de la PRIMERA ronda de una copa (pedido de Alvaro).
+//
+// Con zonas, se cruzan las zonas: el 1° de una zona contra el último
+// clasificado de la otra, el 2° contra el anteúltimo, etc. Con 4 por zona:
+//   llave 1: 1°A vs 4°B      llave 3: 1°B vs 4°A
+//   llave 2: 2°B vs 3°A      llave 4: 2°A vs 3°B
+// Las llaves 1 y 2 se cruzan en la Semi 1, y 3 y 4 en la Semi 2 (así lo
+// arman tanto este cuadro como PlayoffsAdmin) — los dos primeros de zona
+// quedan en mitades distintas y solo se pueden encontrar en la Final.
+// Con 2 por zona (semis directo): 1°A vs 2°B y 1°B vs 2°A. Con 1: 1°A vs 1°B.
+// El local es siempre el mejor ubicado.
+//
+// Sin zonas (o si una zona no llega a completar su mitad del cuadro) se usa
+// la siembra general de antes: 1 vs 8, 2 vs 7... sobre la tabla combinada.
+//
+// Devuelve { pares: [[local, visita]], seeds: [[etiqA, etiqB]], sobrantes }.
+export function primeraRonda(pool, size) {
+  const lista = pool ?? [];
+  const k = size / 2;
+  const zonaA = sortByStandings(lista.filter(t => t.zona === 'A'));
+  const zonaB = sortByStandings(lista.filter(t => t.zona === 'B'));
+
+  if (size >= 2 && zonaA.length >= k && zonaB.length >= k) {
+    const A = zonaA.slice(0, k), B = zonaB.slice(0, k);
+    // Para cada puesto i de la mitad superior: (i°A vs (k+1-i)°B) y (i°B vs
+    // (k+1-i)°A), intercalados para que cada semi tenga un equipo de cada
+    // mitad (ver comentario de arriba).
+    let pares;
+    if (k === 4)      pares = [[A[0], B[3]], [B[1], A[2]], [B[0], A[3]], [A[1], B[2]]];
+    else if (k === 2) pares = [[A[0], B[1]], [B[0], A[1]]];
+    else              pares = [[A[0], B[0]]];
+    const usados = new Set(pares.flat().map(t => t.id));
+    return {
+      pares,
+      seeds: pares.map(([a, b]) => [etiquetaSiembra(a), etiquetaSiembra(b)]),
+      sobrantes: lista.filter(t => !usados.has(t.id)),
+      cruzaZonas: true,
+    };
+  }
+
+  const seeded = lista.slice(0, size);
+  const idx = size === 8 ? [[0,7],[1,6],[2,5],[3,4]] : size === 4 ? [[0,3],[1,2]] : size === 2 ? [[0,1]] : [];
+  return {
+    pares: idx.map(([a, b]) => [seeded[a], seeded[b]]),
+    seeds: idx.map(([a, b]) => [`${a + 1}°`, `${b + 1}°`]),
+    sobrantes: lista.slice(size),
+    cruzaZonas: false,
+  };
+}
+
 // Devuelve el equipo GANADOR de un partido real de playoff ya finalizado, o
 // null si todavía no se jugó / no se cargó. Es la pieza clave del auto-avance:
 // en cuanto este partido se marca "finalizado", el ganador queda disponible
@@ -111,7 +172,7 @@ function TeamSeed({ team, seed }) {
             border: `1.5px solid ${team.color}`, boxShadow: `0 0 6px ${hexA(team.color, '59')}` }}
           onError={e => { e.target.style.display = 'none'; }}/>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {seed != null ? `${seed}. ` : ''}{team.name}
+          {seed != null ? <span style={{ opacity: .6, marginRight: 5 }}>{seed}</span> : null}{team.name}
         </span>
       </span>
     </div>
@@ -265,12 +326,14 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
   const size = bracketSizeFor(pool.length);
   if (size === 0) return <BracketVacio accentColor={accentColor} />;
 
-  const seeded = pool.slice(0, size);
-  const sobrantes = pool.slice(size);
+  // Cruces de la primera ronda (con zonas: 1°A vs 4°B, 2°B vs 3°A, etc. —
+  // ver primeraRonda) — mismo armado que usa el panel para generarlos.
+  const ronda1 = primeraRonda(pool, size);
+  const sobrantes = ronda1.sobrantes;
   const slotProps = { equipos, jugadorasMap, fechas, onAbrirPartido, accentColor };
 
   if (size === 8) {
-    const pairs = [[0,7],[1,6],[2,5],[3,4]];
+    const pairs = ronda1.pares;
     // Ganadores de cuartos (real si el partido está cargado y finalizado,
     // null si todavía no) — alimentan el casillero de semifinal.
     const ganadoresCuartos = pairs.map((_, i) =>
@@ -289,8 +352,8 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
           <div className="bracket-round">
             <div className="bracket-round-label">Cuartos</div>
             {pairs.map(([a, b], i) => (
-              <Slot key={a} {...slotProps} partidosCopa={partidosCopa} instancia="cuartos" llave={i + 1}
-                fallbackA={seeded[a]} fallbackB={seeded[b]} seedA={a + 1} seedB={b + 1}/>
+              <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="cuartos" llave={i + 1}
+                fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
             ))}
           </div>
           <div className="bracket-round">
@@ -323,7 +386,7 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
   }
 
   if (size === 4) {
-    const pairs = [[0,3],[1,2]];
+    const pairs = ronda1.pares;
     const ganadoresSemis = pairs.map((_, i) =>
       resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', i + 1), equipoMap)
     );
@@ -336,8 +399,8 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
           <div className="bracket-round">
             <div className="bracket-round-label">Semifinal</div>
             {pairs.map(([a, b], i) => (
-              <Slot key={a} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
-                fallbackA={seeded[a]} fallbackB={seeded[b]} seedA={a + 1} seedB={b + 1}/>
+              <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
+                fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
             ))}
           </div>
           <div className="bracket-round">
@@ -367,7 +430,8 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
         <div className="bracket-round">
           <div className="bracket-round-label">Final</div>
           <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-            fallbackA={seeded[0]} fallbackB={seeded[1]} seedA={1} seedB={2}/>
+            fallbackA={ronda1.pares[0]?.[0]} fallbackB={ronda1.pares[0]?.[1]}
+            seedA={ronda1.seeds[0]?.[0]} seedB={ronda1.seeds[0]?.[1]}/>
         </div>
         <div className="bracket-round">
           <div className="bracket-round-label">Campeon</div>

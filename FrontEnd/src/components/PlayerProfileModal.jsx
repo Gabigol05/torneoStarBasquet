@@ -340,7 +340,17 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
   const { temporadas, temporadaSeleccionadaId } = useTemporada();
   const temporadaHomeId = temporadaSeleccionadaId[mode];
   const [temporadaVerId, setTemporadaVerId] = useState(temporadaHomeId);
+  // ⚠️ FIX: la caché estaba indexada SOLO por temporada — como este modal
+  // queda montado entre una persona y otra, abrir a A, mirar "Apertura",
+  // y después abrir a B y mirar "Apertura" mostraba los datos de A. Ahora la
+  // clave incluye categoría + jugador/a + temporada.
   const [cachePorTemporada, setCachePorTemporada] = useState({});
+  const claveCache = `${mode}:${player?.id}:${temporadaVerId}`;
+  // Stats partido a partido de ESTA persona en la temporada "de casa" —
+  // antes venían de una descarga de la tabla entera (todas las personas,
+  // todas las temporadas) que hacía cada visitante al entrar a la página;
+  // ahora se piden solo acá, solo las de esta persona, al abrir el perfil.
+  const [statsHome, setStatsHome] = useState({});
 
   // Al abrir el modal (o cambiar de jugadora, o si el chip global cambió
   // mientras el modal estaba cerrado) siempre arranca de nuevo en la
@@ -355,11 +365,12 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
   useEffect(() => {
     if (!isOpen || !player?.id || esTemporadaHome) return;
     if (!isConfigured) return;
-    if (cachePorTemporada[temporadaVerId]) return; // ya cargada (u ocurrió error) — no repetir
+    if (cachePorTemporada[claveCache]) return; // ya cargada (u ocurrió error) — no repetir
     const tablas = TABLAS_POR_MODO[mode] ?? TABLAS_POR_MODO.femenino;
+    const clave = claveCache;
     let cancelado = false;
     (async () => {
-      setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: { loading: true } }));
+      setCachePorTemporada(prev => ({ ...prev, [clave]: { loading: true } }));
       try {
         const [{ data: estRows, error: eErr }, { data: fechasRows, error: fErr }] = await Promise.all([
           supabase.from(tablas.estadisticas).select('*').eq(tablas.idCol, player.id).eq('temporada_id', temporadaVerId),
@@ -400,7 +411,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         // los de estadisticas_X de ESA temporada puntual (o en cero si
         // todavía no jugó ninguna fecha de esa temporada).
         const estRow = (estRows ?? [])[0] ?? null;
-        setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: {
+        setCachePorTemporada(prev => ({ ...prev, [clave]: {
           loading: false,
           player: { ...player, ...(estRow ?? { pj: 0 }) },
           partidos: partidosDeEsa,
@@ -409,18 +420,51 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         } }));
       } catch (err) {
         console.error('[PlayerProfileModal] cambio de temporada:', err);
-        if (!cancelado) setCachePorTemporada(prev => ({ ...prev, [temporadaVerId]: { loading: false, error: err.message } }));
+        if (!cancelado) setCachePorTemporada(prev => ({ ...prev, [clave]: { loading: false, error: err.message } }));
       }
     })();
-    return () => { cancelado = true; };
+    // Si se cierra o se cambia de temporada a mitad de la carga, se borra la
+    // entrada "cargando" — si no, al volver quedaba un spinner para siempre.
+    return () => {
+      cancelado = true;
+      setCachePorTemporada(prev => (prev[clave]?.loading ? (({ [clave]: _x, ...resto }) => resto)(prev) : prev));
+    };
   }, [isOpen, temporadaVerId, esTemporadaHome, player?.id, player?.equipoId, mode]);
 
-  const vistaOtraTemporada = !esTemporadaHome ? cachePorTemporada[temporadaVerId] : null;
+  // Stats partido a partido de la temporada "de casa" (ver statsHome arriba).
+  const partidosHomeIds = useMemo(() => (partidos ?? [])
+    .filter(p => p.estado === 'finalizado' && player?.equipoId != null &&
+      (p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId))
+    .map(p => p.id), [partidos, player?.equipoId]);
+  const claveHome = `${mode}:${player?.id}:${partidosHomeIds.join(',')}`;
+  useEffect(() => {
+    if (!isOpen || !player?.id || !isConfigured) return;
+    if (statsHome[claveHome]) return;
+    if (!partidosHomeIds.length) { setStatsHome(prev => ({ ...prev, [claveHome]: {} })); return; }
+    const tablas = TABLAS_POR_MODO[mode] ?? TABLAS_POR_MODO.femenino;
+    let cancelado = false;
+    supabase.from(tablas.statsPartido)
+      .select('partido_id,pts,rd,ro,as_,sc,sf,dc,df,tc,tf,val')
+      .eq(tablas.idCol, player.id)
+      .in('partido_id', partidosHomeIds)
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) { console.warn('[PlayerProfileModal] stats por partido:', error.message); return; }
+        const m = {};
+        for (const r of (data ?? [])) m[r.partido_id] = { [player.id]: r };
+        setStatsHome(prev => ({ ...prev, [claveHome]: m }));
+      });
+    return () => { cancelado = true; };
+  }, [isOpen, player?.id, claveHome, mode]);
+
+  const vistaOtraTemporada = !esTemporadaHome ? cachePorTemporada[claveCache] : null;
   const cargandoOtraTemporada = !esTemporadaHome && (vistaOtraTemporada?.loading ?? true);
   const effectivePlayer         = (!esTemporadaHome && vistaOtraTemporada?.player) ? vistaOtraTemporada.player : player;
   const effectivePartidos       = !esTemporadaHome ? (vistaOtraTemporada?.partidos ?? [])       : partidos;
   const effectiveFechas         = !esTemporadaHome ? (vistaOtraTemporada?.fechas ?? [])         : fechas;
-  const effectiveStatsPorPartido = !esTemporadaHome ? (vistaOtraTemporada?.statsPorPartido ?? {}) : statsPorPartido;
+  const effectiveStatsPorPartido = !esTemporadaHome
+    ? (vistaOtraTemporada?.statsPorPartido ?? {})
+    : (statsHome[claveHome] ?? (statsPorPartido && Object.keys(statsPorPartido).length ? statsPorPartido : {}));
 
   const historialGrafico = useMemo(() => {
     if (!player || !effectiveStatsPorPartido || !effectivePartidos || !effectiveFechas) return [];
@@ -429,7 +473,13 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
         p.estado === 'finalizado' &&
         (p.equipo_local_id === player.equipoId || p.equipo_visit_id === player.equipoId)
       )
-      .sort((a, b) => (a.fecha_id ?? 0) - (b.fecha_id ?? 0))
+      // Orden por número de fecha (no por id de fecha, que depende del orden
+      // en que se crearon en la base). Los playoffs van al final.
+      .sort((a, b) => {
+        const na = effectiveFechas.find(f => f.id === a.fecha_id)?.numero ?? a.fecha_id ?? 0;
+        const nb = effectiveFechas.find(f => f.id === b.fecha_id)?.numero ?? b.fecha_id ?? 0;
+        return (!!a.es_playoff - !!b.es_playoff) || (na - nb) || ((a.llave ?? 0) - (b.llave ?? 0));
+      })
       .map(p => {
         const st    = effectiveStatsPorPartido?.[p.id]?.[player.id];
         const fecha = effectiveFechas.find(f => f.id === p.fecha_id);

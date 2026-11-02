@@ -78,13 +78,18 @@ export function PageHome() {
   // — cada hook de stats usa solo la de su propia categoría. Antes esto no
   // se pasaba a los hooks de stats, así que el sitio público traía TODAS
   // las temporadas mezcladas sin importar el chip.
-  const { temporadaSeleccionadaId } = useTemporada();
+  const { temporadaSeleccionadaId, loading: temporadasCargando } = useTemporada();
   // Antes los dos hooks pedían datos y abrían su canal de Realtime siempre,
   // aunque solo se ve un modo a la vez — cada visitante hacía el doble de
   // queries/websockets de lo necesario. Ahora solo el hook del modo activo
   // hace fetch/subscribe; el otro se activa recién si el usuario cambia de modo.
-  const statsFem  = useFemeninoStats(mode !== 'masculino', temporadaSeleccionadaId.femenino);
-  const statsMasc = useMasculinoStats(mode === 'masculino', temporadaSeleccionadaId.masculino);
+  // ⚠️ FIX (revisión general): mientras TemporadaContext todavía no sabe
+  // cuál es la temporada activa, los hooks arrancaban con temporadaId=null y
+  // descargaban TODO (todas las temporadas), y un instante después lo volvían
+  // a descargar ya filtrado — cada visita bajaba los datos dos veces. Ahora
+  // esperan a que se resuelva la temporada.
+  const statsFem  = useFemeninoStats(mode !== 'masculino' && !temporadasCargando, temporadaSeleccionadaId.femenino);
+  const statsMasc = useMasculinoStats(mode === 'masculino' && !temporadasCargando, temporadaSeleccionadaId.masculino);
   const {
     equipos, partidos, fechas, statsPorPartido,
     isLoading, error, refetch,
@@ -112,15 +117,20 @@ export function PageHome() {
       const latest = match?.[1];
       if (!latest) return false;
 
-      const stored = localStorage.getItem('star_basquet_build');
-      if (stored && stored !== latest) {
-        localStorage.setItem('star_basquet_build', latest);
-        window.location.reload();
-        return true;
-      } else if (!stored) {
-        localStorage.setItem('star_basquet_build', latest);
-      }
-      return false;
+      // ⚠️ FIX: antes se comparaba contra lo último guardado en
+      // localStorage, no contra el código que realmente está corriendo — así,
+      // después de cada deploy, la app instalada (que ya se actualizaba sola)
+      // recargaba una segunda vez de gusto. Ahora se compara contra el script
+      // que está cargado en esta página, y como máximo se recarga una vez por
+      // versión (por si el navegador sigue sirviendo la vieja desde caché).
+      const actual = document.querySelector('script[type="module"][src*="/assets/index-"]')?.getAttribute('src');
+      if (!actual || actual === latest) return false;
+      let yaIntentado = null;
+      try { yaIntentado = sessionStorage.getItem('star_basquet_reload_to'); } catch { /* sin storage */ }
+      if (yaIntentado === latest) return false;
+      try { sessionStorage.setItem('star_basquet_reload_to', latest); } catch { /* sin storage */ }
+      window.location.reload();
+      return true;
     } catch {
       return false;
     }
@@ -216,6 +226,7 @@ export function PageHome() {
         partidos={partidos}
         fechas={fechas}
         addToast={addToast}
+        mode={mode}
       />
       <GameCenterModal
         isOpen={!!deepLinkPartido}

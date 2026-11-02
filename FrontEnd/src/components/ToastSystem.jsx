@@ -5,7 +5,9 @@ export function useToast() {
   const [toasts, setToasts] = useState([]);
 
   const addToast = useCallback(({ icon = '🏀', title, sub, duration = 4000 }) => {
-    const id = Date.now();
+    // Date.now() solo repetía id cuando se creaban dos toasts en el mismo
+    // milisegundo (pasa con cada resultado nuevo) — cerrar uno cerraba los dos.
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setToasts(prev => [...prev, { id, icon, title, sub }]);
     setTimeout(() => removeToast(id), duration);
     return id;

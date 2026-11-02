@@ -8,8 +8,15 @@
 // (PlantelManager/StatsEditor) sigue mostrando y editando la fecha
 // completa, que ahí sí hace falta para cargar categorías por edad.
 export function edadDesde(fechaNacStr) {
-  if (!fechaNacStr) return null;
-  const nac = new Date(fechaNacStr);
+  if (fechaNacStr == null || fechaNacStr === '') return null;
+  // La vista pública (v_jugadoras_publico / v_jugadores_publico) ya manda la
+  // edad calculada en el servidor, para no exponer la fecha completa.
+  if (typeof fechaNacStr === 'number') return (fechaNacStr >= 0 && fechaNacStr < 120) ? fechaNacStr : null;
+  // ⚠️ FIX: new Date('YYYY-MM-DD') se interpreta como medianoche UTC, que
+  // en Argentina (UTC-3) es el día ANTERIOR — la edad cambiaba un día antes
+  // del cumpleaños. Se arma la fecha en hora local a partir de sus partes.
+  const m = String(fechaNacStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const nac = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(fechaNacStr);
   if (Number.isNaN(nac.getTime())) return null;
   const hoy = new Date();
   let edad = hoy.getFullYear() - nac.getFullYear();

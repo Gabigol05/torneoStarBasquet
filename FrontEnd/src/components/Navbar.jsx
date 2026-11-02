@@ -57,6 +57,7 @@ export function Navbar() {
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+        mode={mode}
       />
 
       <nav className="navbar-sticky">

@@ -58,6 +58,38 @@ async function fetchAllRows(queryFactory, pageSize = 1000) {
 // una temporada vieja se puede seguir mirando sin que se mezcle con la
 // actual. Si es null/undefined trae todo sin filtrar (fallback mientras
 // TemporadaContext todavía no resolvió cuál es la temporada activa).
+// Partidos de UNA temporada. partidos_femenino no tiene temporada_id propio (cuelga
+// de fechas_femenino.temporada_id), así que se filtra con un join a fechas. Si ese
+// join fallara por algún motivo (relación no detectada), se cae a pedir
+// primero los ids de fecha de la temporada y filtrar con .in().
+// Plantel público. ⚠️ Privacidad: la tabla jugadoras_femenino tiene DNI y fecha de
+// nacimiento, y antes el sitio la descargaba entera (select *) para todos los
+// visitantes. Ahora se lee la vista v_jugadoras_publico (seguridad_paso1.sql), que
+// trae solo lo público y la EDAD ya calculada — nunca el DNI ni la fecha. Si
+// la vista todavía no existe (SQL sin aplicar), se usa la tabla como antes.
+async function fetchPlantel() {
+  const r = await fetchAllRows(() => supabase.from('v_jugadoras_publico').select('*').order('id', { ascending: true }));
+  if (!r.error) return r;
+  return fetchAllRows(() => supabase.from('jugadoras_femenino').select('*').order('id', { ascending: true }));
+}
+
+async function fetchPartidosDeTemporada(temporadaId) {
+  if (temporadaId == null) {
+    return fetchAllRows(() => supabase.from('partidos_femenino').select('*').order('id', { ascending: true }));
+  }
+  const r = await fetchAllRows(() => supabase.from('partidos_femenino')
+    .select('*, fechas_femenino!inner(temporada_id)')
+    .eq('fechas_femenino.temporada_id', temporadaId)
+    .order('id', { ascending: true }));
+  if (!r.error) return { data: (r.data ?? []).map(({ fechas_femenino: _f, ...p }) => p), error: null };
+  console.warn('[useFemeninoStats] partidos (join):', r.error.message, '— reintentando con .in()');
+  const { data: fs, error: fErr } = await supabase.from('fechas_femenino').select('id').eq('temporada_id', temporadaId);
+  if (fErr) return { data: null, error: fErr };
+  const ids = (fs ?? []).map(f => f.id);
+  if (!ids.length) return { data: [], error: null };
+  return fetchAllRows(() => supabase.from('partidos_femenino').select('*').in('fecha_id', ids).order('id', { ascending: true }));
+}
+
 async function fetchTodo(temporadaId) {
   if (!isConfigured) return null;
 
@@ -84,14 +116,23 @@ async function fetchTodo(temporadaId) {
     // useMasculinoStats.js, para que femenino pueda tener temporada regular
     // dividida en Zona A/B tal como ya funciona en masculino.
     supabase.from('equipos_femenino').select('id,zona'),
-    supabase.from('jugadoras_femenino').select('*'),
+    // Paginado (ver fetchAllRows): el plantel crece temporada a temporada y
+    // pasa las 1000 filas — sin paginar, jugadores/as nuevos/as desaparecían
+    // en silencio de planteles, líderes y buscador.
+    fetchPlantel(),
     statsQuery,
-    supabase.from('partidos_femenino')
-      .select('*')
-      .order('fecha_id', { ascending: true }),
+    // ⚠️ FIX (revisión general): antes se traían los partidos de TODAS las
+    // temporadas, sin paginar y ordenados del más viejo al más nuevo — al
+    // pasar las 1000 filas (pocas temporadas más) lo primero que quedaba
+    // afuera era justo la temporada actual. Ahora se piden solo los de la
+    // temporada mirada (join con fechas) y paginados.
+    fetchPartidosDeTemporada(temporadaId),
     fechasQuery,
-    fetchAllRows(() => supabase.from('stats_partido_femenino')
-      .select('partido_id,jugadora_id,pts,rd,ro,as_,rb,tp,pe,val,sc,sf,dc,df,tc,tf')),
+    // stats_partido_femenino ya NO se descarga acá: era la tabla más pesada (una
+    // fila por jugador/a por partido, de todas las temporadas) y solo la usa
+    // el gráfico del perfil de un/a jugador/a — ahora el perfil pide solo
+    // las filas de esa persona cuando se abre (PlayerProfileModal).
+    Promise.resolve({ data: [], error: null }),
   ]);
 
   // Log errores sin crashear — tablas pueden no existir todavía
@@ -139,6 +180,10 @@ async function fetchTodo(temporadaId) {
   for (const p of partidos) {
     if (p.estado !== 'finalizado') continue;
     if (p.es_playoff) continue;
+    // Un "finalizado" sin un ganador (marcador vacío o empatado — p.ej. lo
+    // marcaron finalizado antes de cargar el resultado) no suma: antes se le
+    // daba la victoria al visitante por default.
+    if ((p.puntos_local ?? 0) === (p.puntos_visit ?? 0)) continue;
     const li = p.equipo_local_id, vi = p.equipo_visit_id;
     if (!posMap[li]) posMap[li] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
     if (!posMap[vi]) posMap[vi] = { pj:0,pg:0,pp:0,pf:0,pc:0 };
@@ -221,7 +266,9 @@ async function fetchTodo(temporadaId) {
         return {
           nombre: j.nombre,
           numero: j.numero,
-          fechaNac: j.fecha_nac,
+          // Con la vista pública llega `edad` (número); con la tabla vieja,
+          // `fecha_nac`. edadDesde() acepta cualquiera de los dos.
+          fechaNac: j.fecha_nac ?? j.edad ?? null,
           fotoUrl: j.foto_url,
           equipoId: j.equipo_id,
           ...DEFAULT_STATS,
@@ -296,12 +343,19 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
   // cuando responde ya se pidió un refresh más nuevo) — así nunca se pierde
   // el fetch con los datos correctos, sea cual sea el orden en que respondan.
   const fetchIdRef = useRef(0);
+  const cargadaRef = useRef(undefined); // temporada cuyos datos ya están en pantalla
 
   const refresh = useCallback(async () => {
     if (!isConfigured) return;
     const miId = ++fetchIdRef.current;
     try {
-      setIsLoading(true);
+      // ⚠️ FIX: antes CADA refresco (incluidos los automáticos en vivo)
+      // ponía isLoading=true, y la tabla/resultados/líderes se reemplazaban
+      // por esqueletos de carga una y otra vez durante un partido — la página
+      // saltaba mientras la gente scrolleaba. Ahora solo se muestra "cargando"
+      // si todavía no hay datos de ESTA temporada; los refrescos posteriores
+      // actualizan en silencio.
+      if (cargadaRef.current !== temporadaId) setIsLoading(true);
       const data = await fetchTodo(temporadaId);
       if (!data) return;
       if (miId !== fetchIdRef.current) return; // ya hay un refresh más nuevo en curso/resuelto
@@ -311,6 +365,7 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
       setStatsPorPartido(data.statsPorPartido);
       setLastUpdated(new Date());
       setError(null);
+      cargadaRef.current = temporadaId;
     } catch (err) {
       console.error('[useFemeninoStats]', err);
       if (miId === fetchIdRef.current) setError(err.message);
@@ -339,13 +394,19 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
   // diferencia es que una carga de 10 jugadas seguidas termina en 1 refetch,
   // no en 10.
   const debounceRef = useRef(null);
+  const pollRef = useRef(null);
+  const huboErrorRef = useRef(false);
+  // Siempre apunta al refresh de la temporada actual (para intervalos y
+  // listeners que viven más que un render).
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
   const refreshDebounced = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      refresh();
+      refreshRef.current();
     }, 900);
-  }, [refresh]);
+  }, []);
 
   // Realtime — recibe push de Supabase, no pollea
   useEffect(() => {
@@ -360,18 +421,45 @@ export function useFemeninoStats(enabled = true, temporadaId = null) {
       .on('postgres_changes', { event:'*', schema:'public', table:'stats_partido_femenino'  }, refreshDebounced)
       .on('postgres_changes', { event:'*', schema:'public', table:'fechas_femenino'         }, refreshDebounced)
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.warn('[useFemeninoStats] Realtime error — usando polling fallback');
-          // Fallback: refresca cada 2 minutos si Realtime falla
-          const interval = setInterval(refresh, 120_000);
-          return () => clearInterval(interval);
+        // ⚠️ FIX: antes el intervalo de respaldo se creaba adentro de este
+        // callback y "devolvía" su limpieza — pero supabase-js ignora ese
+        // return, así que nunca se limpiaba: cada error de conexión sumaba
+        // otro intervalo, y cada uno seguía refrescando con la temporada
+        // VIEJA (la página volvía sola a la temporada anterior cada 2 min).
+        // Ahora hay UN solo intervalo, guardado en un ref, que se limpia al
+        // reconectar o al desmontar, y siempre usa el refresh actual.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[useFemeninoStats] Realtime error — usando polling de respaldo');
+          if (!pollRef.current) pollRef.current = setInterval(() => refreshRef.current(), 120_000);
+          huboErrorRef.current = true;
+        } else if (status === 'SUBSCRIBED') {
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          // Si se reconectó después de un corte, puede haberse perdido algún
+          // cambio mientras tanto — se pide todo una vez.
+          if (huboErrorRef.current) { huboErrorRef.current = false; refreshRef.current(); }
         }
       });
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       supabase.removeChannel(channel);
     };
-  }, [refresh, refreshDebounced, enabled]);
+  }, [refreshDebounced, enabled]);
+
+  // Al volver a la pestaña/app después de un rato (celular bloqueado, app en
+  // segundo plano) la conexión en vivo pudo haberse cortado sin avisar — se
+  // refresca una vez para no mostrar resultados viejos.
+  useEffect(() => {
+    if (!enabled) return;
+    let ocultaDesde = null;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') { ocultaDesde = Date.now(); return; }
+      if (ocultaDesde && Date.now() - ocultaDesde > 30_000) refreshRef.current();
+      ocultaDesde = null;
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [enabled]);
 
   return {
     equipos, partidos, fechas, statsPorPartido,

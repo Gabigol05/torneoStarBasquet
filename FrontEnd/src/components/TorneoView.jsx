@@ -650,6 +650,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+        mode={mode}
       />
 
       <div className="torneo-section" id="torneo-view">
@@ -805,8 +806,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'resultados' && (
               <div>
-                <ResultadosViewChips/>
-                {resultadosView === 'playoffs' ? <CopaChips/> : <FechaChips modo="resultados"/>}
+                {/* Se llaman como funciones (no como <Componente/>): al estar
+                    definidos adentro del render, como componentes se
+                    desmontaban en cada render y la fila de chips volvía al
+                    principio del scroll después de tocar uno de la derecha. */}
+                {ResultadosViewChips()}
+                {resultadosView === 'playoffs' ? CopaChips() : FechaChips({ modo: 'resultados' })}
                 {isLoadingStats ? <ResultSkeleton/> : (
                   partidosFinalizados.length === 0 ? (
                     resultadosView === 'playoffs' ? (
@@ -833,7 +838,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'fixture' && (
               <div>
-                <FechaChips modo="fixture"/>
+                {FechaChips({ modo: 'fixture' })}
                 {isLoadingStats ? <ResultSkeleton/> : (
                   partidosPendientes.length === 0 ? (
                     <EmptyState icon="📅" title="Sin partidos en esta fecha"

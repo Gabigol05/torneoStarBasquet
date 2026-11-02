@@ -11,7 +11,7 @@ export function useSwipe({ onSwipeLeft, onSwipeRight, threshold = 60 } = {}) {
     // Si el toque empieza dentro de un elemento que ya maneja su propio
     // scroll horizontal (chips de filtro, tablas con overflow-x, etc.),
     // no interceptamos el gesto para no chocar con ese scroll nativo.
-    ignorar.current = !!e.target.closest('.filter-chips, .fecha-chips, [data-no-swipe]');
+    ignorar.current = !!e.target.closest('.filter-chips, .fecha-chips, .table-wrap, [data-no-swipe]');
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
   }, []);

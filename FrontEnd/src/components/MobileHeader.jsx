@@ -36,6 +36,7 @@ export function MobileHeader({ onRefresh } = {}) {
         statsPorPartido={statsPorPartido}
         partidos={partidos}
         fechas={fechas}
+        mode={mode}
       />
       <header className="mobile-header">
         <div className="mh-brand">

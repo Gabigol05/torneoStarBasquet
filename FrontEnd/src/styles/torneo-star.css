@@ -4190,11 +4190,17 @@ table tbody tr:hover {
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  transition: max-height 0.3s ease, opacity 0.3s ease;
+  /* 🐛 Escondido sin relleno: antes el padding de 12px arriba y abajo quedaba
+     igual, y dejaba una franja vacía de 24px arriba de todo en el celular. */
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
 }
 .ptr-indicator.visible {
   max-height: 60px;
   opacity: 1;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 .ptr-spinner {
   width: 16px; height: 16px;
@@ -6495,4 +6501,96 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 @media (max-width: 767px) {
   .social-btn { width: 36px; height: 36px; }
   .social-btn svg { width: 16px; height: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CELULAR — barra de secciones ARRIBA (pedido de Alvaro)
+   ───────────────────────────────────────────────────────────────────────
+   La barra de secciones (Inicio/Tabla/Equipos/Jugadores/Fixture) siempre
+   se vio arriba en el celular y así la quieren: queda fija arriba, ahora a
+   propósito y prolija. Cambios respecto de antes:
+     • ya no tapa nada: la página arranca debajo de la barra (antes se
+       montaba encima del encabezado y del comienzo de la portada);
+     • el encabezado chico (logo + lupa/actualizar/YouTube/Instagram) no se
+       muestra: antes igual quedaba escondido abajo de la barra;
+     • la portada ocupa justo el resto de la pantalla, con la pelota entera;
+     • diseño nuevo de la barra: la sección activa va en una "pastilla" con
+       el color de la categoría y una línea de color abajo.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .mobile-header { display: none !important; }
+
+  .bottom-nav {
+    top: 0;
+    bottom: auto;
+    height: 64px;
+    padding: 0 4px;
+    background: rgba(8, 12, 18, 0.97);
+    border-top: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+  }
+  /* Línea fina con el color de la categoría abajo de la barra */
+  .bottom-nav::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-primary, #4FA3FF) 50%, transparent);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* La página arranca debajo de la barra (y ya no hace falta el espacio
+     que se dejaba abajo para una barra inferior). */
+  #root { padding-top: 64px; padding-bottom: 0 !important; }
+  .team-page-overlay { padding-top: 64px; padding-bottom: 0; }
+  /* Al saltar a una sección, que no quede escondida abajo de la barra */
+  section[id], div[id="torneo-view"] { scroll-margin-top: 72px; }
+
+  /* Avisos: el de "nuevo resultado" sale debajo de la barra, y el de
+     "Instalá Torneo Star" vuelve a apoyarse abajo de todo. */
+  .toast-container { top: 76px; }
+  .install-banner { bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+  /* Portada: justo el resto de la pantalla, la pelota se ve entera */
+  .hero {
+    min-height: calc(100vh - 64px);
+    min-height: calc(100svh - 64px);
+  }
+
+  .bottom-nav-item {
+    gap: 4px;
+    padding: 7px 2px 6px;
+    min-height: 0;
+    color: rgba(238, 242, 248, 0.5);
+    transition: color 0.2s, transform 0.12s;
+  }
+  /* Antes: una rayita sobre el activo. Ahora: el ícono del activo va dentro
+     de una "pastilla" con el color de la categoría. */
+  .bottom-nav-item.active::before { display: none; }
+  .bottom-nav-icon-wrap {
+    width: 50px;
+    height: 30px;
+    border-radius: 15px;
+  }
+  .bottom-nav-icon-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleX(0.6);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .bottom-nav-item.active .bottom-nav-icon-wrap::before {
+    opacity: 0.16;
+    transform: none;
+  }
+  .bottom-nav-icon-wrap svg { position: relative; width: 21px; height: 21px; }
+  .bottom-nav-dot { top: 3px; right: 11px; }
+  .bottom-nav-label { font-size: 10px; letter-spacing: 0.6px; }
+  .bottom-nav-item.active .bottom-nav-label { font-weight: 800; }
+  .bottom-nav-item:active { opacity: 1; transform: scale(0.94); }
 }

@@ -34,7 +34,7 @@ const TABS = [
 const TOOLS = [
   { id:'temporadas', icon:'🏆', label:'Temporadas',         desc:'Ver y crear temporada/torneo' },
   { id:'plantel',    icon:'👥', label:'Plantel',            desc:'Altas, bajas y cambios de equipo' },
-  { id:'playoffs',   icon:'🥇', label:'Cerrar Temporada',   desc:'Armar cruces de playoff automáticamente' },
+  { id:'playoffs',   icon:'🥇', label:'Playoffs',           desc:'Armar y corregir los cruces de playoff' },
   { id:'encuestas',  icon:'🗳️', label:'Encuestas',          desc:'Votaciones públicas' },
   { id:'alias',      icon:'🔗', label:'Alias',              desc:'Ver/borrar nombres vinculados' },
   { id:'equipo-alias', icon:'🛡️', label:'Alias de Equipos', desc:'Nombres de equipo distintos al oficial (ej: apodos del Excel)' },

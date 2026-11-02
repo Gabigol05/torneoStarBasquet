@@ -52,6 +52,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
   const [msg, setMsg] = useState(null);
   const [equipos, setEquipos] = useState([]);       // roster + standings + zona (masc)
   const [partidosReg, setPartidosReg] = useState([]);   // partidos de temporada regular finalizados
+  const [regularesSinJugar, setRegularesSinJugar] = useState(0); // de temporada regular, todavía no finalizados
   const [partidosPlayoff, setPartidosPlayoff] = useState([]); // partidos es_playoff=true de esta temporada
   const [fechas, setFechas] = useState([]);
 
@@ -99,6 +100,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
 
       setEquipos(Object.values(base));
       setPartidosReg(regulares);
+      setRegularesSinJugar(partidos.filter(p => !p.es_playoff && p.estado !== 'finalizado').length);
       setPartidosPlayoff(playoffRows);
       setFechas(fechasT ?? []);
     } catch (err) {
@@ -272,6 +274,42 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
     }
   };
 
+  // Deshacer una ronda generada que TODAVÍA NO SE JUGÓ (ningún partido
+  // finalizado ni en juego): borra esos partidos pendientes y la copa vuelve
+  // a mostrar el editor con la sugerencia, para armarla de nuevo. No toca la
+  // temporada, la tabla ni ningún partido jugado. Si la fecha de esa
+  // instancia (ej. "Cuartos de Final") queda vacía —porque ninguna otra copa
+  // la usa— también se borra, para que no quede una jornada vacía en el sitio.
+  const deshacerRonda = async (cup, instancia, filas) => {
+    if (filas.some(f => f.estado !== 'pendiente')) {
+      flash('❌ Esa ronda ya tiene partidos jugados o en juego — se puede corregir, pero no deshacer.', false);
+      return;
+    }
+    const ok = await confirm(
+      `¿Deshacer ${INSTANCIA_LABEL[instancia]} de ${cup.label}?\n\nSe borran sus ${filas.length} partido${filas.length > 1 ? 's' : ''} pendiente${filas.length > 1 ? 's' : ''} (todavía no se jugó ninguno) y vas a poder armar los cruces de nuevo. La temporada y la tabla no se tocan.`
+    );
+    if (!ok) return;
+    setGenerando(cup.key);
+    try {
+      const ids = filas.map(f => f.id);
+      const { error } = await supabase.from(tablas.partidos)
+        .delete().in('id', ids).eq('estado', 'pendiente').eq('es_playoff', true);
+      if (error) throw error;
+      for (const fechaId of [...new Set(filas.map(f => f.fecha_id))]) {
+        const { count } = await supabase.from(tablas.partidos)
+          .select('id', { count: 'exact', head: true }).eq('fecha_id', fechaId);
+        if (count === 0) await supabase.from(tablas.fechas).delete().eq('id', fechaId);
+      }
+      flash(`✅ ${INSTANCIA_LABEL[instancia]} de ${cup.label} deshecha — ya podés armarla de nuevo.`);
+      setEditando(null);
+      await cargar();
+    } catch (err) {
+      flash(`❌ ${err.message}`, false);
+    } finally {
+      setGenerando(null);
+    }
+  };
+
   // Etiqueta de cada equipo para el editor: "1°A", "7°B"... (o el puesto en
   // la tabla general si no hay zonas). Y la lista de equipos que se pueden
   // arrastrar: todos los que jugaron esta temporada, sin importar a qué copa
@@ -302,7 +340,7 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
     <div>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: 1, color: '#EEF2F8', margin: 0 }}>
-          🏆 CERRAR TEMPORADA REGULAR
+          🏆 PLAYOFFS — ARMAR CRUCES
         </h2>
         <p style={{ color: '#6B7A99', fontSize: 13, margin: '4px 0 0' }}>
           Arma los cruces de playoff automáticamente según la tabla de posiciones actual de{' '}
@@ -311,6 +349,29 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
           Antes de generar podés reacomodar los cruces a mano arrastrando equipos. Cada ronda siguiente
           se habilita sola cuando la anterior está 100% finalizada.
         </p>
+        {/* Pedido de Alvaro: dejar claro que armar o corregir los playoffs no
+            "cierra" nada. Generar cruces solo crea partidos de playoff
+            pendientes: la temporada sigue activa (eso solo cambia desde
+            Temporadas), la tabla de posiciones no se toca (los hooks del sitio
+            excluyen es_playoff) y cualquier ronda que todavía no se jugó se
+            puede corregir o deshacer y volver a armar las veces que haga falta. */}
+        <div style={{
+          marginTop: 12, padding: '10px 14px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.55,
+          background: 'rgba(34,208,122,.07)', border: '1px solid rgba(34,208,122,.25)', color: '#9FE3C1',
+        }}>
+          🔒 Armar o corregir los cruces <b>no cierra la temporada</b> ni cambia la tabla de posiciones: la temporada
+          sigue en curso hasta que la cambies vos desde <b>Temporadas</b>. Mientras una ronda no se haya jugado,
+          podés <b>corregir</b> sus cruces o <b>deshacerla</b> y volver a armarla.
+        </div>
+        {regularesSinJugar > 0 && (
+          <div style={{
+            marginTop: 10, padding: '10px 14px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.55,
+            background: 'rgba(240,180,41,.07)', border: '1px solid rgba(240,180,41,.3)', color: '#F0B429',
+          }}>
+            ⚠️ Todavía hay {regularesSinJugar} partido{regularesSinJugar === 1 ? '' : 's'} de temporada regular sin
+            resultado — la tabla (y por lo tanto la sugerencia de cruces) puede cambiar cuando se carguen.
+          </div>
+        )}
       </div>
 
       {msg && (
@@ -390,9 +451,18 @@ export default function PlayoffsAdmin({ categoria: categoriaProp, setCategoria: 
                       />
                     </div>
                   ) : (
-                    <button onClick={() => setEditando(cup.key)} style={btnSecundario}>
-                      ✏️ Corregir cruces de {INSTANCIA_LABEL[info.rondaEsperada]}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={() => setEditando(cup.key)} style={btnSecundario}>
+                        ✏️ Corregir cruces de {INSTANCIA_LABEL[info.rondaEsperada]}
+                      </button>
+                      {info.filas.every(f => f.estado === 'pendiente') && (
+                        <button onClick={() => deshacerRonda(cup, info.rondaEsperada, info.filas)}
+                          disabled={generando === cup.key}
+                          style={{ ...btnSecundario, color: '#F08098', borderColor: 'rgba(240,64,96,.35)' }}>
+                          ↩️ Deshacer {INSTANCIA_LABEL[info.rondaEsperada]}
+                        </button>
+                      )}
+                    </div>
                   )
                 )}
 

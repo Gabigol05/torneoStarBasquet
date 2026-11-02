@@ -88,8 +88,8 @@ export default function TemporadasManager({ onNavigate } = {}) {
       <div style={S.hint}>
         ℹ️ Crear una temporada nueva archiva automáticamente la que está en curso <b>de esa misma categoría</b> (se
         puede seguir viendo, pero no se le puede cargar nada más) — la otra categoría sigue como estaba, sin
-        tocarse. <b>Activar</b> una archivada hace lo mismo al revés. <b>Cerrar temporada</b> es otra cosa — arma
-        los cruces de playoff según la tabla de posiciones actual; no cambia cuál temporada está en curso.
+        tocarse. <b>Activar</b> una archivada hace lo mismo al revés. <b>Playoffs</b> es otra cosa — arma
+        (y deja corregir) los cruces según la tabla de posiciones; no cierra ni cambia cuál temporada está en curso.
       </div>
 
       {loading ? (
@@ -245,7 +245,7 @@ function CategoriaTemporadas({ cat, temporadas, temporadaActivaId, crearTemporad
                   title={onNavigate ? 'Ir a armar los cruces de playoff' : undefined}
                   style={{ ...S.btnCerrar, opacity: onNavigate ? 1 : 0.5, cursor: onNavigate ? 'pointer' : 'not-allowed' }}
                 >
-                  🥇 CERRAR TEMPORADA (armar playoffs)
+                  🥇 ARMAR PLAYOFFS
                 </button>
               </div>
               <StatRow s={stats[activa.id]} />

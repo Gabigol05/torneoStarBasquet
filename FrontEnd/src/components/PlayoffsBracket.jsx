@@ -102,8 +102,9 @@ export function etiquetaSiembra(team, fallbackNum) {
 // clasificado de la otra, el 2° contra el anteúltimo, etc. Con 4 por zona:
 //   llave 1: 1°A vs 4°B      llave 3: 1°B vs 4°A
 //   llave 2: 2°B vs 3°A      llave 4: 2°A vs 3°B
-// Las semis NO salen de llaves vecinas: se vuelven a cruzar por tabla
-// general entre los 4 ganadores (ver semisPorTablaGeneral más abajo).
+// Las semis NO salen de llaves vecinas ni de una regla fija: los cruces de
+// semifinal los arma el organizador del torneo a su criterio y se cargan
+// desde el panel (Playoffs). Hasta entonces el cuadro las muestra "Por definir".
 // Con 2 por zona (semis directo): 1°A vs 2°B y 1°B vs 2°A. Con 1: 1°A vs 1°B.
 // El local es siempre el mejor ubicado.
 //
@@ -145,26 +146,12 @@ export function primeraRonda(pool, size) {
   };
 }
 
-// Semifinales cuando vienen de cuartos (regla del organizador del torneo):
-// NO se cruzan los ganadores de llaves vecinas (llave 1 vs llave 2), sino que
-// los 4 equipos que ganaron cuartos se ordenan por la TABLA GENERAL de la
-// fase regular (las dos zonas juntas: PTS -> DIF -> PF) y se cruzan
-//   Semi 1: 1° vs 4°      Semi 2: 2° vs 3°
-// con el mejor ubicado de local. Hasta que no estén los 4 ganadores no se
-// puede saber quién juega con quién -> devuelve null.
-// La usan el cuadro público y el panel (PlayoffsAdmin) para generar las semis.
-export function semisPorTablaGeneral(ganadores) {
-  if (!ganadores || ganadores.length !== 4 || ganadores.some(g => !g)) return null;
-  const o = sortByStandings(ganadores);
-  return [[o[0], o[3]], [o[1], o[2]]];
-}
-
 // Aviso que se muestra debajo del título "Semifinal" cuando las semis salen
-// de cuartos.
-function NotaTablaGeneral() {
+// de cuartos: los cruces no siguen una regla fija, los define la organización.
+function NotaSemisOrganizacion() {
   return (
     <div style={{ marginTop: 6, fontSize: 'clamp(12px, 1.4vw, 14px)', letterSpacing: 1.5, color: 'var(--gold)' }}>
-      Cruces por tabla general
+      Cruces a definir por la organización
     </div>
   );
 }
@@ -357,15 +344,9 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
 
   if (size === 8) {
     const pairs = ronda1.pares;
-    // Ganadores de cuartos (real si el partido está cargado y finalizado,
-    // null si todavía no) — alimentan el casillero de semifinal.
-    const ganadoresCuartos = pairs.map((_, i) =>
-      resolveWinner(buscarPartidoSlot(partidosCopa, 'cuartos', i + 1), equipoMap)
-    );
-    // Semis por tabla general entre los 4 ganadores (ver semisPorTablaGeneral):
-    // mientras falte algún resultado de cuartos se muestran "Por definir".
-    const semis = semisPorTablaGeneral(ganadoresCuartos);
-    const etiqGral = t => (t && posGeneral?.[t.id] ? `${posGeneral[t.id]}° gral` : null);
+    // Semis: no se proyectan. Los cruces los arma la organización y, hasta
+    // que se carguen (con copa + instancia + llave), el casillero queda
+    // "Por definir".
     const semisSlots = [0, 1];
     const ganadoresSemis = semisSlots.map((_, i) =>
       resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', i + 1), equipoMap)
@@ -384,12 +365,11 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
             ))}
           </div>
           <div className="bracket-round">
-            <div className="bracket-round-label">Semifinal<NotaTablaGeneral/></div>
+            <div className="bracket-round-label">Semifinal<NotaSemisOrganizacion/></div>
             {semisSlots.map(i => (
               <div key={i} style={{ marginTop: i === 0 ? 'var(--po-mt-semi1, 32px)' : 'var(--po-mt-semi2, 48px)' }}>
                 <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
-                  fallbackA={semis?.[i][0]} fallbackB={semis?.[i][1]}
-                  seedA={etiqGral(semis?.[i][0])} seedB={etiqGral(semis?.[i][1])}/>
+                  fallbackA={null} fallbackB={null}/>
               </div>
             ))}
           </div>
@@ -484,7 +464,7 @@ function BracketVacio({ accentColor }) {
           ))}
         </div>
         <div className="bracket-round">
-          <div className="bracket-round-label">Semifinal<NotaTablaGeneral/></div>
+          <div className="bracket-round-label">Semifinal<NotaSemisOrganizacion/></div>
           <div className="bracket-match" style={{ marginTop: 32 }}>
             <div className="bracket-team tbd">TBD</div>
             <div className="bracket-team tbd">TBD</div>

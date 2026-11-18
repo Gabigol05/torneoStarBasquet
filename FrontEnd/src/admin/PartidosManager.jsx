@@ -6,7 +6,7 @@ import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
 import { recalcularPromedios } from '../lib/recalcularPromedios';
-import { analizarPlayoffs, buscarCruce, labelCruce, esTextoPlayoff } from './playoffDetect';
+import { analizarPlayoffs, labelCruce, esTextoPlayoff, slotsOcupados } from './playoffDetect';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -421,7 +421,7 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
 }
 
 // ── Carga masiva de fixture ───────────────────────────────────────────────────
-function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, onCrearFecha, onClose, cruces=[] }) {
+function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, onCrearFecha, onClose, detectarCruce=null }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
@@ -444,8 +444,11 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
   const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => {
     if (j !== i) return r;
     const next = { ...r, [field]: val };
-    if (field !== 'equipo_local_id' && field !== 'equipo_visit_id') return next;
-    const cruce = buscarCruce(cruces, next.equipo_local_id, next.equipo_visit_id);
+    if ((field !== 'equipo_local_id' && field !== 'equipo_visit_id') || !detectarCruce) return next;
+    // Llaves ya usadas por las otras filas de este fixture (dos semis de la
+    // misma copa en la misma fecha → llave 1 y llave 2).
+    const otrasFilas = slotsOcupados(p.filter((_, k) => k !== i).map((f, k) => ({ ...f, id: `fila-${k}` })));
+    const cruce = detectarCruce(next.equipo_local_id, next.equipo_visit_id, otrasFilas);
     if (cruce && (!next.es_playoff || next.autoPlayoff)) {
       return { ...next, es_playoff:true, copa:cruce.copa, instancia:cruce.instancia, llave:String(cruce.llave), autoPlayoff:true };
     }
@@ -791,7 +794,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
   // temporada regular — así no se sugiere en un partido viejo de temporada
   // entre dos equipos que después se cruzan en playoffs.
   const cruceSugeridoForm = useMemo(() => {
-    const cruce = buscarCruce(analisisPlayoffs.cruces, form.equipo_local_id, form.equipo_visit_id);
+    const cruce = analisisPlayoffs.detectar(form.equipo_local_id, form.equipo_visit_id, null, editId);
     if (!cruce) return null;
     const fid = form.fecha_id ? Number(form.fecha_id) : null;
     if (fid == null || analisisPlayoffs.fechasPlayoff.has(fid)) return cruce;
@@ -1176,7 +1179,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           temporadaActivaId={temporadaActivaId}
           onCrearFecha={loadAll}
           onClose={()=>setView('lista')}
-          cruces={analisisPlayoffs.cruces}
+          detectarCruce={analisisPlayoffs.detectar}
         />
       )}
 

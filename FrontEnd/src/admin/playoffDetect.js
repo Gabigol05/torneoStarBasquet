@@ -7,11 +7,15 @@
 // llave). Con esto el panel reconoce solo un cruce de playoff, completa copa,
 // instancia y llave, y avisa si hay partidos de playoff mal marcados.
 //
-// Usa EXACTAMENTE las mismas funciones que el cuadro público
-// (PlayoffsBracket.jsx), así lo que se marca acá cae en el mismo casillero
-// que el cuadro muestra.
+// La primera ronda de cada copa sale de la tabla, con EXACTAMENTE las mismas
+// funciones que el cuadro público (PlayoffsBracket.jsx). Las rondas
+// siguientes NO se arman acá: los cruces de semifinal los define el
+// organizador del torneo a su criterio. Para esas rondas solo se reconoce un
+// partido como cruce si los dos equipos ganaron la ronda anterior en la misma
+// copa (o perdieron las semis, para el tercer puesto), y se le da la primera
+// llave libre.
 import {
-  buildPools, bracketSizeFor, primeraRonda, semisPorTablaGeneral, resolveWinner,
+  buildPools, bracketSizeFor, primeraRonda, resolveWinner,
 } from '../components/PlayoffsBracket.jsx';
 
 const COPAS = ['oro', 'plata', 'bronce'];
@@ -60,62 +64,74 @@ function tablaRegular(partidos, excluidas, zonas) {
   return { equipos: Object.values(st), pendientes };
 }
 
-// Cruces de playoff que ya se pueden saber, sacando de la tabla las fechas
-// de `excluidas`: la primera ronda de cada copa (por tabla) y las rondas
-// siguientes cuando sus ganadores ya están cargados. Mientras queden partidos
-// de fase regular sin jugar devuelve [], para no confundir un partido de
-// temporada con un cruce.
-function calcularCruces(partidos, excluidas, zonas) {
+// Contexto de playoffs sin las fechas de `excluidas`: la primera ronda de
+// cada copa (sale de la tabla) y quiénes ganaron/perdieron cada ronda ya
+// jugada. null mientras queden partidos de fase regular sin jugar, para no
+// confundir un partido de temporada con un cruce.
+function armarContexto(partidos, excluidas, zonas) {
   const { equipos, pendientes } = tablaRegular(partidos, excluidas, zonas);
-  if (pendientes > 0 || equipos.length < 2) return [];
+  if (pendientes > 0 || equipos.length < 2) return null;
   const eqMap = Object.fromEntries(equipos.map(t => [t.id, t]));
   const pools = buildPools(equipos);
-  const out = [];
-  const add = (copa, instancia, llave, a, b) => {
-    if (a?.id && b?.id) out.push({ copa, instancia, llave, a: a.id, b: b.id });
-  };
-
+  const primera = [];
+  const copas = {};
   for (const copa of COPAS) {
     const pool = pools[copa] ?? [];
     const size = bracketSizeFor(pool.length);
     if (size < 2) continue;
-    const delaCopa = (partidos ?? []).filter(p => p.es_playoff && p.copa === copa);
-    const slot = (inst, llave) => delaCopa.find(p => p.instancia === inst && Number(p.llave) === llave) ?? null;
-    const { pares } = primeraRonda(pool, size);
-
-    let semis = null;
-    if (size === 8) {
-      pares.forEach(([a, b], i) => add(copa, 'cuartos', i + 1, a, b));
-      const ganadores = pares.map((_, i) => resolveWinner(slot('cuartos', i + 1), eqMap));
-      semis = semisPorTablaGeneral(ganadores);
-    } else if (size === 4) {
-      semis = pares;
-    } else {
-      add(copa, 'final', 1, pares[0]?.[0], pares[0]?.[1]);
-      continue;
+    const instancia = size === 8 ? 'cuartos' : size === 4 ? 'semifinal' : 'final';
+    primeraRonda(pool, size).pares.forEach(([a, b], i) => {
+      if (a?.id && b?.id) primera.push({ copa, instancia, llave: i + 1, a: a.id, b: b.id });
+    });
+    const ganadores = { cuartos: new Set(), semifinal: new Set() };
+    const perdedoresSemi = new Set();
+    for (const p of partidos ?? []) {
+      if (!p.es_playoff || p.copa !== copa || !ganadores[p.instancia]) continue;
+      const g = resolveWinner(p, eqMap);
+      if (!g) continue;
+      ganadores[p.instancia].add(g.id);
+      if (p.instancia === 'semifinal') {
+        perdedoresSemi.add(g.id === p.equipo_local_id ? p.equipo_visit_id : p.equipo_local_id);
+      }
     }
-    if (!semis) continue;
-    semis.forEach(([a, b], i) => add(copa, 'semifinal', i + 1, a, b));
-
-    const partidosSemi = [slot('semifinal', 1), slot('semifinal', 2)];
-    const ganadoresSemi = partidosSemi.map(p => resolveWinner(p, eqMap));
-    if (ganadoresSemi.every(Boolean)) {
-      add(copa, 'final', 1, ganadoresSemi[0], ganadoresSemi[1]);
-      const perdedores = partidosSemi.map((p, i) => {
-        const otro = p.equipo_local_id === ganadoresSemi[i].id ? p.equipo_visit_id : p.equipo_local_id;
-        return eqMap[otro];
-      });
-      add(copa, 'tercer_puesto', 1, perdedores[0], perdedores[1]);
-    }
+    copas[copa] = { size, ganadores, perdedoresSemi };
   }
-  return out;
+  return { primera, copas };
 }
 
-// Cruce que corresponde a este par de equipos (en cualquier orden), o null.
-export function buscarCruce(cruces, localId, visitId) {
-  if (!localId || !visitId) return null;
-  return (cruces ?? []).find(c =>
-    (c.a === localId && c.b === visitId) || (c.a === visitId && c.b === localId)) ?? null;
+const claveSlot = (copa, instancia, llave) => `${copa}|${instancia}|${llave}`;
+
+// Cruce que corresponde a este par de equipos, o null. `ocupadas` = slots
+// (copa|instancia|llave) ya usados por otros partidos, para dar la primera
+// llave libre en semifinal.
+function detectarEnContexto(ctx, localId, visitId, ocupadas) {
+  if (!ctx || !localId || !visitId || localId === visitId) return null;
+  const par = id => id === localId || id === visitId;
+  const fija = ctx.primera.find(c => par(c.a) && par(c.b));
+  if (fija) return fija;
+  const ambos = set => set.has(localId) && set.has(visitId);
+  // Primero las rondas más avanzadas: dos ganadores de semis también son
+  // ganadores de cuartos, y para entonces las llaves de semis ya están usadas.
+  for (const [copa, info] of Object.entries(ctx.copas)) {
+    if (ambos(info.ganadores.semifinal)) return { copa, instancia: 'final', llave: 1, a: localId, b: visitId };
+    if (ambos(info.perdedoresSemi)) return { copa, instancia: 'tercer_puesto', llave: 1, a: localId, b: visitId };
+    if (info.size === 8 && ambos(info.ganadores.cuartos)) {
+      const llave = [1, 2].find(l => !ocupadas.has(claveSlot(copa, 'semifinal', l)));
+      if (llave) return { copa, instancia: 'semifinal', llave, a: localId, b: visitId };
+    }
+  }
+  return null;
+}
+
+// Asigna cruce a cada partido de `lista`, en orden, ocupando las llaves a
+// medida que las usa (dos semis de la misma copa → llave 1 y llave 2).
+function asignar(ctx, lista, ocupadasBase) {
+  const ocupadas = new Set(ocupadasBase);
+  return lista.map(p => {
+    const c = detectarEnContexto(ctx, p.equipo_local_id, p.equipo_visit_id, ocupadas);
+    if (c) ocupadas.add(claveSlot(c.copa, c.instancia, c.llave));
+    return c;
+  });
 }
 
 export function labelCruce(c) {
@@ -123,21 +139,31 @@ export function labelCruce(c) {
   return `${LABEL_INSTANCIA[c.instancia] ?? c.instancia} · ${LABEL_COPA[c.copa] ?? c.copa} · Llave ${c.llave}`;
 }
 
+// Slots (copa|instancia|llave) de una lista de partidos/filas ya marcados
+// como playoff. Sirve para no repetir llave al detectar otro cruce.
+export function slotsOcupados(lista, excluirId = null) {
+  return new Set((lista ?? [])
+    .filter(p => p.es_playoff && p.copa && p.instancia && p.llave && p.id !== excluirId)
+    .map(p => claveSlot(p.copa, p.instancia, Number(p.llave))));
+}
+
 // Analiza la temporada y devuelve:
-//  - cruces: los cruces de playoff esperados (ver calcularCruces).
+//  - detectar(localId, visitId, ocupadasExtra?, excluirId?): el cruce de
+//    playoff que corresponde a ese par de equipos, o null.
 //  - fechasPlayoff: ids de las fechas que son de playoff. Una fecha cuenta
 //    como de playoff si su nombre lo dice ("Cuartos de Final",
 //    "Semifinales"...), si ya tiene algún partido marcado como playoff, o si
-//    es una de las últimas fechas y TODOS sus partidos coinciden con los
-//    cruces que salen de la tabla de las fechas anteriores. Esto último cubre
-//    una fecha de playoffs que se cargó como "Fecha 12" sin tildar nada: sin
-//    sacarla, sus resultados cambiarían la tabla y con eso los cruces.
+//    es una de las últimas fechas y TODOS sus partidos son cruces según las
+//    fechas anteriores. Esto último cubre una fecha de playoffs que se cargó
+//    como "Fecha 12" sin tildar nada: sin sacarla, sus resultados cambiarían
+//    la tabla y con eso los cruces.
 //  - malMarcados: partidos de esas fechas que siguen como temporada regular,
 //    con el cruce que les corresponde (null si no se pudo saber cuál).
 export function analizarPlayoffs(partidos, fechas, zonas) {
   const lista = partidos ?? [];
   const excluidas = new Set((fechas ?? []).filter(esFechaPlayoff).map(f => f.id));
   for (const p of lista) if (p.es_playoff && p.fecha_id != null) excluidas.add(p.fecha_id);
+  const ocupadasDb = slotsOcupados(lista);
 
   const porFecha = {};
   for (const p of lista) if (p.fecha_id != null) (porFecha[p.fecha_id] ??= []).push(p);
@@ -146,17 +172,23 @@ export function analizarPlayoffs(partidos, fechas, zonas) {
     .sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0));
   for (const f of recientes) {
     if (excluidas.has(f.id)) continue;
-    const sinEsta = new Set([...excluidas, f.id]);
-    const c = calcularCruces(lista, sinEsta, zonas);
-    const todosCruces = c.length > 0 && porFecha[f.id].every(p =>
-      p.es_playoff || buscarCruce(c, p.equipo_local_id, p.equipo_visit_id));
-    if (!todosCruces) break;
+    const ctxSin = armarContexto(lista, new Set([...excluidas, f.id]), zonas);
+    const sinMarcar = porFecha[f.id].filter(p => !p.es_playoff);
+    if (!ctxSin || !asignar(ctxSin, sinMarcar, ocupadasDb).every(Boolean)) break;
     excluidas.add(f.id);
   }
 
-  const cruces = calcularCruces(lista, excluidas, zonas);
-  const malMarcados = lista
+  const ctx = armarContexto(lista, excluidas, zonas);
+  const sinMarcar = lista
     .filter(p => !p.es_playoff && excluidas.has(p.fecha_id))
-    .map(p => ({ partido: p, cruce: buscarCruce(cruces, p.equipo_local_id, p.equipo_visit_id) }));
-  return { cruces, fechasPlayoff: excluidas, malMarcados };
+    .sort((a, b) => a.id - b.id);
+  const asignados = asignar(ctx, sinMarcar, ocupadasDb);
+  const malMarcados = sinMarcar.map((p, i) => ({ partido: p, cruce: asignados[i] }));
+
+  const detectar = (localId, visitId, ocupadasExtra = null, excluirId = null) => {
+    const ocupadas = excluirId != null ? slotsOcupados(lista, excluirId) : new Set(ocupadasDb);
+    for (const k of ocupadasExtra ?? []) ocupadas.add(k);
+    return detectarEnContexto(ctx, localId, visitId, ocupadas);
+  };
+  return { detectar, fechasPlayoff: excluidas, malMarcados };
 }

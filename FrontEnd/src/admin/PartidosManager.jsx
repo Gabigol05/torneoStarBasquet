@@ -6,6 +6,7 @@ import { TABLAS, sugerirEncuestaQuienGana } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
 import { recalcularPromedios } from '../lib/recalcularPromedios';
+import { analizarPlayoffs, buscarCruce, labelCruce, esTextoPlayoff } from './playoffDetect';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -188,7 +189,7 @@ function EstadoBadge({ estado }) {
 }
 
 // ── Formulario de partido ─────────────────────────────────────────────────────
-function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId, crearEncuesta, setCrearEncuesta, crucesExistentes=[] }) {
+function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading, editId, crearEncuesta, setCrearEncuesta, crucesExistentes=[], cruceSugerido=null }) {
   const n = v => v === '' ? '' : Number(v);
 
   // Calcular totales desde cuartos
@@ -319,6 +320,24 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
           playoffs y en el chip "Playoffs" de Resultados en vez de mezclarse
           con la fecha regular. */}
       <div style={{ marginBottom:16 }}>
+        {/* Si los dos equipos elegidos son un cruce del cuadro de playoffs y
+            el partido no está marcado, se avisa y se ofrece completarlo
+            (copa, instancia y llave) con un click. */}
+        {cruceSugerido && !form.es_playoff && (
+          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:10,
+            padding:'10px 12px', borderRadius:8, background:'rgba(240,180,41,.08)',
+            border:'1px solid rgba(240,180,41,.35)', fontSize:12.5, color:'#EEF2F8' }}>
+            <span style={{ flex:1, minWidth:220 }}>
+              🏆 Este partido es un cruce del cuadro de playoffs: <b style={{ color:'#F0B429' }}>{labelCruce(cruceSugerido)}</b>.
+              Marcalo como playoff para que aparezca en el cuadro y no sume en la tabla.
+            </span>
+            <button type="button"
+              onClick={() => setForm(f => ({ ...f, es_playoff:true, copa:cruceSugerido.copa, instancia:cruceSugerido.instancia, llave:String(cruceSugerido.llave) }))}
+              style={{ ...F.btnSec, borderColor:'rgba(240,180,41,.5)', color:'#F0B429' }}>
+              Marcar como playoff
+            </button>
+          </div>
+        )}
         <PlayoffFields values={form} onChange={setForm} equipos={equipos} crucesExistentes={crucesExistentes}/>
       </div>
 
@@ -402,7 +421,7 @@ function PartidoForm({ form, setForm, fechas, equipos, onSave, onCancel, loading
 }
 
 // ── Carga masiva de fixture ───────────────────────────────────────────────────
-function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, onCrearFecha, onClose }) {
+function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, onCrearFecha, onClose, cruces=[] }) {
   const [jornada,      setJornada]      = useState('');
   const [descripcion,  setDescripcion]  = useState('');
   const [fechaDia,     setFechaDia]     = useState('');
@@ -416,7 +435,25 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
 
   const addPartido = () => setPartidos(p => [...p, { equipo_local_id:'', equipo_visit_id:'', hora_inicio:'', lugar:'', fecha_partido:'', es_playoff:false, copa:'', instancia:'', llave:'' }]);
   const removePartido = (i) => setPartidos(p => p.filter((_,j) => j!==i));
-  const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => j===i?{...r,[field]:val}:r));
+  // Al elegir los dos equipos, si son un cruce del cuadro de playoffs se
+  // marca solo como playoff con su copa, instancia y llave (autoPlayoff).
+  // Así no vuelve a pasar lo de los cuartos masculino 2026, que se cargaron
+  // como fecha regular: sumaron en la tabla y no aparecieron en el cuadro.
+  // Si después se cambia un equipo y deja de ser un cruce, se desmarca solo.
+  // Lo que se toque a mano en "¿Es Playoff?" no se pisa.
+  const updatePartido = (i, field, val) => setPartidos(p => p.map((r,j) => {
+    if (j !== i) return r;
+    const next = { ...r, [field]: val };
+    if (field !== 'equipo_local_id' && field !== 'equipo_visit_id') return next;
+    const cruce = buscarCruce(cruces, next.equipo_local_id, next.equipo_visit_id);
+    if (cruce && (!next.es_playoff || next.autoPlayoff)) {
+      return { ...next, es_playoff:true, copa:cruce.copa, instancia:cruce.instancia, llave:String(cruce.llave), autoPlayoff:true };
+    }
+    if (!cruce && next.autoPlayoff) {
+      return { ...next, es_playoff:false, copa:'', instancia:'', llave:'', autoPlayoff:false };
+    }
+    return next;
+  }));
 
   // Equipos ya usados como local en esta configuración
   const usedLocal  = partidos.map(p => p.equipo_local_id).filter(Boolean);
@@ -426,6 +463,23 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
     if (!jornada) { setMsg({ok:false,text:'Ingresá el número de fecha'}); return; }
     const validos = partidos.filter(p => p.equipo_local_id && p.equipo_visit_id);
     if (validos.length === 0) { setMsg({ok:false,text:'Agregá al menos un partido completo'}); return; }
+
+    // Un playoff sin copa/instancia/llave no tiene casillero en el cuadro.
+    const incompletos = validos.filter(p => p.es_playoff && (!p.copa || !p.instancia || !p.llave));
+    if (incompletos.length > 0) {
+      setMsg({ ok:false, text:`${incompletos.length} partido(s) marcados como playoff no tienen Copa, Instancia o Llave — completalos para que aparezcan en el cuadro.` });
+      return;
+    }
+    // Fecha con nombre de playoffs ("Cuartos de Final", "Semifinales"...)
+    // con partidos sin marcar: esos sumarían en la tabla como temporada
+    // regular y no aparecerían en el cuadro. Se pide confirmación.
+    const fechaMismoNumero = fechas.find(f => Number(f.numero) === Number(jornada));
+    const nombreFecha = descripcion || fechaMismoNumero?.descripcion || '';
+    const sinMarcar = validos.filter(p => !p.es_playoff);
+    if (esTextoPlayoff(nombreFecha) && sinMarcar.length > 0) {
+      const seguir = await confirmDup(`"${nombreFecha}" es una fecha de playoffs, pero ${sinMarcar.length} partido(s) no están marcados como playoff: van a sumar en la tabla de posiciones como temporada regular y no van a aparecer en el cuadro. ¿Guardar igual?`);
+      if (!seguir) return;
+    }
 
     setLoading(true);
     try {
@@ -576,6 +630,14 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
         </div>
       </div>
 
+      {(esTextoPlayoff(descripcion) || partidos.some(p => p.autoPlayoff)) && (
+        <div style={{ marginBottom:16, padding:'10px 12px', borderRadius:8, fontSize:12.5, lineHeight:1.5,
+          background:'rgba(240,180,41,.08)', border:'1px solid rgba(240,180,41,.35)', color:'#EEF2F8' }}>
+          🏆 <b style={{ color:'#F0B429' }}>Fecha de playoffs.</b> Cada partido tiene que ir marcado como playoff (copa, instancia y llave):
+          así aparece en el cuadro y <b>no suma en la tabla</b>. Los cruces que coinciden con el cuadro se marcan solos al elegir los equipos.
+        </div>
+      )}
+
       {/* Lista de partidos */}
       <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
         {partidos.map((p, i) => (
@@ -638,7 +700,12 @@ function FixtureMasivo({ fechas, equipos, tablas, categoria, temporadaActivaId, 
                 más de una copa el mismo fin de semana, así que esto se marca
                 fila por fila y no una sola vez para todo el fixture. */}
             <div style={{ marginTop:8 }}>
-              <PlayoffFields compact values={p} onChange={vals => setPartidos(prev => prev.map((r,j) => j===i?vals:r))}/>
+              <PlayoffFields compact values={p} onChange={vals => setPartidos(prev => prev.map((r,j) => j===i?{ ...vals, autoPlayoff:false }:r))}/>
+              {p.autoPlayoff && (
+                <div style={{ marginTop:6, fontSize:11.5, color:'#F0B429' }}>
+                  ✓ Cruce del cuadro detectado: {labelCruce({ copa:p.copa, instancia:p.instancia, llave:p.llave })}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -690,6 +757,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
 
   const [partidos, setPartidos] = useState([]);
   const [fechas,   setFechas]   = useState([]);
+  const [zonas,    setZonas]    = useState({});   // { equipoId: 'A' | 'B' } — para armar los cruces de playoff
   const [form,     setForm]     = useState(EMPTY_PARTIDO);
   const [editId,   setEditId]   = useState(null);
   const [loading,  setLoading]  = useState(false);
@@ -708,6 +776,54 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
       p.es_playoff && p.copa === form.copa && p.instancia === form.instancia && p.id !== editId);
   }, [partidos, form.es_playoff, form.copa, form.instancia, editId]);
   const { confirm, ConfirmDialog } = useConfirm();
+
+  // Playoffs: cruces esperados del cuadro, qué fechas son de playoff y qué
+  // partidos de esas fechas quedaron cargados como temporada regular (ver
+  // playoffDetect.js). Se usa para el aviso de arriba de la lista, para
+  // marcar solos los cruces al cargar un fixture y para sugerirlo en el
+  // formulario individual.
+  const analisisPlayoffs = useMemo(
+    () => analizarPlayoffs(partidos, fechas, zonas),
+    [partidos, fechas, zonas]
+  );
+  // Sugerencia del formulario individual: solo si el partido va (o está) en
+  // una fecha de playoff, sin fecha, o en una fecha posterior a la última de
+  // temporada regular — así no se sugiere en un partido viejo de temporada
+  // entre dos equipos que después se cruzan en playoffs.
+  const cruceSugeridoForm = useMemo(() => {
+    const cruce = buscarCruce(analisisPlayoffs.cruces, form.equipo_local_id, form.equipo_visit_id);
+    if (!cruce) return null;
+    const fid = form.fecha_id ? Number(form.fecha_id) : null;
+    if (fid == null || analisisPlayoffs.fechasPlayoff.has(fid)) return cruce;
+    const ultimaRegular = Math.max(0, ...fechas
+      .filter(f => !analisisPlayoffs.fechasPlayoff.has(f.id) && partidos.some(p => p.fecha_id === f.id && p.id !== editId))
+      .map(f => Number(f.numero) || 0));
+    const fechaForm = fechas.find(f => f.id === fid);
+    return fechaForm && Number(fechaForm.numero) > ultimaRegular ? cruce : null;
+  }, [analisisPlayoffs, form.equipo_local_id, form.equipo_visit_id, form.fecha_id, fechas, partidos, editId]);
+
+  // Botón del aviso: marca como playoff (con su copa, instancia y llave) los
+  // partidos de playoff que quedaron cargados como temporada regular.
+  const corregirPlayoffs = async () => {
+    const conCruce = analisisPlayoffs.malMarcados.filter(m => m.cruce);
+    if (conCruce.length === 0) return;
+    const ok = await confirm(`Se van a marcar ${conCruce.length} partido(s) como playoff, cada uno con su copa y llave. Dejan de sumar en la tabla de posiciones y pasan al cuadro de playoffs. ¿Continuar?`, { danger:false, confirmLabel:'Marcar como playoff' });
+    if (!ok) return;
+    setLoading(true);
+    let errores = 0;
+    for (const { partido, cruce } of conCruce) {
+      const { error } = await supabase.from(tablas.partidos)
+        .update({ es_playoff:true, copa:cruce.copa, instancia:cruce.instancia, llave:cruce.llave })
+        .eq('id', partido.id).eq('es_playoff', false);
+      if (error) { errores++; console.warn('[PartidosManager] corregirPlayoffs', partido.id, error.message); }
+    }
+    setLoading(false);
+    flash(errores
+      ? `⚠️ ${conCruce.length - errores} partido(s) corregidos, ${errores} con error — probá de nuevo`
+      : `✅ ${conCruce.length} partido(s) marcados como playoff`, errores === 0);
+    loadAll();
+  };
+
   // Edición de una fecha existente (número/descripción/día) — antes no había
   // forma de corregir el día de un fixture ya cargado si se aplazaba o
   // cambiaba de fecha; solo se podía fijar al crearlo la primera vez.
@@ -789,10 +905,12 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
       .from(tablas.fechas).select('*').eq('temporada_id', temporadaActivaId).order('numero', { ascending:true });
     if (fsErr) { flash(`❌ No se pudieron traer las fechas: ${fsErr.message}`, false); return; }
     const fechaIds = (fs ?? []).map(f => f.id);
-    const [{ data: psConFecha, error: pErr1 }, { data: psSinFecha, error: pErr2 }] = await Promise.all([
+    const [{ data: psConFecha, error: pErr1 }, { data: psSinFecha, error: pErr2 }, { data: eqZonas }] = await Promise.all([
       fechaIds.length ? supabase.from(tablas.partidos).select('*').in('fecha_id', fechaIds) : Promise.resolve({ data: [] }),
       supabase.from(tablas.partidos).select('*').is('fecha_id', null),
+      supabase.from(tablas.equipos).select('id,zona'),
     ]);
+    setZonas(Object.fromEntries((eqZonas ?? []).map(e => [e.id, e.zona])));
     if (pErr1 || pErr2) { flash(`❌ No se pudieron traer los partidos: ${(pErr1 ?? pErr2).message}`, false); return; }
     const ps = [...(psConFecha ?? []), ...(psSinFecha ?? [])].sort((a, b) => (a.fecha_id ?? Infinity) - (b.fecha_id ?? Infinity));
     setPartidos(ps);
@@ -824,6 +942,18 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         flash('El marcador está empatado — revisá los puntos, un partido finalizado no puede quedar en empate', false);
         return;
       }
+    }
+
+    // Playoff sin copa/instancia/llave: no tiene casillero en el cuadro.
+    if (form.es_playoff && (!form.copa || !form.instancia || !form.llave)) {
+      flash('Falta la Copa, la Instancia o la Llave del cruce — sin eso no aparece en el cuadro de playoffs', false);
+      return;
+    }
+    // Partido sin marcar en una fecha de playoffs: sumaría en la tabla.
+    const fechaSel = fechas.find(f => f.id === Number(form.fecha_id));
+    if (fechaSel && !form.es_playoff && analisisPlayoffs.fechasPlayoff.has(fechaSel.id)) {
+      const seguir = await confirm(`"${fechaSel.descripcion ?? `Fecha ${fechaSel.numero}`}" es una fecha de playoffs, pero este partido no está marcado como playoff: va a sumar en la tabla de posiciones y no va a aparecer en el cuadro. ¿Guardar igual?`);
+      if (!seguir) return;
     }
 
     if (!editId && form.fecha_id) {
@@ -1001,6 +1131,41 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
         </div>
       )}
 
+      {/* Partidos de playoff cargados como temporada regular: suman en la
+          tabla y no aparecen en el cuadro. Se listan con el cruce que les
+          corresponde y un botón para marcarlos de una vez. */}
+      {view==='lista' && analisisPlayoffs.malMarcados.length > 0 && (() => {
+        const lista = analisisPlayoffs.malMarcados;
+        const conCruce = lista.filter(m => m.cruce).length;
+        return (
+          <div style={{ marginBottom:20, padding:'14px 16px', borderRadius:10, fontSize:13,
+            background:'rgba(240,64,96,.08)', border:'1px solid rgba(240,64,96,.35)', color:'#EEF2F8' }}>
+            <div style={{ fontWeight:700, color:'#F04060', marginBottom:4 }}>
+              ⚠️ {lista.length} partido(s) de playoffs están cargados como temporada regular
+            </div>
+            <div style={{ color:'#8899BB', marginBottom:10 }}>
+              Están sumando en la tabla de posiciones y no aparecen en el cuadro de playoffs.
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom: conCruce ? 12 : 0, fontSize:12.5 }}>
+              {lista.map(({ partido, cruce }) => (
+                <div key={partido.id}>
+                  {nombreEq(partido.equipo_local_id)} vs {nombreEq(partido.equipo_visit_id)}
+                  <span style={{ color: cruce ? '#F0B429' : '#F04060' }}>
+                    {' → '}{cruce ? labelCruce(cruce) : 'no coincide con ningún cruce del cuadro: editalo a mano'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {conCruce > 0 && (
+              <button onClick={corregirPlayoffs} disabled={loading}
+                style={{ ...F.btnPrimary, opacity: loading ? 0.5 : 1 }}>
+                {loading ? 'Guardando...' : `🏆 MARCAR ${conCruce} COMO PLAYOFF`}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Fixture masivo */}
       {view==='fixture' && (
         <FixtureMasivo
@@ -1011,6 +1176,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           temporadaActivaId={temporadaActivaId}
           onCrearFecha={loadAll}
           onClose={()=>setView('lista')}
+          cruces={analisisPlayoffs.cruces}
         />
       )}
 
@@ -1024,6 +1190,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
           loading={loading} editId={editId}
           crearEncuesta={crearEncuesta} setCrearEncuesta={setCrearEncuesta}
           crucesExistentes={crucesExistentesForm}
+          cruceSugerido={cruceSugeridoForm}
         />
       )}
 

@@ -6319,6 +6319,100 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .tp2-desempate { font-size: 11px; }
 }
 
+/* ══ STATS POR FECHA (perfil de jugadora/jugador) ══ */
+.spf-wrap {
+  container: spf / inline-size;
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  background: #0D1522;
+}
+.spf { width: 100%; border-collapse: collapse; font-family: 'Barlow Condensed', sans-serif; }
+.spf th {
+  padding: 10px 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #6B7A99; text-align: center; white-space: nowrap;
+  background: #0A111C;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.spf td {
+  padding: 9px 8px;
+  text-align: center; white-space: nowrap;
+  font-size: 15px; font-weight: 600; color: #D5DCE8;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid rgba(255, 255, 255, .045);
+}
+.spf tbody tr:last-child td { border-bottom: none; }
+.spf tbody tr:hover td { background: rgba(255, 255, 255, .035); }
+.spf .spf-izq { text-align: left; }
+/* Primera columna fija al deslizar (celular) */
+.spf .spf-fija {
+  position: sticky; left: 0; z-index: 1;
+  background: #0D1522;
+  text-align: left; padding-left: 12px;
+}
+.spf th.spf-fija { background: #0A111C; }
+.spf tbody tr:hover .spf-fija { background: #121C2B; }
+.spf-fecha {
+  display: inline-block;
+  font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1px; color: #8A96AD;
+}
+.spf-fecha.is-playoff {
+  font-size: 12px; letter-spacing: .8px; color: #F0B429;
+  padding: 3px 8px; border-radius: 999px;
+  background: rgba(240, 180, 41, .1); border: 1px solid rgba(240, 180, 41, .35);
+}
+.spf-fecha.is-prom { color: #EEF2F8; font-size: 15px; }
+.spf tr.is-playoff td { background: rgba(240, 180, 41, .04); }
+.spf tr.is-playoff .spf-fija { box-shadow: inset 3px 0 0 #F0B429; }
+.spf-rival { display: inline-flex; align-items: center; gap: 8px; max-width: 150px; }
+.spf-rival img {
+  width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  border: 1.5px solid; background: #0E1420;
+}
+.spf-rival span { overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: #EEF2F8; }
+.spf-res {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 7px;
+  font-size: 12px; font-weight: 700; letter-spacing: .5px;
+}
+.spf-res b { font-weight: 600; letter-spacing: 0; }
+.spf-res.is-g { background: rgba(34, 208, 122, .13); color: #2EE08A; border: 1px solid rgba(34, 208, 122, .35); }
+.spf-res.is-p { background: rgba(240, 64, 96, .12); color: #FF6B85; border: 1px solid rgba(240, 64, 96, .35); }
+.spf td.spf-pts { font-family: 'Bebas Neue', sans-serif; font-size: 22px; font-weight: 400; letter-spacing: .5px; }
+.spf-estrella { margin-left: 4px; font-size: 13px; color: #F0B429; vertical-align: 3px; }
+.spf tr.is-mejor td { background: rgba(240, 180, 41, .07); }
+.spf-pos { color: #2EE08A !important; }
+.spf-neg { color: #FF5C7A !important; }
+.spf-dim { color: #6B7A99 !important; font-size: 13px !important; }
+.spf-tiro { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.spf-tiro-n { font-size: 14px; color: #D5DCE8; }
+.spf-tiro-pct { font-size: 11px; color: #6B7A99; }
+.spf-tiro-pct.is-bien { color: #2EE08A; }
+.spf-tiro.is-vacio .spf-tiro-n { color: #4A566E; }
+.spf tfoot td {
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  border-bottom: none;
+  background: rgba(0, 0, 0, .22);
+  color: #EEF2F8;
+}
+.spf tfoot .spf-fija { background: #0A111C; }
+.spf tfoot td { background: #0A111C; }
+/* Angosto (perfil en celular o modal chico): el rival va solo con su escudo */
+@container spf (max-width: 600px) {
+  .spf-rival span { display: none; }
+  .spf th, .spf td { padding-left: 4px; padding-right: 4px; }
+  .spf th { letter-spacing: 1px; font-size: 10.5px; }
+  .spf .spf-fija { padding-left: 10px; }
+  .spf td { font-size: 14px; }
+  .spf td.spf-pts { font-size: 20px; }
+  .spf-fecha.is-playoff { white-space: normal; max-width: 64px; font-size: 11px; line-height: 1.05; padding: 3px 7px; border-radius: 8px; text-align: center; }
+  .spf-res { flex-direction: column; gap: 1px; padding: 3px 6px; font-size: 11px; line-height: 1; }
+  .spf-res b { font-size: 11px; }
+  .spf-tiro-n { font-size: 13px; }
+  .spf-tiro-pct { font-size: 10px; }
+}
+
 /* ══ CABECERA DE EQUIPO: racha y pastillas (rediseño 21/11) ══ */
 .team-forma {
   display: flex;

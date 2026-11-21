@@ -6,6 +6,14 @@ import { equiposMasculino } from '../data/masculinoData';
 const LOGOS = Object.fromEntries(
   [...equiposFemenino, ...equiposMasculino].map(e => [e.id, e.logo])
 );
+const EQUIPOS = Object.fromEntries(
+  [...equiposFemenino, ...equiposMasculino].map(e => [e.id, e])
+);
+
+// Datos fijos de un equipo (nombre, logo, color) por id, o null.
+export function equipoPorId(equipoId) {
+  return (equipoId && EQUIPOS[equipoId]) || null;
+}
 
 export function logoDeEquipo(equipoId) {
   return (equipoId && LOGOS[equipoId]) || null;

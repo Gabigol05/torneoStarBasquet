@@ -5,6 +5,8 @@ import { labelPartidoCorto } from '../lib/fechaLabel';
 import { edadDesde } from '../lib/edad';
 import { useTemporada } from '../context/TemporadaContext';
 import { EscudoJugador } from './EscudoJugador.jsx';
+import { StatsPorFecha } from './StatsPorFecha.jsx';
+import { equipoPorId } from '../lib/escudos';
 import { supabase, isConfigured } from '../lib/supabase';
 
 // Qué tabla/columna consultar según la categoría del jugador — mismos
@@ -484,7 +486,13 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
       .map(p => {
         const st    = effectiveStatsPorPartido?.[p.id]?.[player.id];
         const fecha = effectiveFechas.find(f => f.id === p.fecha_id);
+        const esLocal = p.equipo_local_id === player.equipoId;
+        const rival = equipoPorId(esLocal ? p.equipo_visit_id : p.equipo_local_id);
+        const pf = (esLocal ? p.puntos_local : p.puntos_visit) ?? 0;
+        const pc = (esLocal ? p.puntos_visit : p.puntos_local) ?? 0;
         return {
+          partidoId: p.id,
+          rival, pf, pc, gano: pf > pc,
           // Playoffs: "Semifinal Oro" en vez de "F11" — la instancia/copa
           // viven en el partido, no en la fecha (ver lib/fechaLabel.js).
           match:     labelPartidoCorto(p, fecha) ?? (fecha ? `F${fecha.numero}` : `P${p.id}`),
@@ -695,39 +703,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               {historialGrafico.length > 0 && (
                 <div>
                   <div style={ST.sectionTitle}>📋 Stats por fecha</div>
-                  <div className="scrollbar-accent" style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                      <thead>
-                        <tr>
-                          {['Fecha', 'PTS', 'REB', 'AST', 'VAL', 'TL', '2P', '3P'].map(h => (
-                            <th key={h} style={{ color: '#6B7A99', padding: '6px 8px', textAlign: 'center', fontSize: 10, borderBottom: '1px solid #1C2535', whiteSpace: 'nowrap' }}>
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {historialGrafico.map((r, i) => (
-                          <tr key={i} style={{
-                            background: r.esPlayoff
-                              ? 'rgba(240,180,41,.06)'
-                              : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)'),
-                            boxShadow: r.esPlayoff ? 'inset 3px 0 0 #F0B429' : 'none',
-                          }}>
-                            <td style={{ color: r.esPlayoff ? '#F0B429' : '#6B7A99', padding: '7px 8px', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: r.esPlayoff ? 12 : 14, whiteSpace: 'nowrap' }}>{r.match}</td>
-                            <td style={{ color: '#F0B429', padding: '7px 8px', textAlign: 'center', fontFamily: "'Bebas Neue',sans-serif", fontSize: 17, fontWeight: 700 }}>{r.pts}</td>
-                            <td style={{ color: '#EEF2F8', padding: '7px 8px', textAlign: 'center' }}>{r.reb}</td>
-                            <td style={{ color: '#EEF2F8', padding: '7px 8px', textAlign: 'center' }}>{r.ast}</td>
-                            {/* ⚠️ FIX: columna VAL agregada */}
-                            <td style={{ color: r.val >= 0 ? '#22D07A' : '#F04060', padding: '7px 8px', textAlign: 'center' }}>{r.val}</td>
-                            <td style={{ color: '#22D07A', padding: '7px 8px', textAlign: 'center', fontSize: 11 }}>{r.sc}/{r.sc + r.sf}</td>
-                            <td style={{ color: '#F0B429', padding: '7px 8px', textAlign: 'center', fontSize: 11 }}>{r.dc}/{r.dc + r.df}</td>
-                            <td style={{ color: '#60A5FA', padding: '7px 8px', textAlign: 'center', fontSize: 11 }}>{r.tc}/{r.tc + r.tf}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <StatsPorFecha filas={historialGrafico} mejor={mejorPartido} accent={player.color ?? '#F0B429'}/>
                 </div>
               )}
             </>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Children, useMemo, useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import { useStats } from '../context/StatsContext';
@@ -149,11 +149,7 @@ export function primeraRonda(pool, size) {
 // Aviso que se muestra debajo del título "Semifinal" cuando las semis salen
 // de cuartos: los cruces no siguen una regla fija, los define la organización.
 function NotaSemisOrganizacion() {
-  return (
-    <div style={{ marginTop: 6, fontSize: 'clamp(12px, 1.4vw, 14px)', letterSpacing: 1.5, color: 'var(--gold)' }}>
-      Cruces a definir por la organización
-    </div>
-  );
+  return <span className="bracket-round-nota">Cruces a definir por la organización</span>;
 }
 
 // Devuelve el equipo GANADOR de un partido real de playoff ya finalizado, o
@@ -173,38 +169,78 @@ function buscarPartidoSlot(partidosCopa, instancia, llave) {
 }
 
 function TeamSeed({ team, seed }) {
-  if (!team) return <div className="bracket-team tbd">Por definir</div>;
+  if (!team) {
+    return (
+      <div className="bracket-team tbd">
+        <span className="bracket-team-logo bracket-team-logo--vacio" aria-hidden="true"/>
+        <span className="bracket-team-name">Por definir</span>
+      </div>
+    );
+  }
   return (
     <div className="bracket-team">
-      <span style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
-        <img src={team.logo} alt="" decoding="async"
-          style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
-            border: `1.5px solid ${team.color}`, boxShadow: `0 0 6px ${hexA(team.color, '59')}` }}
-          onError={e => { e.target.style.display = 'none'; }}/>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {seed != null ? <span style={{ opacity: .6, marginRight: 5 }}>{seed}</span> : null}{team.name}
-        </span>
-      </span>
+      <img src={team.logo} alt="" decoding="async" className="bracket-team-logo"
+        style={{ borderColor: team.color, boxShadow: `0 0 10px ${hexA(team.color, '59')}` }}
+        onError={e => { e.target.style.visibility = 'hidden'; }}/>
+      <span className="bracket-team-name">{team.name}</span>
+      {seed != null && <span className="bracket-team-seed">{seed}</span>}
     </div>
   );
 }
 
-// Wrapper de un cruce con equipos reales pero SIN resultado todavía: o bien
-// la proyección por semilla (fase regular sin jugar aún el cruce), o el
-// casillero de la ronda siguiente ya completado con el/la ganador/a real de
-// la ronda anterior (auto-avance) mientras ese partido no se cargó todavía.
-// Degradado con los colores de ambos equipos — mismo lenguaje que
-// fixture/resultado/votaciones. Los cruces que siguen "TBD" en ambos lados
-// usan el .bracket-match plano.
-function BracketMatch({ teamA, teamB, seedA, seedB }) {
+// Cruce con equipos SIN resultado todavía: la proyección por semilla (fase
+// regular sin jugar aún el cruce), el casillero de la ronda siguiente ya
+// completado con el ganador real de la ronda anterior (auto-avance), o
+// "Por definir". Degradado con los colores de ambos equipos — mismo lenguaje
+// que fixture/resultado/votaciones. La variante "final" es más grande.
+function BracketMatch({ teamA, teamB, seedA, seedB, variante = null }) {
   const cA = teamA?.color ?? '#5A6B85';
   const cB = teamB?.color ?? '#5A6B85';
   return (
-    <div className="bracket-match" style={{ background: `linear-gradient(115deg, ${hexA(cA, '55')}, #1C2535 45%, ${hexA(cB, '55')})` }}>
+    <div className={`bracket-match${variante === 'final' ? ' bracket-match--final' : ''}`}
+      style={{ background: `linear-gradient(115deg, ${hexA(cA, '55')}, #1C2535 45%, ${hexA(cB, '55')})` }}>
       <div className="bracket-match-inner" style={{ background: `linear-gradient(135deg, ${hexA(cA, '14')}, #0B111C 45%, ${hexA(cB, '14')})` }}>
         <TeamSeed team={teamA} seed={seedA}/>
+        <div className="bracket-vs" aria-hidden="true"><span>VS</span></div>
         <TeamSeed team={teamB} seed={seedB}/>
       </div>
+    </div>
+  );
+}
+
+// Una columna del cuadro (Cuartos, Semifinal, Final, Campeón). El cuerpo
+// reparte el alto en partes iguales entre sus partidos y centra cada uno en
+// su parte: como todas las columnas miden lo mismo (la más alta, Cuartos),
+// cada semi queda a la altura del medio de sus dos cuartos y la final en el
+// centro del cuadro, sin márgenes puestos a mano. En celular las columnas
+// se apilan (ver .bracket en el CSS). La final va dentro de un marco
+// destacado y con el título grande.
+function Ronda({ tipo, titulo, nota = null, children }) {
+  return (
+    <div className={`bracket-round bracket-round--${tipo}`}>
+      <div className="bracket-round-label">
+        {tipo === 'final' && <span className="bracket-round-trofeo" aria-hidden="true">🏆</span>}
+        <span className="bracket-round-titulo">{titulo}</span>
+        {nota}
+      </div>
+      <div className="bracket-round-body">
+        {Children.toArray(children).map((c, i) => (
+          <div key={c.key ?? i} className="bracket-slot">
+            {tipo === 'final' ? <div className="bracket-final-frame">{c}</div> : c}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Contenedor del cuadro: pasa el color de la copa como variables CSS (para
+// el marco de la final, el título "Campeón" y los conectores).
+function BracketWrap({ accentColor, children }) {
+  const c = accentColor ?? '#F0B429';
+  return (
+    <div className="bracket-wrap" style={{ '--cup': c, '--cup-a15': hexA(c, '26'), '--cup-a45': hexA(c, '73') }}>
+      <div className="bracket">{children}</div>
     </div>
   );
 }
@@ -249,7 +285,8 @@ function Slot({ partidosCopa, instancia, llave, accentColor, fallbackA, fallback
         onClick={() => onAbrirPartido?.(real.id)}/>
     );
   }
-  return <BracketMatch teamA={fallbackA} teamB={fallbackB} seedA={seedA} seedB={seedB}/>;
+  return <BracketMatch teamA={fallbackA} teamB={fallbackB} seedA={seedA} seedB={seedB}
+    variante={instancia === 'final' ? 'final' : null}/>;
 }
 
 // ── MEJORA (pedido de Alvaro): el campeón es el logro más importante del
@@ -266,11 +303,8 @@ function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
   const colorCss = accentColor ?? 'var(--gold)';
   const colorHex = accentColor ?? '#F0B429';
   const iconSize = size === 8 ? 92 : size === 4 ? 80 : 68;
-  // En escritorio este padding baja el casillero para alinearlo con el
-  // árbol horizontal (queda a la altura de la Final); ese corrimiento no
-  // aplica en la lista vertical de mobile — se saca casi del todo ahí vía
-  // --po-pt-campeon8/4 (ver @media 767px en torneo-star.css).
-  const paddingTop = size === 8 ? 'var(--po-pt-campeon8, 48px)' : size === 4 ? 'var(--po-pt-campeon4, 20px)' : 0;
+  // Queda centrado a la altura de la Final por el layout de columnas
+  // (ver Ronda), sin corrimientos a mano.
 
   const pl = partidoFinal?.puntos_local ?? 0;
   const pv = partidoFinal?.puntos_visit ?? 0;
@@ -317,7 +351,7 @@ function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
   );
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', paddingTop }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       {ganador ? (
         <div style={{
           position: 'relative', padding: '26px 24px 22px', borderRadius: 20,
@@ -347,45 +381,34 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
     // Semis: no se proyectan. Los cruces los arma la organización y, hasta
     // que se carguen (con copa + instancia + llave), el casillero queda
     // "Por definir".
-    const semisSlots = [0, 1];
-    const ganadoresSemis = semisSlots.map((_, i) =>
-      resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', i + 1), equipoMap)
+    const ganadoresSemis = [1, 2].map(ll =>
+      resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', ll), equipoMap)
     );
     const partidoFinal = buscarPartidoSlot(partidosCopa, 'final', 1);
 
     return (
       <>
-      <div className="bracket-wrap">
-        <div className="bracket">
-          <div className="bracket-round">
-            <div className="bracket-round-label">Cuartos</div>
-            {pairs.map(([a, b], i) => (
-              <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="cuartos" llave={i + 1}
-                fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
-            ))}
-          </div>
-          <div className="bracket-round">
-            <div className="bracket-round-label">Semifinal<NotaSemisOrganizacion/></div>
-            {semisSlots.map(i => (
-              <div key={i} style={{ marginTop: i === 0 ? 'var(--po-mt-semi1, 32px)' : 'var(--po-mt-semi2, 48px)' }}>
-                <Slot {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
-                  fallbackA={null} fallbackB={null}/>
-              </div>
-            ))}
-          </div>
-          <div className="bracket-round">
-            <div className="bracket-round-label">Final</div>
-            <div style={{ marginTop: 'var(--po-mt-final8, 120px)' }}>
-              <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-                fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
-            </div>
-          </div>
-          <div className="bracket-round">
-            <div className="bracket-round-label">Campeon</div>
-            <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={8}/>
-          </div>
-        </div>
-      </div>
+      <BracketWrap accentColor={accentColor}>
+        <Ronda tipo="cuartos" titulo="Cuartos">
+          {pairs.map(([a, b], i) => (
+            <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="cuartos" llave={i + 1}
+              fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
+          ))}
+        </Ronda>
+        <Ronda tipo="semis" titulo="Semifinal" nota={<NotaSemisOrganizacion/>}>
+          {[1, 2].map(ll => (
+            <Slot key={ll} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={ll}
+              fallbackA={null} fallbackB={null}/>
+          ))}
+        </Ronda>
+        <Ronda tipo="final" titulo="Final">
+          <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
+            fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
+        </Ronda>
+        <Ronda tipo="campeon" titulo="Campeón">
+          <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={8}/>
+        </Ronda>
+      </BracketWrap>
       <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
       </>
     );
@@ -400,28 +423,21 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
 
     return (
       <>
-      <div className="bracket-wrap">
-        <div className="bracket">
-          <div className="bracket-round">
-            <div className="bracket-round-label">Semifinal</div>
-            {pairs.map(([a, b], i) => (
-              <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
-                fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
-            ))}
-          </div>
-          <div className="bracket-round">
-            <div className="bracket-round-label">Final</div>
-            <div style={{ marginTop: 'var(--po-mt-final4, 32px)' }}>
-              <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-                fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
-            </div>
-          </div>
-          <div className="bracket-round">
-            <div className="bracket-round-label">Campeon</div>
-            <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={4}/>
-          </div>
-        </div>
-      </div>
+      <BracketWrap accentColor={accentColor}>
+        <Ronda tipo="semis" titulo="Semifinal">
+          {pairs.map(([a, b], i) => (
+            <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
+              fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
+          ))}
+        </Ronda>
+        <Ronda tipo="final" titulo="Final">
+          <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
+            fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
+        </Ronda>
+        <Ronda tipo="campeon" titulo="Campeón">
+          <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={4}/>
+        </Ronda>
+      </BracketWrap>
       <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
       </>
     );
@@ -431,20 +447,16 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
   const partidoFinal = buscarPartidoSlot(partidosCopa, 'final', 1);
   return (
     <>
-    <div className="bracket-wrap">
-      <div className="bracket">
-        <div className="bracket-round">
-          <div className="bracket-round-label">Final</div>
-          <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-            fallbackA={ronda1.pares[0]?.[0]} fallbackB={ronda1.pares[0]?.[1]}
-            seedA={ronda1.seeds[0]?.[0]} seedB={ronda1.seeds[0]?.[1]}/>
-        </div>
-        <div className="bracket-round">
-          <div className="bracket-round-label">Campeon</div>
-          <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={2}/>
-        </div>
-      </div>
-    </div>
+    <BracketWrap accentColor={accentColor}>
+      <Ronda tipo="final" titulo="Final">
+        <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
+          fallbackA={ronda1.pares[0]?.[0]} fallbackB={ronda1.pares[0]?.[1]}
+          seedA={ronda1.seeds[0]?.[0]} seedB={ronda1.seeds[0]?.[1]}/>
+      </Ronda>
+      <Ronda tipo="campeon" titulo="Campeón">
+        <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={2}/>
+      </Ronda>
+    </BracketWrap>
     <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
     </>
   );
@@ -452,50 +464,20 @@ function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos
 
 function BracketVacio({ accentColor }) {
   return (
-    <div className="bracket-wrap">
-      <div className="bracket">
-        <div className="bracket-round">
-          <div className="bracket-round-label">Cuartos</div>
-          {[[1,8],[2,7],[3,6],[4,5]].map(([a,b]) => (
-            <div key={a} className="bracket-match">
-              <div className="bracket-team tbd">{a}. Por definir</div>
-              <div className="bracket-team tbd">{b}. Por definir</div>
-            </div>
-          ))}
-        </div>
-        <div className="bracket-round">
-          <div className="bracket-round-label">Semifinal<NotaSemisOrganizacion/></div>
-          <div className="bracket-match" style={{ marginTop: 32 }}>
-            <div className="bracket-team tbd">TBD</div>
-            <div className="bracket-team tbd">TBD</div>
-          </div>
-          <div className="bracket-match" style={{ marginTop: 80 }}>
-            <div className="bracket-team tbd">TBD</div>
-            <div className="bracket-team tbd">TBD</div>
-          </div>
-        </div>
-        <div className="bracket-round">
-          <div className="bracket-round-label">Final</div>
-          <div className="bracket-match" style={{ marginTop: 120 }}>
-            <div className="bracket-team tbd">TBD</div>
-            <div className="bracket-team tbd">TBD</div>
-          </div>
-        </div>
-        <div className="bracket-round">
-          <div className="bracket-round-label">Campeon</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', paddingTop: 80 }}>
-            <div style={{ textAlign: 'center', color: accentColor ?? 'var(--gold)' }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill={accentColor ?? 'var(--gold)'} opacity=".3">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-              </svg>
-              <div style={{ fontFamily: "'Bebas Neue'", fontSize: 18, letterSpacing: 2, marginTop: 8, opacity: .4 }}>
-                Por definir
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <BracketWrap accentColor={accentColor}>
+      <Ronda tipo="cuartos" titulo="Cuartos">
+        {[1, 2, 3, 4].map(i => <BracketMatch key={i}/>)}
+      </Ronda>
+      <Ronda tipo="semis" titulo="Semifinal" nota={<NotaSemisOrganizacion/>}>
+        {[1, 2].map(i => <BracketMatch key={i}/>)}
+      </Ronda>
+      <Ronda tipo="final" titulo="Final">
+        <BracketMatch variante="final"/>
+      </Ronda>
+      <Ronda tipo="campeon" titulo="Campeón">
+        <CampeonBox partidoFinal={null} equipoMap={{}} accentColor={accentColor} size={8}/>
+      </Ronda>
+    </BracketWrap>
   );
 }
 
@@ -505,11 +487,9 @@ function BracketVacio({ accentColor }) {
 function TercerPuesto({ partido, equipos, jugadorasMap, fechas, onAbrirPartido, accentColor }) {
   if (!partido) return null;
   return (
-    <div style={{ marginTop: 20 }}>
-      <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#8a96ad', marginBottom: 8 }}>
-        Tercer Puesto
-      </div>
-      <div style={{ maxWidth: 320 }}>
+    <div className="bracket-tercer">
+      <div className="bracket-tercer-label">🥉 Tercer puesto</div>
+      <div className="bracket-tercer-card">
         {partido.estado === 'pendiente'
           ? <FixtureCard partido={partido} equiposFem={equipos} fechas={fechas}/>
           : <MatchResultCard partido={partido} equiposFem={equipos} jugadorasMap={jugadorasMap} fechas={fechas}
@@ -527,13 +507,9 @@ function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasM
   const tercerPuesto = buscarPartidoSlot(partidosCopa, 'tercer_puesto', 1);
 
   return (
-    <div style={{ marginBottom: 48 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        fontFamily: "'Barlow Condensed'", fontSize: 13, fontWeight: 700,
-        letterSpacing: 3, textTransform: 'uppercase', color: cup.color, marginBottom: 16,
-      }}>
-        <span style={{ width: 12, height: 12, borderRadius: 3, background: cup.color, display: 'inline-block' }}/>
+    <div className="cup-bracket" style={{ '--cup': cup.color, '--cup-a15': hexA(cup.color, '26') }}>
+      <div className="cup-bracket-titulo">
+        <span className="cup-bracket-marca" aria-hidden="true"/>
         {cup.label}
       </div>
       <BracketProyectado pool={pool} accentColor={cup.color} partidosCopa={partidosCopa} equipoMap={equipoMap}

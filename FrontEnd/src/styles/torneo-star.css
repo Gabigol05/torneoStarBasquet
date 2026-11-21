@@ -1824,139 +1824,345 @@ tbody td {
 }
 
 /* ══════════════════════════════
-   BRACKET
+   BRACKET (cuadro de playoffs)
 ══════════════════════════════ */
+/* Rediseño (pedido de Alvaro, 21/11): antes cada ronda bajaba sus cruces con
+   márgenes fijos (32/48/120px) pensados para tarjetas compactas; con las
+   tarjetas reales de resultado/fixture (mucho más altas) la Final quedaba
+   arriba, fuera del centro, y chica. Ahora todas las columnas miden lo mismo
+   (.bracket estira a la más alta) y cada .bracket-slot ocupa una parte igual
+   del alto de su columna con el cruce centrado: las semis quedan a la altura
+   del medio de sus cuartos y la Final en el centro del cuadro, sea cual sea
+   el alto de las tarjetas. La Final va más grande, con marco y título
+   dorado. En celular las rondas se apilan (ver @media al final). */
+.cup-bracket { margin-bottom: clamp(48px, 6vw, 72px); }
+.cup-bracket-titulo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(24px, 2.4vw, 32px);
+  letter-spacing: 3px;
+  line-height: 1;
+  color: var(--cup, var(--gold));
+  margin-bottom: clamp(18px, 2.4vw, 26px);
+}
+.cup-bracket-titulo::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--cup-a15, rgba(240,180,41,.2)), transparent);
+}
+.cup-bracket-marca {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--cup, var(--gold));
+  box-shadow: 0 0 14px var(--cup, var(--gold));
+  flex-shrink: 0;
+}
+
 .bracket-wrap {
   overflow-x: auto;
-  padding-bottom: clamp(12px, 2vw, 16px);
+  padding: 4px 2px clamp(12px, 2vw, 16px);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--color-accent) transparent;
 }
-
 .bracket-wrap::-webkit-scrollbar { height: 6px; }
 .bracket-wrap::-webkit-scrollbar-track { background: transparent; }
 .bracket-wrap::-webkit-scrollbar-thumb { background: var(--color-accent); border-radius: 999px; }
 .bracket-wrap::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
 .bracket {
+  --bracket-gap: clamp(18px, 2vw, 30px);
   display: flex;
-  gap: 0;
+  align-items: stretch;
+  gap: var(--bracket-gap);
+  width: max-content;
   min-width: 100%;
 }
-
 .bracket-round {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: clamp(272px, 21vw, 310px);
+}
+.bracket-round--final { width: clamp(292px, 23vw, 340px); }
+.bracket-round--campeon { width: clamp(190px, 15vw, 230px); }
+
+.bracket-round-label {
+  /* Alto fijo y el aviso de semis colgado abajo: así los títulos de todas
+     las columnas quedan a la misma altura y los cuerpos arrancan parejos. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 104px;
+  padding-bottom: 24px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.bracket-round-titulo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(22px, 2vw, 28px);
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #C9D3E3;
+}
+.bracket-round-nota {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  white-space: nowrap;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: .85;
+}
+.bracket-round-trofeo {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(240, 180, 41, .55));
+}
+/* "FINAL": lo más importante del cuadro — grande y dorado. */
+.bracket-round--final .bracket-round-titulo {
+  font-size: clamp(40px, 3.6vw, 54px);
+  letter-spacing: 7px;
+  color: #F0B429;
+  background: linear-gradient(180deg, #FFE7A3 0%, #F0B429 55%, #C48A12 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(240, 180, 41, .35));
+}
+.bracket-round--campeon .bracket-round-titulo { color: var(--cup, var(--gold)); }
+
+.bracket-round-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
-  padding: 0 clamp(6px, 1vw, 8px);
-  min-width: clamp(140px, 20vw, 180px);
+  gap: 16px;
+}
+.bracket-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+/* Conector corto que entra a cada cruce desde la ronda anterior. */
+.bracket-round:not(:first-child) .bracket-slot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(-1 * var(--bracket-gap));
+  width: var(--bracket-gap);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cup-a45, rgba(240,180,41,.45)));
+  pointer-events: none;
+}
+/* Las tarjetas de resultado/fixture llenan el ancho de su columna. */
+.bracket-slot .result-card-v2,
+.bracket-slot .fixture-card-v2 {
+  min-width: 0;
+  width: 100%;
 }
 
-/* ⚠️ FIX (reporte Alvaro, captura de celular: cruces de playoff pisándose,
-   texto cortado, la tarjeta de "Campeón" flotando arriba de otro cruce): el
-   cuadro (Cuartos/Semifinal/Final/Campeón) es un árbol de columnas lado a
-   lado pensado para .bracket-match — una tarjeta compacta (~60px de alto).
-   Pero en cuanto hay un resultado real cargado, PlayoffsBracket.jsx dibuja
-   ahí adentro la MISMA tarjeta grande de Resultados/Fixture
-   (.result-card-v2/.fixture-card-v2, con un piso de min-width:320px para no
-   aplastarse — ver el comentario en esa regla). En escritorio hay lugar de
-   sobra y el cuadro scrollea horizontal sin problema. En celular esa
-   tarjeta de 320px de ancho no entra en una columna de ~150-180px: se
-   desborda para los costados, encima de la columna vecina — y los
-   corrimientos verticales (32/48/120px, puestos a mano para alinear el
-   árbol contra tarjetas COMPACTAS) quedan totalmente desalineados contra
-   tarjetas reales de 300-500px de alto, así que las columnas terminan
-   pisándose también verticalmente. No es una cuestión de sombra/ancho, es
-   que el layout de "árbol horizontal" no tiene sentido en una pantalla
-   angosta con tarjetas completas. En mobile se pasa a una lista vertical:
-   una ronda debajo de la otra, cada una a todo el ancho — misma tarjeta,
-   mismo contenido, sin comprimir nada ni necesitar los corrimientos del
-   árbol (se llevan a 0 acá abajo vía las variables --po-*, que
-   PlayoffsBracket.jsx usa en sus estilos inline en vez del número fijo). */
-@media (max-width: 767px) {
-  .bracket-wrap {
-    overflow-x: visible;
-  }
-  .bracket {
-    flex-direction: column;
-    gap: 28px;
-    min-width: 0;
-  }
-  .bracket-round {
-    flex: none;
-    justify-content: flex-start;
-    gap: 14px;
-    padding: 0;
-    min-width: 0;
-    width: 100%;
-    --po-mt-semi1: 0px;
-    --po-mt-semi2: 0px;
-    --po-mt-final8: 0px;
-    --po-mt-final4: 0px;
-    --po-pt-campeon8: 8px;
-    --po-pt-campeon4: 8px;
-  }
-  .bracket-round-label {
-    text-align: left;
-    padding-left: 2px;
-  }
+/* Marco de la Final */
+.bracket-final-frame {
+  position: relative;
+  padding: 10px;
+  border-radius: 24px;
+  border: 1px solid var(--cup-a45, rgba(240,180,41,.45));
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, var(--cup-a15, rgba(240,180,41,.15)), transparent 70%),
+    rgba(8, 16, 26, .6);
+  box-shadow: 0 0 44px var(--cup-a15, rgba(240,180,41,.15)), inset 0 0 0 1px rgba(255,255,255,.03);
 }
 
-.bracket-round-label {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(11px, 1.3vw, 13px);
-  font-weight: 700;
-  letter-spacing: clamp(1.5px, 0.3vw, 3px);
-  text-transform: uppercase;
-  color: var(--gray);
-  text-align: center;
-  margin-bottom: clamp(12px, 2vw, 16px);
-}
+/* La tarjeta de la Final (pendiente o jugada) va más grande que las demás. */
+.bracket-final-frame .fc2v-logo { width: 68px; height: 68px; }
+.bracket-final-frame .fc2v-name { font-size: 21px; }
+.bracket-final-frame .rc2-pts { font-size: 48px; }
+.bracket-final-frame .fc2v-badge { font-size: 14px; }
 
+/* Cruce sin resultado (proyección / "Por definir") */
 .bracket-match {
   background: var(--dark3);
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
-  margin: clamp(4px, 0.8vw, 6px) 0;
   padding: 1px;
 }
-
 .bracket-match-inner {
   background: var(--dark3);
-  border-radius: 7px;
+  border-radius: 13px;
   overflow: hidden;
 }
-
 .bracket-team {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: clamp(6px, 1vw, 8px) clamp(10px, 1.5vw, 12px);
+  gap: 10px;
+  min-height: 54px;
+  padding: 12px 14px;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(13px, 1.6vw, 15px);
+  font-size: 16px;
   font-weight: 700;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: #EEF2F8;
 }
-
-.bracket-team:last-child {
-  border-bottom: none;
+.bracket-team.tbd { color: #5A6B85; }
+.bracket-team.winner { background: rgba(240, 180, 41, 0.07); color: var(--gold); }
+.bracket-team-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid;
+  background: #0E1420;
+  flex-shrink: 0;
 }
-
-.bracket-team.winner {
-  background: rgba(240, 180, 41, 0.07);
+.bracket-team-logo--vacio {
+  display: inline-block;
+  border: 2px dashed rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .02);
+}
+.bracket-team-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: .3px;
+}
+.bracket-team-seed {
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #8899BB;
+  background: rgba(255, 255, 255, .05);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+.bracket-vs {
+  position: relative;
+  height: 1px;
+  margin: 0 14px;
+  background: rgba(255, 255, 255, .07);
+}
+.bracket-vs span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  line-height: 1;
+  color: #8899BB;
+  background: #0E1420;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 999px;
+  padding: 3px 9px 2px;
+}
+/* Variante Final: más grande */
+.bracket-match--final .bracket-team {
+  min-height: 72px;
+  padding: 16px 18px;
+  font-size: 20px;
+  gap: 14px;
+}
+.bracket-match--final .bracket-team-logo { width: 44px; height: 44px; border-width: 2.5px; }
+.bracket-match--final .bracket-vs { margin: 0 18px; }
+.bracket-match--final .bracket-vs span {
+  font-size: 15px;
+  padding: 4px 12px 3px;
   color: var(--gold);
+  border-color: rgba(240, 180, 41, .4);
 }
-
-.bracket-team.tbd {
-  color: var(--gray2);
-}
-
 .bracket-score {
   font-family: 'Bebas Neue', sans-serif;
   font-size: clamp(16px, 2.2vw, 19px);
   letter-spacing: 1px;
+}
+
+/* Tercer puesto */
+.bracket-tercer { margin-top: 28px; }
+.bracket-tercer-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(20px, 1.8vw, 24px);
+  letter-spacing: 3px;
+  color: #CD7F32;
+  margin-bottom: 12px;
+}
+.bracket-tercer-card { max-width: 340px; }
+
+/* ── Celular: las rondas se apilan, una debajo de la otra, a todo el ancho
+   (un árbol horizontal con tarjetas completas no entra en una pantalla
+   angosta). Título de cada ronda a la izquierda con una línea; la Final
+   centrada, grande y con líneas doradas a los costados. */
+@media (max-width: 767px) {
+  .cup-bracket-titulo { font-size: 26px; margin-bottom: 22px; }
+  .bracket-wrap { overflow-x: visible; padding: 0; }
+  .bracket {
+    flex-direction: column;
+    width: auto;
+    min-width: 0;
+    gap: 34px;
+  }
+  .bracket-round,
+  .bracket-round--final,
+  .bracket-round--campeon { width: 100%; }
+  .bracket-round-label {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    height: auto;
+    padding-bottom: 0;
+    gap: 6px 10px;
+    margin-bottom: 14px;
+    text-align: left;
+  }
+  .bracket-round-label::after {
+    content: '';
+    flex: 1;
+    min-width: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .16), transparent);
+  }
+  .bracket-round-titulo { font-size: 26px; }
+  .bracket-round-nota { position: static; white-space: normal; order: 10; flex-basis: 100%; font-size: 12px; }
+  .bracket-final-frame .fc2v-logo { width: 60px; height: 60px; }
+  .bracket-final-frame .fc2v-name { font-size: 19px; }
+  .bracket-final-frame .rc2-pts { font-size: 42px; }
+  .bracket-round--final .bracket-round-label,
+  .bracket-round--campeon .bracket-round-label { justify-content: center; }
+  .bracket-round--final .bracket-round-label::before {
+    content: '';
+    flex: 1;
+    min-width: 24px;
+    height: 1px;
+    order: -1;
+    background: linear-gradient(90deg, transparent, rgba(240, 180, 41, .55));
+  }
+  .bracket-round--final .bracket-round-label::after {
+    background: linear-gradient(90deg, rgba(240, 180, 41, .55), transparent);
+  }
+  .bracket-round--final .bracket-round-titulo { font-size: 44px; letter-spacing: 6px; }
+  .bracket-round--campeon .bracket-round-label::after { display: none; }
+  .bracket-round-body { gap: 14px; }
+  .bracket-slot { flex: none; }
+  .bracket-round:not(:first-child) .bracket-slot::before { display: none; }
+  .bracket-final-frame { padding: 8px; border-radius: 20px; }
+  .bracket-team { font-size: 17px; min-height: 56px; }
+  .bracket-match--final .bracket-team { font-size: 20px; min-height: 70px; }
+  .bracket-tercer-card { max-width: none; }
 }
 
 /* ══════════════════════════════
@@ -5383,6 +5589,11 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 }
 
 /* ══ FECHA CHIPS ══════════════════════════════════════════════ */
+/* Botones de fecha (ACUM, F1, F2...), copa y vista Temporada/Playoffs.
+   Rediseño (pedido de Alvaro, 21/11): más grandes y fáciles de tocar, con
+   fondo, y el activo bien marcado (borde + brillo del color de la
+   categoría, que llega inline como color/borderColor). En celular van en
+   una sola fila que se desliza en vez de ocupar varias líneas. */
 .fecha-chips {
   display: flex;
   gap: 8px;
@@ -5390,19 +5601,68 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   margin-bottom: 20px;
 }
 .fecha-chip {
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid #1C2535;
-  border-radius: 20px;
-  color: #6B7A99;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 38px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid #1E2A3D;
+  border-radius: 999px;
+  color: #8A96AD;
   cursor: pointer;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 15px;
-  letter-spacing: 1px;
-  transition: all 0.15s;
+  font-size: 17px;
+  letter-spacing: 1.2px;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .1s;
 }
-.fecha-chip:hover { border-color: #4A566E; color: #EEF2F8; }
-.fecha-chip.active { font-weight: 700; }
+.fecha-chip:hover { border-color: #3A4A63; color: #EEF2F8; background: rgba(255, 255, 255, .06); }
+.fecha-chip:active { transform: scale(.96); }
+.fecha-chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.fecha-chip.active {
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px currentColor, 0 0 18px -6px currentColor;
+}
+/* Vista "Temporada Regular / Playoffs": control segmentado */
+.fecha-chips.view-toggle {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid #1E2A3D;
+}
+.view-toggle .fecha-chip {
+  height: 38px;
+  padding: 0 20px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 17px;
+}
+.view-toggle .fecha-chip.active { background: rgba(255, 255, 255, .09); }
+
+@media (max-width: 767px) {
+  .fecha-chips:not(.view-toggle) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding: 2px 24px 4px 2px;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .fecha-chips:not(.view-toggle)::-webkit-scrollbar { display: none; }
+  .fecha-chip { height: 40px; scroll-snap-align: start; }
+  .fecha-chips.view-toggle { display: flex; width: 100%; }
+  .view-toggle .fecha-chip { flex: 1; min-width: 0; padding: 0 8px; font-size: 16px; }
+}
 
 /* ══ RESULT CARDS ═════════════════════════════════════════════ */
 .results-grid {

@@ -575,7 +575,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const ResultadosViewChips = () => {
     if (!hayPlayoffsCargados) return null;
     return (
-      <div className="fecha-chips" style={{ marginBottom: 12 }}>
+      <div className="fecha-chips view-toggle" style={{ marginBottom: 14 }}>
         <button
           className={`fecha-chip ${resultadosView === 'regular' ? 'active' : ''}`}
           onClick={() => setResultadosView('regular')}

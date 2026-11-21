@@ -1,5 +1,5 @@
 ﻿import logoIndependencia  from '../assets/logo_masc_independencia.png';
-import logoJurasicos      from '../assets/logo_masc_jurasicos.png';
+import logoJurasicos      from '../assets/logo_masc_jurasicos.webp';
 import logoWalkers        from '../assets/logo_masc_walkers.png';
 import logoNN             from '../assets/logo_masc_nn.png';
 import logoNorthSide      from '../assets/logo_masc_north_side.png';
@@ -7,21 +7,21 @@ import logoPueblerinos    from '../assets/logo_masc_pueblerinos.png';
 import logo4K             from '../assets/logo_masc_4k.png';
 import logoCrewMonsters   from '../assets/logo_masc_crew_monsters.png';
 import logoHoopers        from '../assets/logo_masc_hoopers.png';
-import logoTanques        from '../assets/logo_masc_tanques.png';
+import logoTanques        from '../assets/logo_masc_tanques.webp';
 import logoAguilas        from '../assets/logo_masc_aguilas.png';
 import logoArtigas        from '../assets/logo_masc_artigas.png';
 import logoDeadCow        from '../assets/logo_masc_dead_cow.png';
 import logoFederados      from '../assets/logo_masc_federados.png';
-import logoIncas          from '../assets/logo_masc_incas.png';
+import logoIncas          from '../assets/logo_masc_incas.webp';
 import logoChangos        from '../assets/logo_masc_changos.png';
 import logoRandom         from '../assets/logo_masc_random.jpeg';
-import logoDoctaBandidos  from '../assets/logo_masc_docta_bandidos.png';
+import logoDoctaBandidos  from '../assets/logo_masc_docta_bandidos.webp';
 import logoLinaje         from '../assets/logo_masc_linaje.png';
 import logoOroNegro       from '../assets/logo_masc_oro_negro.png';
-import logoRealNorte      from '../assets/logo_masc_real_norte.png';
+import logoRealNorte      from '../assets/logo_masc_real_norte.webp';
 import logoElRejunte      from '../assets/logo_masc_el_rejunte.png';
 import logoSanFrancisco   from '../assets/logo_masc_san_francisco.png';
-import logoVillaAzalais   from '../assets/logo_masc_villa_azalais.png';
+import logoVillaAzalais   from '../assets/logo_masc_villa_azalais.webp';
 
 export const equiposMasculino = [
   // San Francisco arriba de Independencia a pedido (temporal, hasta que

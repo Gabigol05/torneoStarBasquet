@@ -634,6 +634,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         fechas={fechas}
         onSelectPlayer={handleSelectPlayer}
         mode={mode}
+        usaZonas={usaZonasEnVista}
       />
     );
   }

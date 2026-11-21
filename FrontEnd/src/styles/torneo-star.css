@@ -6151,6 +6151,14 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .tp2-vacio { padding: 22px 20px; text-align: center; color: var(--gray); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; }
 .tp2-forma-nd { color: #4A566E; }
 .tp2-fila:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tp2-fila.is-estatica { cursor: default; }
+.tp2-fila.is-estatica:hover { transform: none; }
+/* Equipo actual (página de equipo): borde y nombre en el color del equipo */
+.tp2-fila.is-actual {
+  box-shadow: inset 3px 0 0 var(--banda), 0 0 0 1.5px var(--team), 0 0 22px -8px var(--team);
+}
+.tp2-fila.is-actual .tp2-nombre { color: var(--team); }
+.tp-tabla-equipo { margin-bottom: 24px; }
 .tp2-panel {
   container: tabla / inline-size;
   border-radius: 18px; overflow: hidden;
@@ -6240,7 +6248,6 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 }
 .tp2-forma-pill.is-g { background: rgba(34,208,122,.16); color: #2EE08A; border: 1px solid rgba(34,208,122,.4); }
 .tp2-forma-pill.is-p { background: rgba(240,64,96,.14); color: #FF5C7A; border: 1px solid rgba(240,64,96,.4); }
-.tp2-forma-pill.is-ultimo { outline: 1.5px solid rgba(255,255,255,.55); outline-offset: 1.5px; }
 
 .tp2-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 14px 20px 18px; border-top: 1px solid rgba(255,255,255,.06); margin-top: 8px; }
 .tp2-leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #8A96AD; }
@@ -6354,7 +6361,6 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   border: 1px solid rgba(240, 64, 96, .45);
   box-shadow: 0 0 12px -4px rgba(240, 64, 96, .6);
 }
-.team-forma-pill.is-ultimo { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
 .team-page-meta { gap: 10px; }
 .team-page-badge {
   display: inline-flex;

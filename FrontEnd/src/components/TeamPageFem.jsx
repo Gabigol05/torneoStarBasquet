@@ -2,6 +2,7 @@
 import { PlayerProfileModal, GameCenterModal } from './LazyModals';
 import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
 import { EscudoJugador } from './EscudoJugador.jsx';
+import { TablaZona, ordenarTabla, tablaFechaAnterior } from './TablaPosiciones.jsx';
 import { edadDesde } from '../lib/edad';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
@@ -26,7 +27,7 @@ function StatSkeleton() {
   );
 }
 
-export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPartido, partidos, fechas, onSelectPlayer, mode = 'femenino' }) {
+export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPartido, partidos, fechas, onSelectPlayer, mode = 'femenino', usaZonas = false }) {
   const esFem = mode === 'femenino';
   const [activeTab,      setActiveTab]      = useState('jugadoras');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -72,6 +73,14 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
     [allTeams]);
 
   const posicion = sortedTeams.findIndex(t => t.id === team.id) + 1;
+  // Tabla de la ZONA del equipo (si la temporada se juega por zonas), que es
+  // la que define la clasificación — la general mezclaba las dos zonas.
+  const zonaEquipo = usaZonas && team.zona ? team.zona : null;
+  const tablaEquipo = useMemo(
+    () => ordenarTabla(zonaEquipo ? allTeams.filter(t => t.zona === zonaEquipo) : allTeams),
+    [allTeams, zonaEquipo]);
+  const posicionZona = tablaEquipo.findIndex(t => t.id === team.id) + 1;
+  const tablaAnterior = useMemo(() => tablaFechaAnterior(partidos, fechas), [partidos, fechas]);
   const pct      = team.pj > 0 ? (team.pg / team.pj).toFixed(3) : '.000';
   const dif      = team.pf - team.pc;
 
@@ -126,8 +135,8 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   {team.pg}G — {team.pp}P
                 </div>
                 {/* Racha: últimos 5 partidos, del más viejo (izquierda) al más
-                    reciente (derecha, con aro). Al pasar el mouse muestra el
-                    rival y el marcador. */}
+                    reciente (derecha). Al pasar el mouse muestra el rival y el
+                    marcador. */}
                 {team.historial?.length > 0 && (() => {
                   const ultimos = team.historial.slice(-5);
                   return (
@@ -136,7 +145,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       <div className="team-forma-pills">
                         {ultimos.map((p, i) => (
                           <span key={i}
-                            className={`team-forma-pill ${p.resultado === 'G' ? 'is-g' : 'is-p'}${i === ultimos.length - 1 ? ' is-ultimo' : ''}`}
+                            className={`team-forma-pill ${p.resultado === 'G' ? 'is-g' : 'is-p'}`}
                             title={`${p.resultado === 'G' ? 'Ganó' : 'Perdió'} ${p.pf}-${p.pc} vs ${p.rival}`}>
                             {p.resultado}
                           </span>
@@ -152,7 +161,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                   </span>
                   <span className="team-page-badge team-page-badge--pos"
                     style={{ background: `${team.color}1f`, borderColor: `${team.color}80`, color: team.color, boxShadow: `0 0 16px -6px ${team.color}` }}>
-                    {posicion === 1 ? '🏆 ' : ''}{posicion}° en la tabla
+                    {posicionZona === 1 ? '🏆 ' : ''}{posicionZona}° {zonaEquipo ? `Zona ${zonaEquipo}` : 'en la tabla'}
                   </span>
                   {isLoadingStats && (
                     <span className="team-page-badge" style={{ color: 'var(--gray)' }}>
@@ -429,52 +438,15 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
             {/* ── TABLA / POSICIÓN ── */}
             {activeTab === 'tabla' && (
               <div>
-                <div className="tp-section-label">Posición en la Tabla</div>
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
-                        <th>PJ</th><th>G</th><th>P</th>
-                        <th>PF</th><th>PC</th><th>DIF</th><th>%</th>
-                        <th className="th-racha">Forma</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedTeams.map((t, idx) => {
-                        const isMe = t.id === team.id;
-                        const tPct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
-                        const tDif = t.pf - t.pc;
-                        return (
-                          <tr key={t.id} className={isMe ? 'highlight-row' : ''}>
-                            <td className="team-cell">
-                              <span className={`pos-num ${idx < 3 ? 'top3' : ''}`}>{idx + 1}</span>
-                              <img src={t.logo} alt={t.name}
-                                style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', marginRight: '6px' }}
-                                onError={e => { e.target.style.display = 'none'; }}/>
-                              <span className="team-name-txt" style={isMe ? { color: team.color, fontWeight: 700 } : {}}>
-                                {t.name}
-                              </span>
-                              {isMe && (
-                                <span className="tp-you-badge" style={{ background: team.color }}>▶ VOS</span>
-                              )}
-                            </td>
-                            <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
-                            <td>{t.pf}</td><td>{t.pc}</td>
-                            <td className={tDif >= 0 ? 'green' : 'red'}>{tDif > 0 ? `+${tDif}` : tDif}</td>
-                            <td className="pct-td">{tPct}</td>
-                            <td className="td-racha">
-                              {/* ⚠️ FIX: usar historial, no partidos */}
-                              {getRacha(t.historial).map((r, i) => (
-                                <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
-                              ))}
-                              {!t.historial?.length && <span className="racha-nd">–</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="tp-section-label">Posición en la tabla</div>
+                <div className="tp-tabla-equipo">
+                  <TablaZona
+                    titulo={zonaEquipo ? `Zona ${zonaEquipo}` : 'Tabla general'}
+                    lista={tablaEquipo}
+                    anterior={tablaAnterior}
+                    modeColor={esFem ? 'var(--fem2)' : 'var(--masc2, #3b82f6)'}
+                    destacadoId={team.id}
+                    vacio="Sin equipos en esta temporada"/>
                 </div>
 
                 {/* Stats del equipo en cards */}

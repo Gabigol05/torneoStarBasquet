@@ -57,7 +57,7 @@ function Forma({ ultimos }) {
     <span className="tp2-forma">
       {ultimos.map((p, i) => (
         <span key={i}
-          className={`tp2-forma-pill ${p.resultado === 'G' ? 'is-g' : 'is-p'}${i === ultimos.length - 1 ? ' is-ultimo' : ''}`}
+          className={`tp2-forma-pill ${p.resultado === 'G' ? 'is-g' : 'is-p'}`}
           title={`${p.fechaNum != null ? `F${p.fechaNum}: ` : ''}${p.resultado === 'G' ? 'Ganó' : 'Perdió'} ${p.pf}-${p.pc} vs ${p.rival}`}>
           {p.resultado}
         </span>
@@ -74,7 +74,9 @@ function racha(historial) {
   return { tipo: ult, n };
 }
 
-export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSelect, vacio }) {
+// `destacadoId`: equipo a resaltar (página de equipo). Sin `onSelect` las
+// filas no son clickeables.
+export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSelect, vacio, destacadoId = null }) {
   const g = Math.ceil(lista.length / 3);
   // Puesto de cada equipo en la fecha anterior, dentro de esta misma lista.
   let posAntes = null;
@@ -86,9 +88,6 @@ export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSe
     <div className="tp2-panel">
       <div className="tp2-panel-head">
         <div className="tp2-panel-titulo" style={{ color: modeColor }}>{titulo}</div>
-        <div className="tp2-panel-sub">
-          {anterior?.ultima != null ? `Fecha ${anterior.ultima} · ` : ''}{lista.length} equipos
-        </div>
       </div>
 
       <div className="tp2-grid tp2-header">
@@ -112,9 +111,10 @@ export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSe
         const inicioBanda = i % g === 0;
         const dif = (t.pf ?? 0) - (t.pc ?? 0);
         const r = racha(t.historial);
-        const pct = t.pj ? Math.round((t.pg / t.pj) * 100) : 0;
         const fav = esFavorito?.(t.id);
         const color = t.color ?? '#8899BB';
+        const destacado = t.id === destacadoId;
+        const clickeable = !!onSelect;
         return (
           <div key={t.id} className="tp2-bloque">
             {inicioBanda && (
@@ -123,11 +123,12 @@ export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSe
                 <span className="tp2-banda-nombre">{banda.label}</span>
               </div>
             )}
-            <div role="button" tabIndex={0}
-              className={`tp2-grid tp2-fila${i === 0 && t.pj > 0 ? ' is-lider' : ''}${fav ? ' is-fav' : ''}`}
-              onClick={() => onSelect?.(t)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(t); } }}
-              style={{ '--banda': banda.color, background: `linear-gradient(90deg, ${hexA(color, '1f')}, transparent 45%)` }}>
+            <div role={clickeable ? 'button' : undefined} tabIndex={clickeable ? 0 : undefined}
+              className={`tp2-grid tp2-fila${i === 0 && t.pj > 0 ? ' is-lider' : ''}${fav ? ' is-fav' : ''}${destacado ? ' is-actual' : ''}${clickeable ? '' : ' is-estatica'}`}
+              onClick={clickeable ? () => onSelect(t) : undefined}
+              onKeyDown={clickeable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(t); } } : undefined}
+              style={{ '--banda': banda.color, '--team': color,
+                background: `linear-gradient(90deg, ${hexA(color, destacado ? '40' : '1f')}, transparent ${destacado ? '70%' : '45%'})` }}>
               <span className="tp2-c-pos tp2-pos" style={{ color: banda.color }}>{i + 1}</span>
               <Movimiento delta={posAntes ? posAntes[t.id] - i : null}/>
               <span className="tp2-c-eq tp2-equipo">
@@ -148,9 +149,6 @@ export function TablaZona({ titulo, lista, anterior, modeColor, esFavorito, onSe
                       </span>
                     )}
                     <span className="tp2-meta-mob">{t.pg}-{t.pp} · {dif > 0 ? `+${dif}` : dif}</span>
-                  </span>
-                  <span className="tp2-pct" title={`${pct}% de victorias`}>
-                    <span style={{ width: `${pct}%`, background: color }}/>
                   </span>
                 </span>
               </span>

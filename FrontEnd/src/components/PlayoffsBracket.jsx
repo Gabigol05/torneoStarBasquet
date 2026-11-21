@@ -213,20 +213,35 @@ function BracketMatch({ teamA, teamB, seedA, seedB, variante = null }) {
 // su parte: como todas las columnas miden lo mismo (la más alta, Cuartos),
 // cada semi queda a la altura del medio de sus dos cuartos y la final en el
 // centro del cuadro, sin márgenes puestos a mano. En celular las columnas
-// se apilan (ver .bracket en el CSS). La final va dentro de un marco
-// destacado y con el título grande.
+// se apilan (ver .bracket en el CSS).
+// Final y Campeón llevan el título pegado arriba de su tarjeta (no arriba de
+// la columna, que queda lejos porque la tarjeta va centrada). El título se
+// cuelga por encima sin ocupar lugar, así la tarjeta sigue exactamente en el
+// centro; la cabecera de la columna queda vacía para que los cuerpos de todas
+// las columnas arranquen a la misma altura. La final va además en un marco.
 function Ronda({ tipo, titulo, nota = null, children }) {
+  const tituloSobreTarjeta = tipo === 'final' || tipo === 'campeon';
+  const cabecera = (
+    <>
+      {tipo === 'final' && <span className="bracket-round-trofeo" aria-hidden="true">🏆</span>}
+      <span className="bracket-round-titulo">{titulo}</span>
+      {nota}
+    </>
+  );
   return (
     <div className={`bracket-round bracket-round--${tipo}`}>
-      <div className="bracket-round-label">
-        {tipo === 'final' && <span className="bracket-round-trofeo" aria-hidden="true">🏆</span>}
-        <span className="bracket-round-titulo">{titulo}</span>
-        {nota}
+      <div className={`bracket-round-label${tituloSobreTarjeta ? ' bracket-round-label--vacio' : ''}`}>
+        {!tituloSobreTarjeta && cabecera}
       </div>
       <div className="bracket-round-body">
         {Children.toArray(children).map((c, i) => (
           <div key={c.key ?? i} className="bracket-slot">
-            {tipo === 'final' ? <div className="bracket-final-frame">{c}</div> : c}
+            {tituloSobreTarjeta ? (
+              <div className="bracket-slot-ancla">
+                <div className="bracket-slot-titulo">{cabecera}</div>
+                {tipo === 'final' ? <div className="bracket-final-frame">{c}</div> : c}
+              </div>
+            ) : c}
           </div>
         ))}
       </div>

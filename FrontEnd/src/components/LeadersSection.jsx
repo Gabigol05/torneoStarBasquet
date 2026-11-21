@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EscudoJugador } from './EscudoJugador.jsx';
 import { useTournament } from '../context/TournamentContext';
 
 function calcLiders(equipos, statKey, promKey, minAttempts, n = 8) {
@@ -14,6 +15,7 @@ function calcLiders(equipos, statKey, promKey, minAttempts, n = 8) {
       if (val > 0 && (!minAttempts || intentos >= minAttempts)) {
         all.push({
           nombre: j.nombre, equipo: eq.name, color: eq.color, val,
+          logo: eq.logo, equipoId: eq.id,
           pj: j.pj ?? 0,
           prom: promKey ? (j[promKey] ?? 0) : null,
         });
@@ -28,14 +30,46 @@ function calcLiders(equipos, statKey, promKey, minAttempts, n = 8) {
 // CSS con alpha dinamico, que no anda bien en navegadores viejos de celulares.
 const hexA = (hex, alpha) => `${hex}${alpha}`;
 
-function getInitials(nombre) {
-  return (nombre ?? '?').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+function nombreCorto(nombre) {
+  return (nombre ?? '').split(' ').slice(0, 2).join(' ');
 }
 
-function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos, color, mode }) {
+// Valor con a lo sumo un decimal (42.857 -> 42.9) y el % en los porcentajes.
+function formatVal(val, esPct) {
+  const n = Number(val ?? 0);
+  const txt = Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return esPct ? `${txt}%` : txt;
+}
+
+// Fila del ranking: puesto, escudo del equipo, nombre (una línea) y equipo
+// debajo, barra relativa al líder y el valor a la derecha.
+function FilaLider({ l, puesto, top, esPct, accent, destacada = false }) {
+  return (
+    <div className={`lc-row${destacada ? ' lc-row--lider' : ''}`}>
+      <span className="lc-row-rank" style={destacada ? { color: accent } : undefined}>{puesto}</span>
+      <span className="lc-row-escudo" style={{ borderColor: l.color }}>
+        <EscudoJugador logo={l.logo} equipoId={l.equipoId} nombre={l.nombre} color={l.color}/>
+      </span>
+      <span className="lc-row-main">
+        <span className="lc-row-name">{nombreCorto(l.nombre)}</span>
+        <span className="lc-row-team">{l.equipo}</span>
+        <span className="lc-row-strength">
+          <span className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: l.color }} />
+        </span>
+      </span>
+      <span className="lc-row-val">
+        {formatVal(l.val, esPct)}
+        {l.prom !== null && <span className="lc-row-sub">{l.pj} PJ</span>}
+      </span>
+    </div>
+  );
+}
+
+function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, unidad, equipos, color, mode }) {
   const lideres = calcLiders(equipos, statKey, promKey, minAttempts);
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
+  const esPct = statKey.startsWith('pct_');
   // Antes la card se coloreaba segun la CATEGORIA de stat (dorado para
   // Puntos, azul para Rebotes, etc.), sin relacion con quien lidera. Ahora
   // usa el color del EQUIPO del lider — mismo lenguaje visual que fixture,
@@ -100,22 +134,25 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
 
         <div className={`leader-flip-face front leader-card has-color ${modeClass}`} style={cardBg}>
           <div className="lc-inner" style={innerBg}>
-            <div className="lc-stat-label">{emoji} {titulo}</div>
+            <div className="lc-stat-label"><span className="lc-stat-emoji">{emoji}</span>{titulo}</div>
             <div className="lc-top">
-              <div className="lc-avatar"
-                style={{ background: `${top.color}22`, color: top.color, border: `2px solid ${top.color}`, boxShadow: `0 0 14px ${hexA(top.color,'59')}` }}>
-                {getInitials(top.nombre)}
+              <div className="lc-avatar lc-avatar--escudo"
+                style={{ borderColor: top.color, boxShadow: `0 0 18px ${hexA(top.color, '66')}` }}>
+                <EscudoJugador logo={top.logo} equipoId={top.equipoId} nombre={top.nombre} color={top.color}/>
               </div>
-              <div>
-                <div className="lc-player-name">{(top.nombre ?? '').split(' ').slice(0, 2).join(' ')}</div>
-                <div className="lc-team-name">{top.equipo}</div>
+              <div className="lc-top-info">
+                <div className="lc-player-name">{nombreCorto(top.nombre)}</div>
+                <div className="lc-team-name" style={{ color: top.color }}>{top.equipo}</div>
               </div>
             </div>
-            <div className="lc-big-num" style={{ color: accent }}>{top.val}</div>
+            <div className="lc-big-row">
+              <span className="lc-big-num" style={{ color: accent }}>{formatVal(top.val, esPct)}</span>
+              {unidad && <span className="lc-big-unit">{unidad}</span>}
+            </div>
             <div className="lc-sub">{sub}</div>
             {top.prom !== null && (
               <div className="lc-context">
-                {top.pj} PJ · {top.prom} prom/partido
+                {top.pj} PJ · {top.prom} por partido
               </div>
             )}
             <div className="lc-strength-track">
@@ -123,20 +160,7 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
             </div>
             <div className="lc-list">
               {lideres.slice(1, 3).map((l, i) => (
-                <div className="lc-row" key={i}>
-                  <span className="lc-row-rank">{i + 2}</span>
-                  <span className="lc-row-dot" style={{ background: l.color }} />
-                  <span style={{ flex: 1 }}>
-                    {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
-                    <div className="lc-row-strength">
-                      <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: l.color }} />
-                    </div>
-                  </span>
-                  <span className="lc-row-val">
-                    {l.val}
-                    {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
-                  </span>
-                </div>
+                <FilaLider key={i} l={l} puesto={i + 2} top={top} esPct={esPct} accent={accent}/>
               ))}
             </div>
             {lideres.length > 3 && (
@@ -147,23 +171,10 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
 
         <div className={`leader-flip-face back leader-card has-color ${modeClass}`} style={cardBg}>
           <div className="lc-inner" style={innerBg}>
-            <div className="lc-stat-label">{emoji} {titulo} · Ranking completo</div>
+            <div className="lc-stat-label"><span className="lc-stat-emoji">{emoji}</span>{titulo} · Top {lideres.length}</div>
             <div className="lc-list lc-list-full">
               {lideres.map((l, i) => (
-                <div className="lc-row" key={i}>
-                  <span className="lc-row-rank" style={i === 0 ? { color: accent } : undefined}>{i + 1}</span>
-                  <span className="lc-row-dot" style={{ background: l.color }} />
-                  <span style={{ flex: 1 }}>
-                    {(l.nombre ?? '').split(' ').slice(0, 2).join(' ')} - {l.equipo}
-                    <div className="lc-row-strength">
-                      <div className="lc-row-strength-fill" style={{ width: `${top.val > 0 ? (l.val / top.val) * 100 : 0}%`, background: l.color }} />
-                    </div>
-                  </span>
-                  <span className="lc-row-val">
-                    {l.val}
-                    {l.prom !== null && <span className="lc-row-sub"> ({l.pj} PJ)</span>}
-                  </span>
-                </div>
+                <FilaLider key={i} l={l} puesto={i + 1} top={top} esPct={esPct} accent={accent} destacada={i === 0}/>
               ))}
             </div>
             <div className="lc-flip-hint">Volver ↻</div>
@@ -179,13 +190,13 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, equipos
 // mostraba solo el título pelado ("PUNTOS", "REBOTES"...), sin ícono al
 // lado, en las dos versiones de la tarjeta (con y sin datos).
 const LIDER_CATEGORIAS = [
-  { titulo: 'Puntos',      emoji: '🏀', statKey: 'pts_total', promKey: 'pts_prom', sub: 'acumulado en el torneo', color: '#F0B429' },
-  { titulo: 'Rebotes',     emoji: '🔁', statKey: 'reb_total', promKey: 'reb_prom', sub: 'acumulado en el torneo', color: '#60A5FA' },
-  { titulo: 'Asistencias', emoji: '🤝', statKey: 'ast_total', promKey: 'ast_prom', sub: 'acumulado en el torneo', color: '#22D07A' },
-  { titulo: 'Robos',       emoji: '🖐️', statKey: 'rob_total', promKey: 'rob_prom', sub: 'acumulado en el torneo', color: '#F97316' },
-  { titulo: 'Tapones',     emoji: '🛡️', statKey: 'tap_total', promKey: 'tap_prom', sub: 'acumulado en el torneo', color: '#A78BFA' },
+  { titulo: 'Puntos',      emoji: '🏀', statKey: 'pts_total', promKey: 'pts_prom', unidad: 'PTS', sub: 'acumulado en el torneo', color: '#F0B429' },
+  { titulo: 'Rebotes',     emoji: '🔁', statKey: 'reb_total', promKey: 'reb_prom', unidad: 'REB', sub: 'acumulado en el torneo', color: '#60A5FA' },
+  { titulo: 'Asistencias', emoji: '🤝', statKey: 'ast_total', promKey: 'ast_prom', unidad: 'AST', sub: 'acumulado en el torneo', color: '#22D07A' },
+  { titulo: 'Robos',       emoji: '🖐️', statKey: 'rob_total', promKey: 'rob_prom', unidad: 'ROB', sub: 'acumulado en el torneo', color: '#F97316' },
+  { titulo: 'Tapones',     emoji: '🛡️', statKey: 'tap_total', promKey: 'tap_prom', unidad: 'TAP', sub: 'acumulado en el torneo', color: '#A78BFA' },
   { titulo: '% Triples',   emoji: '🎯', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
-  { titulo: 'Valoracion',  emoji: '⭐', statKey: 'val_total', promKey: 'val_prom', sub: 'acumulado en el torneo', color: '#FCD34D' },
+  { titulo: 'Valoración',  emoji: '⭐', statKey: 'val_total', promKey: 'val_prom', unidad: 'VAL', sub: 'acumulado en el torneo', color: '#FCD34D' },
 ];
 
 export function LeadersSection({ equipos = [], isLoading = false }) {
@@ -194,8 +205,8 @@ export function LeadersSection({ equipos = [], isLoading = false }) {
   return (
     <>
       <section className="page-section" id="jugadores">
-        <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Estadisticas Individuales</p>
-        <h2 className="section-heading">Lideres <span className="gold">2026</span></h2>
+        <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Estadísticas individuales</p>
+        <h2 className="section-heading">Líderes <span className="gold">2026</span></h2>
 
         <div style={{ marginBottom: 24, fontFamily: "'Barlow Condensed'", fontSize: 12,
           fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--gray)' }}>
@@ -203,7 +214,7 @@ export function LeadersSection({ equipos = [], isLoading = false }) {
         </div>
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7A99' }}>
-            Cargando estadisticas...
+            Cargando estadísticas...
           </div>
         ) : (
           <div className="leaders-grid">

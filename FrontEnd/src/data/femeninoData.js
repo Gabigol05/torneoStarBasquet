@@ -38,25 +38,28 @@ import logoNoVayase     from '../assets/logo_f_no_vayase.png';
 import logoSacaleJugo   from '../assets/logo_f_sacale_jugo.png';
 import logoClubPesca    from '../assets/logo_f_club_pesca.png';
 
+// Colores de cada equipo tomados de su logo (revisión 21/11: varios no
+// coincidían — p. ej. Branca estaba en rosa con un escudo dorado, Cuervas en
+// gris con un logo bordó, No Vayase en amarillo con un logo verde).
 export const equiposFemenino = [
   // ── Zona A ──
-  { id: 'f_piquete',       name: 'Piquete',            logo: logoPiquete,      color: '#f97316' },
-  { id: 'f_artigas',       name: 'Artigas BC',         logo: logoArtigas,      color: '#22c55e' },
+  { id: 'f_piquete',       name: 'Piquete',            logo: logoPiquete,      color: '#e8492a' },
+  { id: 'f_artigas',       name: 'Artigas BC',         logo: logoArtigas,      color: '#22a447' },
   { id: 'f_piratas',       name: 'Piratas',            logo: logoPiratas,      color: '#e5e7eb' },
-  { id: 'f_triple_locura', name: 'Triple Locura',      logo: logoTripleLocura, color: '#ec4899' },
-  { id: 'f_union',         name: 'Unión Alta Gracia',  logo: logoUnion,        color: '#06b6d4' },
-  { id: 'f_branca',        name: 'Branca',             logo: logoBranca,       color: '#ec4899' },
+  { id: 'f_triple_locura', name: 'Triple Locura',      logo: logoTripleLocura, color: '#f472b6' },
+  { id: 'f_union',         name: 'Unión Alta Gracia',  logo: logoUnion,        color: '#2dd4bf' },
+  { id: 'f_branca',        name: 'Branca',             logo: logoBranca,       color: '#d4af5a' },
 
   // ── Zona B ──
-  { id: 'f_qaramtas',      name: 'Qaramtas',           logo: logoQaramtas,     color: '#a855f7' },
-  { id: 'f_cuervas',       name: 'Cuervas',            logo: logoCuervas,      color: '#64748b' },
-  { id: 'f_no_vayase',     name: 'No Vayase',          logo: logoNoVayase,     color: '#eab308' },
-  { id: 'f_el_h',          name: 'El H',               logo: logoElH,          color: '#14b8a6' },
-  { id: 'f_sacale_jugo',   name: 'Sácale el Jugo a la Naranja', logo: logoSacaleJugo, color: '#ea580c' },
-  { id: 'f_club_pesca',    name: 'Club Pesca',         logo: logoClubPesca,    color: '#0ea5e9' },
+  { id: 'f_qaramtas',      name: 'Qaramtas',           logo: logoQaramtas,     color: '#3db894' },
+  { id: 'f_cuervas',       name: 'Cuervas',            logo: logoCuervas,      color: '#c0284f' },
+  { id: 'f_no_vayase',     name: 'No Vayase',          logo: logoNoVayase,     color: '#6cc04a' },
+  { id: 'f_el_h',          name: 'El H',               logo: logoElH,          color: '#f2b830' },
+  { id: 'f_sacale_jugo',   name: 'Sácale el Jugo a la Naranja', logo: logoSacaleJugo, color: '#f7882f' },
+  { id: 'f_club_pesca',    name: 'Club Pesca',         logo: logoClubPesca,    color: '#1f9d63' },
 
   // ── No juegan la temporada 2026 (ver comentario arriba) ──
-  { id: 'f_black_mamba',   name: 'Black Mamba',        logo: logoBlackMamba,   color: '#8b5cf6' },
+  { id: 'f_black_mamba',   name: 'Black Mamba',        logo: logoBlackMamba,   color: '#a855f7' },
   { id: 'f_pilar',         name: 'Pilar Sport Club',   logo: logoPilar,        color: '#ef4444' },
   { id: 'f_ferrobre',      name: 'Ferrobre',           logo: logoFerrobre,     color: '#f59e0b' },
 ];

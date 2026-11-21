@@ -4,6 +4,7 @@ import { ErrorBoundary } from './ErrorBoundary.jsx';
 import { labelPartidoCorto } from '../lib/fechaLabel';
 import { edadDesde } from '../lib/edad';
 import { useTemporada } from '../context/TemporadaContext';
+import { EscudoJugador } from './EscudoJugador.jsx';
 import { supabase, isConfigured } from '../lib/supabase';
 
 // Qué tabla/columna consultar según la categoría del jugador — mismos
@@ -574,10 +575,8 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
 
           {/* Avatar */}
           <div className="pp-avatar-container" style={{ borderColor: player.color ?? 'var(--fem2)', boxShadow: `0 0 22px ${hexA(player.color ?? '#FF4FA3', '70')}` }}>
-            <div className="pp-avatar-initials"
-              style={{ borderColor: player.color ?? 'var(--fem2)', color: player.color ?? 'var(--fem2)' }}>
-              {(player.name ?? '').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-            </div>
+            <EscudoJugador logo={player.logo ?? player.equipoLogo} equipoId={player.equipoId}
+              nombre={player.name} color={player.color ?? '#FF4FA3'}/>
           </div>
 
           <div className="pp-name">{player.name}</div>

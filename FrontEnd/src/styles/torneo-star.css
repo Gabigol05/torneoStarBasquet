@@ -1957,6 +1957,22 @@ tbody td {
   justify-content: center;
   position: relative;
 }
+/* Final y Campeón: título pegado arriba de la tarjeta. Se cuelga por encima
+   (absolute) para no correr la tarjeta del centro de la columna. */
+.bracket-slot-ancla { position: relative; }
+.bracket-slot-titulo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* Conector corto que entra a cada cruce desde la ronda anterior. */
 .bracket-round:not(:first-child) .bracket-slot::before {
   content: '';
@@ -2141,21 +2157,29 @@ tbody td {
   .bracket-final-frame .fc2v-logo { width: 60px; height: 60px; }
   .bracket-final-frame .fc2v-name { font-size: 19px; }
   .bracket-final-frame .rc2-pts { font-size: 42px; }
-  .bracket-round--final .bracket-round-label,
-  .bracket-round--campeon .bracket-round-label { justify-content: center; }
-  .bracket-round--final .bracket-round-label::before {
+  .bracket-round-label--vacio { display: none; }
+  .bracket-slot-titulo {
+    position: static;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .bracket-round--final .bracket-slot-titulo::before,
+  .bracket-round--final .bracket-slot-titulo::after {
     content: '';
     flex: 1;
     min-width: 24px;
     height: 1px;
+  }
+  .bracket-round--final .bracket-slot-titulo::before {
     order: -1;
     background: linear-gradient(90deg, transparent, rgba(240, 180, 41, .55));
   }
-  .bracket-round--final .bracket-round-label::after {
+  .bracket-round--final .bracket-slot-titulo::after {
     background: linear-gradient(90deg, rgba(240, 180, 41, .55), transparent);
   }
   .bracket-round--final .bracket-round-titulo { font-size: 44px; letter-spacing: 6px; }
-  .bracket-round--campeon .bracket-round-label::after { display: none; }
   .bracket-round-body { gap: 14px; }
   .bracket-slot { flex: none; }
   .bracket-round:not(:first-child) .bracket-slot::before { display: none; }
@@ -6117,6 +6141,210 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   text-transform: uppercase;
   color: var(--gray2);
 }
+
+/* ══ CABECERA DE EQUIPO: racha y pastillas (rediseño 21/11) ══ */
+.team-forma {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.team-forma-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+.team-forma-pills { display: flex; gap: 6px; }
+.team-forma-pill {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: .5px;
+  line-height: 1;
+  cursor: default;
+}
+.team-forma-pill.is-g {
+  background: rgba(34, 208, 122, .16);
+  color: #2EE08A;
+  border: 1px solid rgba(34, 208, 122, .45);
+  box-shadow: 0 0 12px -4px rgba(34, 208, 122, .7);
+}
+.team-forma-pill.is-p {
+  background: rgba(240, 64, 96, .14);
+  color: #FF5C7A;
+  border: 1px solid rgba(240, 64, 96, .45);
+  box-shadow: 0 0 12px -4px rgba(240, 64, 96, .6);
+}
+.team-forma-pill.is-ultimo { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
+.team-page-meta { gap: 10px; }
+.team-page-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: #C9D3E3;
+}
+.team-page-badge-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.team-page-badge--pos {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 1.5px;
+}
+
+/* ══ ESCUDO COMO FOTO DE JUGADORA/JUGADOR ══════════════════════
+   Mientras no haya fotos, el avatar de cada jugadora/jugador muestra el
+   escudo de su equipo (EscudoJugador.jsx) llenando el círculo; el círculo
+   contenedor pone tamaño, borde y brillo del color del equipo. Si el logo
+   no carga, quedan las iniciales. */
+.escudo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0E1420;
+}
+.escudo-iniciales {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+}
+.player-item-avatar,
+.tp-player-avatar,
+.gs-item-avatar,
+.lc-avatar,
+.pp-avatar-container { overflow: hidden; }
+.pp-avatar-container { background: #0E1420; }
+.pp-avatar-container .escudo-iniciales { font-family: 'Bebas Neue', sans-serif; font-size: 40px; font-weight: 400; }
+.lc-avatar .escudo-iniciales { font-family: 'Bebas Neue', sans-serif; font-size: 20px; font-weight: 400; }
+
+/* ══ LÍDERES v3 (escudos, número con unidad, filas en una línea) ══ */
+.lc-stat-label { display: flex; align-items: center; gap: 8px; }
+.lc-stat-emoji { font-size: 15px; letter-spacing: 0; }
+.lc-top { min-width: 0; }
+.lc-top-info { min-width: 0; }
+.lc-avatar--escudo {
+  width: clamp(56px, 6.5vw, 64px);
+  height: clamp(56px, 6.5vw, 64px);
+  border: 2.5px solid;
+  background: #0E1420;
+}
+.lc-player-name {
+  font-size: clamp(18px, 2.2vw, 21px);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-team-name {
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: .5px;
+}
+.lc-big-row { display: flex; align-items: baseline; gap: 8px; }
+.lc-big-unit {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(18px, 2vw, 22px);
+  letter-spacing: 2px;
+  color: var(--gray);
+}
+.lc-list { display: flex; flex-direction: column; }
+.lc-row {
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.lc-row:last-child { border-bottom: none; }
+.lc-row-rank {
+  min-width: 16px;
+  text-align: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+}
+.lc-row-escudo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  background: #0E1420;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lc-row-escudo .escudo-iniciales { font-size: 11px; }
+.lc-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lc-row-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #EEF2F8;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-row-team {
+  font-size: 12px;
+  color: var(--gray);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-row-strength { display: block; margin-top: 4px; }
+.lc-row-strength-fill { display: block; }
+.lc-row-val {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: .5px;
+  line-height: 1;
+}
+.lc-row-sub {
+  margin: 3px 0 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  letter-spacing: .5px;
+}
+.lc-row--lider .lc-row-name { color: #fff; }
+.lc-list-full { margin-top: 4px; padding-top: 6px; }
+.lc-list-full .lc-row { padding: 4px 0; gap: 9px; }
+.lc-list-full .lc-row-escudo { width: 26px; height: 26px; }
+.lc-list-full .lc-row-name { font-size: 14px; }
+.lc-list-full .lc-row-team { font-size: 11px; }
+.lc-list-full .lc-row-strength { display: none; }
+.lc-list-full .lc-row-val { font-size: 19px; }
+.lc-list-full .lc-row-sub { margin-top: 1px; font-size: 10px; }
 
 /* ══ ENCUESTAS v2 (voting redesign) ══════════════════════════════ */
 .votaciones-band {

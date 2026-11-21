@@ -55,6 +55,7 @@ import { useStats }         from '../context/StatsContext';
 import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
 import { useWheelHorizontal } from '../hooks/useWheelHorizontal';
+import { EscudoJugador } from './EscudoJugador.jsx';
 import { labelFecha, labelPartido, esPartidoPlayoff, COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
 
 const TABS = [
@@ -945,9 +946,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                         <div className="player-item-inner" style={{ background: `linear-gradient(160deg, ${hexA(j.equipoColor, '12')}, #0B111C 55%)` }}>
                         <div className="player-item-avatar"
                           style={{ background: `${j.equipoColor}22`, border: `1.5px solid ${j.equipoColor}`, boxShadow: `0 0 10px ${hexA(j.equipoColor, '59')}` }}>
-                          <span style={{ fontFamily: "'Barlow Condensed'", fontSize: '14px', fontWeight: '700', color: j.equipoColor }}>
-                            {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-                          </span>
+                          <EscudoJugador logo={j.equipoLogo} equipoId={j.equipoId} nombre={j.nombre} color={j.equipoColor}/>
                         </div>
                         <div className="player-item-info">
                           <div className="player-item-name">{j.nombre}</div>

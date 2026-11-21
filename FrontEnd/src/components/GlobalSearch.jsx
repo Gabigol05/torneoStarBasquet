@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGlobalSearch } from '../hooks/useGlobalSearch';
+import { EscudoJugador } from './EscudoJugador.jsx';
 import { useTournament } from '../context/TournamentContext';
 
 const normQ = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -162,7 +163,6 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                       <div className="gs-group-label">Más buscados</div>
                       {masBuscados.map((j, i) => {
                         const active = cursor === i;
-                        const initials = j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
                         return (
                           <div key={j.id}
                             className={`gs-item ${active ? 'gs-item-active' : ''}`}
@@ -178,7 +178,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                                 background:`${j.equipoColor}20`, color:j.equipoColor, border:`1.5px solid ${j.equipoColor}40`,
                                 ...(i === 0 ? { boxShadow: '0 0 10px rgba(240,180,41,.35)' } : {}),
                               }}>
-                              {initials}
+                              <EscudoJugador logo={j.equipoLogo} equipoId={j.equipoId} nombre={j.nombre} color={j.equipoColor}/>
                             </div>
                             <div className="gs-item-info">
                               <div className="gs-item-name">{j.nombre}</div>
@@ -250,7 +250,6 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                   {results.jugadoras.map((j, i) => {
                     const idx = results.equipos.length + i;
                     const active = cursor === idx;
-                    const initials = j.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
                     const hayStats = (j.pj ?? 0) > 0;
                     return (
                       <div key={j.id}
@@ -259,7 +258,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
                         onClick={() => handleSelect({ type:'jugadora', data:j })}>
                         <div className="gs-item-avatar"
                           style={{ background:`${j.equipoColor}20`, color:j.equipoColor, border:`1.5px solid ${j.equipoColor}40` }}>
-                          {initials}
+                          <EscudoJugador logo={j.equipoLogo} equipoId={j.equipoId} nombre={j.nombre} color={j.equipoColor}/>
                         </div>
                         <div className="gs-item-info">
                           <div className="gs-item-name">{highlightMatch(j.nombre, query)}</div>

@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import { PlayerProfileModal, GameCenterModal } from './LazyModals';
 import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
+import { EscudoJugador } from './EscudoJugador.jsx';
 import { edadDesde } from '../lib/edad';
 
 // Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
@@ -124,18 +125,34 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                 <div className="team-page-record" style={{ color: team.color }}>
                   {team.pg}G — {team.pp}P
                 </div>
-                {team.historial?.length > 0 && (
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-                    {getRacha(team.historial).map((r, i) => (
-                      <span key={i} className={`racha-pill ${r === 'G' ? 'racha-g' : 'racha-p'}`}>{r}</span>
-                    ))}
-                  </div>
-                )}
+                {/* Racha: últimos 5 partidos, del más viejo (izquierda) al más
+                    reciente (derecha, con aro). Al pasar el mouse muestra el
+                    rival y el marcador. */}
+                {team.historial?.length > 0 && (() => {
+                  const ultimos = team.historial.slice(-5);
+                  return (
+                    <div className="team-forma">
+                      <span className="team-forma-label">Últimos {ultimos.length}</span>
+                      <div className="team-forma-pills">
+                        {ultimos.map((p, i) => (
+                          <span key={i}
+                            className={`team-forma-pill ${p.resultado === 'G' ? 'is-g' : 'is-p'}${i === ultimos.length - 1 ? ' is-ultimo' : ''}`}
+                            title={`${p.resultado === 'G' ? 'Ganó' : 'Perdió'} ${p.pf}-${p.pc} vs ${p.rival}`}>
+                            {p.resultado}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="team-page-meta">
-                  <span className="team-page-badge">{esFem ? '♀ Torneo Femenino' : '♂ Torneo Masculino'}</span>
-                  <span className="team-page-badge"
-                    style={{ background: `${team.color}22`, borderColor: `${team.color}55`, color: team.color }}>
-                    #{posicion} en la tabla
+                  <span className="team-page-badge">
+                    <span className="team-page-badge-dot" style={{ background: esFem ? 'var(--fem2)' : 'var(--masc2, #3b82f6)' }}/>
+                    {esFem ? 'Torneo Femenino' : 'Torneo Masculino'}
+                  </span>
+                  <span className="team-page-badge team-page-badge--pos"
+                    style={{ background: `${team.color}1f`, borderColor: `${team.color}80`, color: team.color, boxShadow: `0 0 16px -6px ${team.color}` }}>
+                    {posicion === 1 ? '🏆 ' : ''}{posicion}° en la tabla
                   </span>
                   {isLoadingStats && (
                     <span className="team-page-badge" style={{ color: 'var(--gray)' }}>
@@ -223,11 +240,9 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                       })}>
                       <div className="tp-player-card-inner" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '12')}, #0B111C 55%)` }}>
 
-                      {/* Avatar con iniciales en lugar de SVG genérico */}
+                      {/* Avatar: escudo del equipo hasta que haya fotos */}
                       <div className="tp-player-avatar" style={{ borderColor: team.color, color: team.color, background: `${team.color}15`, boxShadow: `0 0 12px ${hexA(team.color, '59')}` }}>
-                        <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: '13px', fontWeight: 700 }}>
-                          {j.nombre.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-                        </span>
+                        <EscudoJugador logo={team.logo} equipoId={team.id} nombre={j.nombre} color={team.color}/>
                       </div>
 
                       {/* Info */}

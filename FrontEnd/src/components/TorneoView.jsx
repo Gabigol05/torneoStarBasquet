@@ -56,6 +56,7 @@ import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
 import { useWheelHorizontal } from '../hooks/useWheelHorizontal';
 import { EscudoJugador } from './EscudoJugador.jsx';
+import { TablaZona, tablaFechaAnterior } from './TablaPosiciones.jsx';
 import { labelFecha, labelPartido, esPartidoPlayoff, COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
 
 const TABS = [
@@ -535,6 +536,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : 'var(--masc2, #3b82f6)';
 
+  // Tabla como estaba antes de la última fecha jugada — para las flechas de
+  // "subió / bajó" de la tabla de posiciones.
+  const tablaAnterior = useMemo(() => tablaFechaAnterior(partidos, fechas), [partidos, fechas]);
+
   // En "Resultados / Temporada Regular" no tiene sentido ofrecer un chip para
   // una fecha cuyo único partido terminó re-marcado como playoff (ej: una
   // "Fecha 10" que en realidad era la semifinal) — el chip quedaba
@@ -713,90 +718,18 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
               <div>
                 {isLoadingStats ? <TableSkeleton/> : (
                   <>
-                  <div className="zonas-grid" style={panelesTabla.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}>
+                  <div className={`tp2-wrap${panelesTabla.length === 1 ? ' tp2-wrap--una' : ''}`}>
                     {panelesTabla.map(({ zona, lista }) => (
-                      <div className="table-wrap zona-tabla" key={zona ?? 'general'}>
-                        <div className="zona-tabla-title" style={{ color: modeColor }}>{zona ? `ZONA ${zona}` : 'TABLA GENERAL'}</div>
-                        <table>
-                          <thead>
-                            <tr>
-                              <th style={{ textAlign: 'left', paddingLeft: '20px' }}># Equipo</th>
-                              <th>PJ</th><th>G</th><th>P</th>
-                              <th>PF</th><th>PC</th><th>DIF</th><th>%</th>
-                              <th style={{ color: modeColor }}>PTS</th>
-                              <th className="th-racha">Forma</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lista.length === 0 ? (
-                              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--gray)' }}>{zona ? 'Sin equipos asignados a esta zona' : 'Sin equipos en esta temporada'}</td></tr>
-                            ) : lista.flatMap((t, idx) => {
-                              const pct = t.pj > 0 ? (t.pg / t.pj).toFixed(3) : '.000';
-                              const dif = t.pf - t.pc;
-                              const grupoZona = Math.ceil(lista.length / 3);
-                              const band = bandFor(idx + 1, lista.length);
-                              const isBandStart = idx === 0 || idx === grupoZona || idx === grupoZona * 2;
-                              const rows = [];
-                              if (isBandStart) {
-                                rows.push(
-                                  <tr key={`band-${zona}-${idx}`}>
-                                    <td colSpan={9} style={{ padding: '12px 16px 6px', fontFamily: "'Barlow Condensed'", fontSize: 10.5, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: band.color, borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,.08)' }}>
-                                      {band.label}
-                                    </td>
-                                  </tr>
-                                );
-                              }
-                              rows.push(
-                                <tr key={t.id} className="table-row-clickable" onClick={() => handleSelectTeam(t)}
-                                  style={{ background: `linear-gradient(90deg, ${hexA(t.color ?? band.color, '26')}, transparent 55%), ${band.tint}`, boxShadow: `inset 3px 0 0 ${band.color}` }}>
-                                  <td className="team-cell">
-                                    <span className={`pos-num ${idx < 3 ? 'top3' : ''}`} style={{ color: band.color }}>{idx + 1}</span>
-                                    <img src={t.logo} alt={t.name} decoding="async"
-                                      style={{ width: '26px', height: '26px', borderRadius: '50%', objectFit: 'cover', marginRight: '8px' }}
-                                      onError={e => { e.target.style.display = 'none'; }}/>
-                                    <span className="team-name-txt">{t.name}</span>
-                                    {esFavorito(t.id) && <span className="fav-star">*</span>}
-                                  </td>
-                                  <td>{t.pj}</td><td>{t.pg}</td><td>{t.pp}</td>
-                                  <td>{t.pf}</td><td>{t.pc}</td>
-                                  <td className={dif >= 0 ? 'green' : 'red'}>{dif > 0 ? `+${dif}` : dif}</td>
-                                  <td className="pct-td">{pct}</td>
-                                  <td className="pts-td" style={{ color: modeColor }}>{t.pg * 2 + t.pp}</td>
-                                  <td className="td-racha">
-                                    {t.historial?.slice(-5).map((h, i) => (
-                                      <span key={i} className={`racha-pill ${h.resultado === 'G' ? 'racha-g' : 'racha-p'}`}>
-                                        {h.resultado}
-                                      </span>
-                                    ))}
-                                    {!t.historial?.length && <span className="racha-nd">-</span>}
-                                  </td>
-                                </tr>
-                              );
-                              return rows;
-                            })}
-                          </tbody>
-                        </table>
-                        <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F0B429', display: 'inline-block' }}/>
-                              Copa de Oro - 1 a {Math.ceil(lista.length / 3)}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#C7D1DD', display: 'inline-block' }}/>
-                              Copa de Plata - {Math.ceil(lista.length / 3) + 1} a {Math.ceil(lista.length / 3) * 2}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Barlow Condensed'", fontSize: 11.5, letterSpacing: 1.5, color: '#8a96ad', textTransform: 'uppercase' }}>
-                              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#CD7F32', display: 'inline-block' }}/>
-                              Copa de Bronce - {Math.ceil(lista.length / 3) * 2 + 1}+
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--gray)', textAlign: 'right' }}>
-                            Desempate: PTS -&gt; DIF -&gt; PF
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      <TablaZona key={zona ?? 'general'}
+                        titulo={zona ? `Zona ${zona}` : 'Tabla general'}
+                        lista={lista}
+                        anterior={tablaAnterior}
+                        modeColor={modeColor}
+                        esFavorito={esFavorito}
+                        onSelect={handleSelectTeam}
+                        vacio={zona ? 'Sin equipos asignados a esta zona' : 'Sin equipos en esta temporada'}/>
+                    ))
+                  }
                   </div>
                   </>
                 )}

@@ -6142,6 +6142,176 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   color: var(--gray2);
 }
 
+/* ══ TABLA DE POSICIONES v2 (rediseño 21/11 — TablaPosiciones.jsx) ══
+   Bandas por copa, movimiento vs. fecha anterior, racha, puntos destacados
+   y últimos 5. Se adapta al ancho del PANEL con container queries. */
+.tp2-wrap { display: grid; grid-template-columns: 1fr; gap: 28px; }
+@media (min-width: 1320px) { .tp2-wrap { grid-template-columns: 1fr 1fr; } }
+.tp2-wrap.tp2-wrap--una { grid-template-columns: 1fr; }
+.tp2-vacio { padding: 22px 20px; text-align: center; color: var(--gray); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; }
+.tp2-forma-nd { color: #4A566E; }
+.tp2-fila:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tp2-panel {
+  container: tabla / inline-size;
+  border-radius: 18px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 20px 50px -30px rgba(0,0,0,.8);
+}
+.tp2-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 18px 20px 12px; }
+.tp2-panel-titulo { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 3px; line-height: 1; }
+.tp2-panel-sub { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gray); }
+
+.tp2-grid {
+  display: grid;
+  grid-template-columns: 34px 32px minmax(150px, 1fr) 34px 34px 34px 42px 42px 50px 56px 128px;
+  align-items: center;
+  column-gap: 4px;
+  padding: 0 14px 0 12px;
+}
+.tp2-header {
+  height: 34px;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11.5px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: #6B7A99;
+  border-top: 1px solid rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(0,0,0,.18);
+}
+.tp2-num { text-align: center; font-family: 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: #D5DCE8; }
+.tp2-dim { color: #7D8AA5; font-weight: 500; }
+.tp2-c-pos { text-align: center; }
+.tp2-c-forma { display: flex; justify-content: flex-end; }
+
+.tp2-banda {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px 6px;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase;
+}
+.tp2-bloque:not(:first-of-type) .tp2-banda { border-top: 1px solid rgba(255,255,255,.07); margin-top: 4px; }
+.tp2-banda-marca { width: 10px; height: 10px; border-radius: 3px; background: var(--banda); box-shadow: 0 0 10px var(--banda); }
+.tp2-banda-nombre { font-size: 13px; letter-spacing: 2.5px; color: var(--banda); }
+.tp2-banda-rango { margin-left: auto; font-size: 11.5px; letter-spacing: 1.5px; color: #6B7A99; }
+
+.tp2-fila {
+  position: relative;
+  min-height: 60px;
+  margin: 3px 8px;
+  padding-left: 10px; padding-right: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform .15s, background-color .15s, box-shadow .15s;
+  box-shadow: inset 3px 0 0 var(--banda);
+}
+.tp2-fila:hover { background-color: rgba(255,255,255,.05); transform: translateX(2px); }
+.tp2-fila.is-lider { box-shadow: inset 3px 0 0 var(--banda), 0 0 0 1px rgba(240,180,41,.35), 0 0 24px -8px rgba(240,180,41,.5); }
+.tp2-fila.is-fav { box-shadow: inset 3px 0 0 var(--banda), 0 0 0 1px rgba(255,255,255,.25); }
+.tp2-pos { font-family: 'Bebas Neue', sans-serif; font-size: 24px; line-height: 1; }
+.tp2-mov { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; text-align: left; letter-spacing: .5px; }
+.tp2-mov--sube { color: #2EE08A; }
+.tp2-mov--baja { color: #FF5C7A; }
+.tp2-mov--igual { color: #4A566E; }
+
+.tp2-equipo { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 8px 0; }
+.tp2-escudo { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; border: 2px solid; overflow: hidden; background: #0E1420; }
+.tp2-escudo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tp2-equipo-txt { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.tp2-nombre { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; color: #F1F4FA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+.tp2-fav { color: #F0B429; margin-left: 6px; font-size: 14px; }
+.tp2-meta { display: flex; gap: 8px; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: .4px; line-height: 1.1; }
+.tp2-racha.is-g { color: #2EE08A; }
+.tp2-racha.is-p { color: #FF7A90; }
+.tp2-meta-mob { display: none; color: #8A96AD; }
+.tp2-pct { display: block; width: 90px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.07); overflow: hidden; margin-top: 3px; }
+.tp2-pct span { display: block; height: 100%; border-radius: 3px; opacity: .85; }
+
+.tp2-dif.is-pos { color: #2EE08A; }
+.tp2-dif.is-neg { color: #FF5C7A; }
+.tp2-pts {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 42px; height: 34px; padding: 0 6px;
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.05);
+  font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: .5px; line-height: 1;
+}
+.tp2-forma { display: inline-flex; gap: 4px; }
+.tp2-forma-pill {
+  width: 21px; height: 21px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 13px; line-height: 1; cursor: default;
+}
+.tp2-forma-pill.is-g { background: rgba(34,208,122,.16); color: #2EE08A; border: 1px solid rgba(34,208,122,.4); }
+.tp2-forma-pill.is-p { background: rgba(240,64,96,.14); color: #FF5C7A; border: 1px solid rgba(240,64,96,.4); }
+.tp2-forma-pill.is-ultimo { outline: 1.5px solid rgba(255,255,255,.55); outline-offset: 1.5px; }
+
+.tp2-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 14px 20px 18px; border-top: 1px solid rgba(255,255,255,.06); margin-top: 8px; }
+.tp2-leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #8A96AD; }
+.tp2-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tp2-leyenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.tp2-leyenda b { font-size: 11px; }
+.tp2-desempate { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1px; color: #6B7A99; }
+
+/* Se adapta al ancho del PANEL (no de la pantalla): con las dos zonas lado
+   a lado cada panel es angosto y oculta PF/PC; en celular pasa al modo compacto. */
+@container tabla (max-width: 760px) {
+  .tp2-grid { grid-template-columns: 30px 28px minmax(140px, 1fr) 32px 32px 32px 48px 54px 120px; }
+  .tp2-opt { display: none; }
+}
+/* Angosto (celular): tabla compacta estilo app deportiva — una fila limpia
+   por equipo con # | Equipo | PJ | G | P | DIF | PTS. La flecha de
+   movimiento va chiquita debajo del puesto; racha, % y últimos 5 se ocultan
+   (están en la página de cada equipo). */
+@container tabla (max-width: 520px) {
+  .tp2-panel-head { padding: 14px 14px 10px; }
+  .tp2-panel-titulo { font-size: 24px; letter-spacing: 2.5px; }
+  .tp2-panel-sub { font-size: 11.5px; }
+  .tp2-grid {
+    grid-template-columns: 30px minmax(0, 1fr) 24px 24px 24px 40px 40px;
+    column-gap: 2px;
+    padding: 0 10px 0 8px;
+  }
+  .tp2-grid > :nth-child(2),
+  .tp2-opt,
+  .tp2-c-forma { display: none; }
+  .tp2-header { height: 30px; font-size: 10.5px; letter-spacing: 1px; }
+  .tp2-header .tp2-c-eq { padding-left: 2px; }
+  .tp2-banda { padding: 12px 12px 6px; gap: 8px; }
+  .tp2-banda-nombre { font-size: 11.5px; letter-spacing: 2px; }
+  .tp2-fila {
+    min-height: 52px;
+    margin: 0;
+    border-radius: 0;
+    padding-left: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, .045);
+  }
+  .tp2-bloque:last-of-type .tp2-fila { border-bottom: none; }
+  .tp2-fila:hover { transform: none; }
+  .tp2-fila.is-lider { box-shadow: inset 3px 0 0 var(--banda); background-color: rgba(240, 180, 41, .06); }
+  .tp2-fila.is-fav { box-shadow: inset 3px 0 0 var(--banda); background-color: rgba(255, 255, 255, .05); }
+  .tp2-pos { font-size: 19px; align-self: center; }
+  .tp2-fila > .tp2-mov {
+    display: block;
+    position: absolute;
+    left: 8px;
+    width: 30px;
+    bottom: 5px;
+    text-align: center;
+    font-size: 9.5px;
+    letter-spacing: 0;
+  }
+  .tp2-fila > .tp2-mov--igual { display: none; }
+  .tp2-equipo { gap: 9px; padding: 6px 0; }
+  .tp2-escudo { width: 28px; height: 28px; border-width: 1.5px; box-shadow: none !important; }
+  .tp2-equipo-txt { gap: 0; }
+  .tp2-nombre { font-size: 15px; }
+  .tp2-fav { font-size: 12px; margin-left: 4px; }
+  .tp2-meta, .tp2-pct { display: none; }
+  .tp2-num { font-size: 14.5px; }
+  .tp2-dif { font-size: 13.5px; }
+  .tp2-pts { min-width: 34px; height: 28px; border-radius: 8px; font-size: 19px; padding: 0 4px; }
+  .tp2-pie { padding: 12px 14px 14px; flex-direction: column; gap: 8px; }
+  .tp2-leyenda { gap: 10px; font-size: 10.5px; }
+  .tp2-desempate { font-size: 11px; }
+}
+
 /* ══ CABECERA DE EQUIPO: racha y pastillas (rediseño 21/11) ══ */
 .team-forma {
   display: flex;

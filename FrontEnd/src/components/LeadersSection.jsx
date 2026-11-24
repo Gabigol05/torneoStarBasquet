@@ -195,7 +195,9 @@ const LIDER_CATEGORIAS = [
   { titulo: 'Asistencias', emoji: '🤝', statKey: 'ast_total', promKey: 'ast_prom', unidad: 'AST', sub: 'acumulado en el torneo', color: '#22D07A' },
   { titulo: 'Robos',       emoji: '🖐️', statKey: 'rob_total', promKey: 'rob_prom', unidad: 'ROB', sub: 'acumulado en el torneo', color: '#F97316' },
   { titulo: 'Tapones',     emoji: '🛡️', statKey: 'tap_total', promKey: 'tap_prom', unidad: 'TAP', sub: 'acumulado en el torneo', color: '#A78BFA' },
-  { titulo: '% Triples',   emoji: '🎯', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
+  // % Triples sacada (pedido de Alvaro, 21/11): con pocos intentos el ranking
+  // mostraba porcentajes engañosos (ej. 60% con 3 de 5).
+  // { titulo: '% Triples',   emoji: '🎯', statKey: 'pct_triples', promKey: null,     sub: 'efectividad 3pts',       color: '#FB7185', minAttempts: 5 },
   { titulo: 'Valoración',  emoji: '⭐', statKey: 'val_total', promKey: 'val_prom', unidad: 'VAL', sub: 'acumulado en el torneo', color: '#FCD34D' },
 ];
 

@@ -56,7 +56,7 @@ import { useSwipe }         from '../hooks/useSwipe';
 import { useFavorito }      from '../hooks/useFavorito';
 import { useWheelHorizontal } from '../hooks/useWheelHorizontal';
 import { EscudoJugador } from './EscudoJugador.jsx';
-import { TablaZona, tablaFechaAnterior } from './TablaPosiciones.jsx';
+import { TablaZona, tablaFechaAnterior, ordenarTabla } from './TablaPosiciones.jsx';
 import { labelFecha, labelPartido, esPartidoPlayoff, COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
 
 const TABS = [
@@ -536,6 +536,97 @@ export function FixtureCard({ partido, equiposFem, fechas }) {
   );
 }
 
+
+// ── Tarjeta de equipo (pestaña Equipos) ────────────────────────────────────
+// Frente: escudo, nombre y plantel. Dorso (hover / primer toque): puesto,
+// copa, anillo de % ganados, récord/puntos/diferencia y últimos 5.
+const COPA_EQ = { oro: 'Oro', plata: 'Plata', bronce: 'Bronce' };
+const ESTRELLA = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>
+);
+
+function AnilloGanados({ pct, color }) {
+  const r = 26, c = 2 * Math.PI * r;
+  return (
+    <span className="fc2-anillo">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r={r} className="fc2-anillo-bg"/>
+        <circle cx="32" cy="32" r={r} className="fc2-anillo-fg" stroke={color}
+          strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 32 32)"/>
+      </svg>
+      <span className="fc2-anillo-tx"><b>{pct}%</b><small>ganados</small></span>
+    </span>
+  );
+}
+
+function TarjetaEquipo({ team, info, mode, fav, onFav, tapped, onCardClick, onLeave }) {
+  const pj = team.pj ?? 0;
+  const dif = (team.pf ?? 0) - (team.pc ?? 0);
+  const pct = pj > 0 ? Math.round(((team.pg ?? 0) / pj) * 100) : 0;
+  const pts = (team.pg ?? 0) * 2 + (team.pp ?? 0);
+  return (
+    <div className={`flip-card fc2${tapped ? ' tapped' : ''}`} style={{ '--t': team.color ?? '#5A6B85' }}
+      onClick={onCardClick} onMouseLeave={onLeave}>
+      <button className={`fc-fav-btn fc2-fav${fav ? ' active' : ''}`}
+        onClick={e => { e.stopPropagation(); onFav(); }}
+        aria-label={fav ? 'Quitar de favoritos' : 'Marcar como favorito'}
+        title={fav ? 'Quitar favorito' : 'Marcar como favorito'}>
+        {ESTRELLA}
+      </button>
+      <div className="flip-card-inner">
+        <div className="flip-card-front fc2-front">
+          <span className="fc2-esc">
+            <img src={team.logo} alt={team.name} loading="lazy" decoding="async"
+              onError={e => { e.target.style.visibility = 'hidden'; }}/>
+          </span>
+          <h3 className="fc2-nom">{team.name}</h3>
+          <div className="fc2-sub">{team.jugadoras.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}</div>
+          <div className="fc2-hint">{pj > 0 ? 'Tocá para ver más ↻' : 'Tocá para ver el plantel'}</div>
+        </div>
+        <div className="flip-card-back fc2-back">
+          {team.logo && <img className="fc2-marca" src={team.logo} alt="" loading="lazy" aria-hidden="true"/>}
+          <div className="fc2-bk-h">
+            <span className="fc2-bk-esc"><img src={team.logo} alt="" loading="lazy"/></span>
+            <span className="fc2-bk-nom">{team.name}</span>
+          </div>
+          {info?.pos != null && pj > 0 && (
+            <div className="fc2-pos">
+              <b>{info.pos}°</b>{info.zona ? `Zona ${info.zona}` : 'en la tabla'}
+              {info.copa && <span className={`fc2-copa fc2-copa--${info.copa}`}>{COPA_EQ[info.copa]}</span>}
+            </div>
+          )}
+          {pj > 0 ? (
+            <>
+              <div className="fc2-mid">
+                <AnilloGanados pct={pct} color={team.color ?? '#2EE08A'}/>
+                <div className="fc2-nums">
+                  <div><b>{team.pg ?? 0}-{team.pp ?? 0}</b><small>Récord</small></div>
+                  <div><b>{pts}</b><small>Pts</small></div>
+                  <div><b className={dif >= 0 ? 'fc2-mas' : 'fc2-menos'}>{dif > 0 ? '+' : ''}{dif}</b><small>Dif</small></div>
+                  <div><b>{pj}</b><small>PJ</small></div>
+                </div>
+              </div>
+              {info?.forma?.length > 0 && (
+                <div className="fc2-forma" aria-label="Últimos partidos">
+                  <small>Últimos {info.forma.length}</small>
+                  {info.forma.map((r, i) => (
+                    <i key={i} className={r.g ? 'g' : 'p'} title={`${r.g ? 'Ganó' : 'Perdió'} ${r.pf}-${r.pc}`}>{r.g ? 'G' : 'P'}</i>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="fc2-sin">Todavía no jugó partidos esta temporada</div>
+          )}
+          <div className="fc2-ver"><span>Ver plantel</span><span>→</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extSelectTeam }) {
   const { mode } = useTournament();
   const {
@@ -641,6 +732,32 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // equipo recién armado con 0 partidos igual aparezca, y únicamente cuando
   // la temporada mirada es la ACTIVA ahora mismo (nunca para una archivada).
   const { equiposDeTemporada, activaCategoria } = useEquiposDeTemporada(equiposFemenino, mode);
+
+  // Pestaña Equipos: puesto en su zona, copa a la que iría (mismo corte de
+  // ~1/3 por zona que el cuadro de playoffs) y últimos 5 de cada equipo.
+  const infoEquipos = useMemo(() => {
+    const out = {};
+    const grupos = {};
+    for (const t of equiposDeTemporada) (grupos[t.zona ?? '-'] ??= []).push(t);
+    for (const [zona, lista] of Object.entries(grupos)) {
+      const orden = ordenarTabla(lista);
+      const g = Math.ceil(orden.length / 3);
+      orden.forEach((t, i) => {
+        const forma = [...(t.historial ?? [])]
+          .sort((a, b) => (!!a.esPlayoff - !!b.esPlayoff) || ((a.fechaNum ?? 0) - (b.fechaNum ?? 0)))
+          .slice(-5).map(h => ({ g: h.resultado === 'G', pf: h.pf, pc: h.pc }));
+        out[t.id] = {
+          pos: i + 1, zona: zona === '-' ? null : zona,
+          copa: i < g ? 'oro' : i < g * 2 ? 'plata' : 'bronce',
+          forma,
+        };
+      });
+    }
+    return out;
+  }, [equiposDeTemporada]);
+
+  // Todos juntos, en el mismo orden de siempre (pedido de Alvaro).
+  const gruposEquipos = useMemo(() => [{ key: 'todos', titulo: null, equipos: equiposDeTemporada }], [equiposDeTemporada]);
 
   const jugadorasFiltradas = useMemo(() => {
     const q = searchJugadoras.toLowerCase();
@@ -1227,48 +1344,24 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
             )}
 
             {activeTab === 'equipos' && (
-              <div className="teams-grid">
-                {equiposDeTemporada.map(team => (
-                  <div
-                    className={`flip-card${tappedCard === team.id ? ' tapped' : ''}`}
-                    key={team.id}
-                    onClick={() => {
-                      const isTouch = window.matchMedia('(hover: none)').matches;
-                      if (isTouch && tappedCard !== team.id) setTappedCard(team.id);
-                      else { setTappedCard(null); handleSelectTeam(team); }
-                    }}
-                    onMouseLeave={() => setTappedCard(null)}>
-                    <button
-                      className={`fc-fav-btn ${esFavorito(team.id) ? 'active' : ''}`}
-                      onClick={e => { e.stopPropagation(); toggleFavorito(team.id); }}
-                      title={esFavorito(team.id) ? 'Quitar favorito' : 'Marcar como favorito'}>
-                      {esFavorito(team.id) ? '*' : 'o'}
-                    </button>
-                    <div className="flip-card-inner">
-                      <div className="flip-card-front" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '70')}, #1C2535 65%)` }}>
-                        <div className="fc-front-inner" style={{ background: `linear-gradient(160deg, ${hexA(team.color, '14')}, #0B111C 60%)` }}>
-                          <div className="fc-logo-wrap" style={{ borderColor: team.color, boxShadow: `0 0 16px ${hexA(team.color, '59')}` }}>
-                            <img src={team.logo} alt={team.name} className="fc-logo-img" loading="lazy" decoding="async"
-                              onError={e => { e.target.style.background = 'var(--dark4)'; }}/>
-                          </div>
-                          <h3 className="fc-name">{team.name}</h3>
-                          <div className="fc-subtitle" style={{ color: team.color }}>{team.jugadoras.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}</div>
-                          {team.pj > 0 && (
-                            <div style={{ marginTop: 6, fontSize: 13, color: team.color, fontFamily: "'Bebas Neue',sans-serif", letterSpacing: 1 }}>
-                              {team.pg}G - {team.pp}P
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flip-card-back" style={{ borderColor: team.color }}>
-                        <img src={team.logo} alt="bg" className="fc-back-logo" loading="lazy" decoding="async"/>
-                        <div className="fc-record-label">RECORD ACTUAL</div>
-                        <div className="fc-record-val" style={{ color: team.color }}>{team.pg} - {team.pp}</div>
-                        <div className="fc-team-name">{team.name}</div>
-                        <div style={{ marginTop: '12px', fontSize: '13px', fontFamily: "'Barlow Condensed'", color: 'var(--gray)', letterSpacing: '1px' }}>
-                          TAP PARA VER PLANTEL
-                        </div>
-                      </div>
+              <div className="eqs">
+                {gruposEquipos.map(gr => (
+                  <div key={gr.key} className="eqs-grupo">
+                    {gr.titulo && (
+                      <div className={`eqs-tit${gr.copa ? ` eqs-tit--${gr.copa}` : ''}`}><b>{gr.titulo}</b><i/></div>
+                    )}
+                    <div className="teams-grid">
+                      {gr.equipos.map(team => (
+                        <TarjetaEquipo key={team.id} team={team} info={infoEquipos[team.id]} mode={mode}
+                          fav={esFavorito(team.id)} onFav={() => toggleFavorito(team.id)}
+                          tapped={tappedCard === team.id}
+                          onLeave={() => setTappedCard(null)}
+                          onCardClick={() => {
+                            const isTouch = window.matchMedia('(hover: none)').matches;
+                            if (isTouch && tappedCard !== team.id) setTappedCard(team.id);
+                            else { setTappedCard(null); handleSelectTeam(team); }
+                          }}/>
+                      ))}
                     </div>
                   </div>
                 ))}

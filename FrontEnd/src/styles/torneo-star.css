@@ -8400,3 +8400,7 @@ nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3);
   .torneo-section { padding-top: calc(14px + env(safe-area-inset-top)); }
   div[id="torneo-view"] { scroll-margin-top: 0; }
 }
+
+/* Rapidez: en "Todas" se dibujan decenas de tarjetas de partido; las que
+   están fuera de la pantalla no se pintan hasta que llegás a ellas. */
+.rx-card { content-visibility: auto; contain-intrinsic-size: auto 200px; }

@@ -59,9 +59,12 @@ export function Navbar() {
 
   const irATab = useCallback((tab) => (e) => {
     e.preventDefault();
-    document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+    // Cambia la pestaña al instante (antes esperaba 400 ms) y después baja.
     setSeleccion(tab);
-    setTimeout(() => dispatchTabChange(tab), 400);
+    dispatchTabChange(tab);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+    }));
   }, []);
 
   const activo = seleccion;

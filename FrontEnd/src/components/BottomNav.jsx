@@ -5,6 +5,14 @@ function dispatchTab(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
 }
 
+// Rapidez: antes se esperaban 300 ms antes de cambiar de pestaña. Ahora la
+// pestaña cambia al instante y el desplazamiento arranca apenas se dibujó.
+function irAlTorneo() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
+  }));
+}
+
 const Icons = {
   inicio: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,8 +85,8 @@ export function BottomNav({ activeTab, onTabChange }) {
       label: 'Tabla',
       icon: Icons.tabla,
       onClick: () => {
-        document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => { dispatchTab('tabla'); onTabChange?.('tabla'); }, 300);
+        dispatchTab('tabla'); onTabChange?.('tabla');
+        irAlTorneo();
       },
     },
     {
@@ -86,8 +94,8 @@ export function BottomNav({ activeTab, onTabChange }) {
       label: 'Resultados',
       icon: Icons.resultados,
       onClick: () => {
-        document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => { dispatchTab('resultados'); onTabChange?.('resultados'); }, 300);
+        dispatchTab('resultados'); onTabChange?.('resultados');
+        irAlTorneo();
       },
     },
     {
@@ -95,8 +103,8 @@ export function BottomNav({ activeTab, onTabChange }) {
       label: 'Fixture',
       icon: Icons.fixture,
       onClick: () => {
-        document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => { dispatchTab('fixture'); onTabChange?.('fixture'); }, 300);
+        dispatchTab('fixture'); onTabChange?.('fixture');
+        irAlTorneo();
       },
     },
     {
@@ -105,8 +113,8 @@ export function BottomNav({ activeTab, onTabChange }) {
       icon: Icons.equipos,
       dot: true,
       onClick: () => {
-        document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => { dispatchTab('equipos'); onTabChange?.('equipos'); }, 300);
+        dispatchTab('equipos'); onTabChange?.('equipos');
+        irAlTorneo();
       },
     },
     {
@@ -114,8 +122,8 @@ export function BottomNav({ activeTab, onTabChange }) {
       label: mode === 'femenino' ? 'Jugadoras' : 'Jugadores',
       icon: Icons.jugadores,
       onClick: () => {
-        document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => { dispatchTab('jugadores'); onTabChange?.('jugadores'); }, 300);
+        dispatchTab('jugadores'); onTabChange?.('jugadores');
+        irAlTorneo();
       },
     },
   ];

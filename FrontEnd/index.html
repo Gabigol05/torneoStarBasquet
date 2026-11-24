@@ -92,15 +92,30 @@
             .catch(function () {})
             .then(function () { location.reload(); });
         }
+        // Solo cuentan los archivos propios del sitio (/assets/...): antes
+        // cualquier falla externa (por ejemplo Google Fonts sin conexión o
+        // bloqueado) recargaba la página entera sin motivo.
+        function propio(u) {
+          try { var x = new URL(u, location.href); return x.origin === location.origin && x.pathname.indexOf('/assets/') === 0; }
+          catch (e) { return false; }
+        }
         window.addEventListener('error', function (e) {
           var t = e && e.target;
-          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) recuperar();
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && propio(t.src || t.href)) recuperar();
         }, true);
-        setTimeout(function () {
+        // Con internet lento el JS puede tardar más de 6 s en bajar: antes se
+        // recargaba igual y la descarga arrancaba de cero. Ahora solo se
+        // recupera si el JS YA terminó de bajar y aun así no arrancó (o si
+        // pasaron más de 30 s).
+        function revisar(n) {
           var root = document.getElementById('root');
-          if (root && root.children.length === 0) recuperar();
-          else { try { sessionStorage.removeItem(KEY); } catch (e) {} }
-        }, 6000);
+          if (root && root.children.length > 0) { try { sessionStorage.removeItem(KEY); } catch (e) {} return; }
+          var s = document.querySelector('script[type="module"][src]');
+          var bajo = s && window.performance && performance.getEntriesByName && performance.getEntriesByName(s.src).length > 0;
+          if (bajo || n >= 8) recuperar();
+          else setTimeout(function () { revisar(n + 1); }, 3000);
+        }
+        setTimeout(function () { revisar(0); }, 6000);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

@@ -88,11 +88,15 @@ export default defineConfig({
         // todavía no estaban, y esa respuesta quedó guardada (caché del
         // navegador/Vercel/service worker) en lugar del JS/CSS real -> el
         // sitio quedaba en blanco. vercel.json ya no reescribe /assets/;
-        // además se cambian TODAS las direcciones de archivos ("-r2-") para
+        // además se cambian TODAS las direcciones de archivos ("-r3-") para
         // que nadie vuelva a usar esas copias malas ya guardadas.
-        entryFileNames: 'assets/[name]-r2-[hash].js',
-        chunkFileNames: 'assets/[name]-r2-[hash].js',
-        assetFileNames: 'assets/[name]-r2-[hash][extname]',
+        // (23/11) "-r3-": se sacó de vercel.json el Cache-Control "immutable"
+        // de /assets/ — también se aplicaba a los 404 de un archivo pedido
+        // justo durante un deploy, y el navegador guardaba ese 404 por un año
+        // (página en negro). Nombres nuevos para salir de eso.
+        entryFileNames: 'assets/[name]-r3-[hash].js',
+        chunkFileNames: 'assets/[name]-r3-[hash].js',
+        assetFileNames: 'assets/[name]-r3-[hash][extname]',
         // Separa las librerías más pesadas en su propio chunk, para que no
         // vayan mezcladas con el bundle principal ni se re-descarguen enteras
         // cada vez que cambia código de la app (mejor cacheo entre deploys).

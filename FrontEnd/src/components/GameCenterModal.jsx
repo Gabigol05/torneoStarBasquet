@@ -358,7 +358,7 @@ function ShareMatchButton({ data, partidoId, mode }) {
   };
 
   return (
-    <button onClick={handleShare} title="Compartir partido" style={{
+    <button onClick={handleShare} title="Compartir partido" className="gc-btn-share" style={{
       position: 'absolute', top: 16, right: 16, zIndex: 10,
       display: 'flex', alignItems: 'center', gap: 6,
       height: 36, padding: copied ? '0 12px' : 0, width: copied ? 'auto' : 36,
@@ -502,7 +502,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
       style={{ backdropFilter: 'blur(6px)', background: 'rgba(3,5,10,.72)', animation: 'gcFadeIn .25s ease' }}>
       <div className="gc-modal" onClick={e => e.stopPropagation()}
         style={{ animation: 'gcPopIn .25s ease', boxShadow: '0 30px 90px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.1)', position: 'relative' }}>
-        <button onClick={onClose} style={{
+        <button onClick={onClose} className="gc-btn-back" aria-label="Volver" style={{
           position: 'absolute', top: 16, left: 16, zIndex: 10,
           width: 36, height: 36, borderRadius: '50%',
           background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
@@ -532,7 +532,7 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
             <div className="gc-header" style={{
               background: `linear-gradient(120deg, ${hexA(data.eqLocal?.color ?? '#8899BB', '40')}, #1C2535 45%, ${hexA(data.eqVisit?.color ?? '#8899BB', '40')})`,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+              <div className="gc-badges" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{
                   fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 11, letterSpacing: 1.5,
                   color: '#7fe0a3', background: 'rgba(127,224,163,.12)', padding: '4px 12px', borderRadius: 100,

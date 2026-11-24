@@ -4,7 +4,6 @@ import { GlobalSearch } from './GlobalSearch';
 import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './LazyModals';
 import { useTournament } from '../context/TournamentContext';
-import { useActiveSection } from '../hooks/useActiveSection';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 
 // Mismos íconos que las pestañas de la vista del torneo.
@@ -28,7 +27,32 @@ function dispatchTabChange(tabKey) {
 export function Navbar() {
   const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
   const { mode } = useTournament();
-  const activeSection = useActiveSection();
+  // Sección visible según el scroll (la línea de referencia es justo debajo
+  // del menú fijo). useActiveSection no servía acá: pide que el 30% de la
+  // sección esté en pantalla y la vista del torneo es más alta que la
+  // pantalla, así que nunca se marcaba y quedaba siempre "Inicio".
+  const [seccion, setSeccion] = useState('inicio');
+  useEffect(() => {
+    let raf = 0;
+    const calcular = () => {
+      raf = 0;
+      const linea = 120;
+      const torneo = document.getElementById('torneo-view')?.getBoundingClientRect();
+      const hero = document.getElementById('inicio')?.getBoundingClientRect();
+      if (torneo && torneo.top <= linea && torneo.bottom > linea) setSeccion('torneo');
+      else if (!hero || hero.bottom > linea) setSeccion('inicio');
+      else setSeccion('otra');
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(calcular); };
+    calcular();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   // Pestaña abierta en la vista del torneo (la avisa TorneoView).
   const [tabActual, setTabActual] = useState('tabla');
@@ -56,8 +80,7 @@ export function Navbar() {
     setTimeout(() => dispatchTabChange(tab), 400);
   }, []);
 
-  const enTorneo = ['torneo-view', 'jugadores', 'equipos'].includes(activeSection);
-  const activo = activeSection === 'inicio' ? 'inicio' : enTorneo ? tabActual : null;
+  const activo = seccion === 'inicio' ? 'inicio' : seccion === 'torneo' ? tabActual : null;
 
   const izq = [
     { key: 'inicio',     label: 'Inicio',     href: '#inicio' },

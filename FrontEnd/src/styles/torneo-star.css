@@ -8078,3 +8078,13 @@ nav.navbar-sticky.nv3--femenino { --nv-c: #ff4fa3; --nv-c2: #e8187a; --nv-c3: rg
 /* Mismo color que la pestaña activa del torneo */
 nav.navbar-sticky.nv3 .nv3-b.is-on { background: var(--masc2, #3b82f6); box-shadow: 0 6px 18px -4px var(--masc2, #3b82f6); }
 nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3); box-shadow: 0 6px 18px -4px var(--fem2, #ff4fa3); }
+
+/* Menú de escritorio fijo arriba: antes el <nav> era sticky pero dentro de
+   un contenedor de su mismo alto (.desktop-only), así que se iba con la
+   página — al tocar "Tabla" bajabas a la tabla y para ver qué botón estaba
+   marcado había que volver a subir (y ahí ya quedaba "Inicio"). Ahora el
+   contenedor es el que queda pegado arriba. */
+@media (min-width: 768px) {
+  .desktop-only { position: sticky; top: 0; z-index: 240; }
+  section[id], div[id="torneo-view"] { scroll-margin-top: 84px; }
+}

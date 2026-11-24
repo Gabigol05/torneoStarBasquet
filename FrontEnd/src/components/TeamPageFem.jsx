@@ -304,7 +304,7 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
             {/* ── RESULTADOS ── */}
             {activeTab === 'resultados' && (
               <div>
-                <div className="tp-section-label">Historial de Partidos</div>
+                <div className="tp-section-label">Historial de partidos</div>
                 {team.historial.length === 0 ? (
                   <div className="tp-empty-state">
                     <div className="tp-empty-icon">🏀</div>
@@ -312,71 +312,81 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                     <div className="tp-empty-sub">Los resultados aparecerán aquí cuando comience el torneo</div>
                   </div>
                 ) : (
-                  <div className="tp-matches-list">
+                  <div className="hx">
+                    {/* Historial (rediseño 23/11): franja verde/roja según el
+                        resultado, escudo del rival, marcador grande, cuartos
+                        con quién ganó cada uno, día y goleador si hay stats. */}
+                    <div className="hx-resumen">
+                      <span>{team.historial.length} {team.historial.length === 1 ? 'partido' : 'partidos'}</span>
+                      <span className="hx-g">{team.historial.filter(h => h.resultado === 'G').length} G</span>
+                      <span className="hx-p">{team.historial.filter(h => h.resultado !== 'G').length} P</span>
+                    </div>
                     {[...team.historial].reverse().map((h, idx) => {
                       const partidoFull = partidos?.find(p => p.id === h.partidoId);
                       const esLocal     = partidoFull?.equipo_local_id === team.id;
                       const fechaObj    = fechas?.find(f => f.id === h.fechaId);
-                      const rivalTeam   = allTeams?.find(t => t.name === h.rival);
+                      const rivalId     = partidoFull ? (esLocal ? partidoFull.equipo_visit_id : partidoFull.equipo_local_id) : null;
+                      const rivalTeam   = allTeams?.find(t => t.id === rivalId) ?? allTeams?.find(t => t.name === h.rival);
                       const cRival      = rivalTeam?.color ?? '#5A6B85';
-
-                      // ⚠️ FIX: calcular pf/pc desde cuartos si son 0 y hay parciales
-                      const pf = h.pf || (esLocal
-                        ? ((partidoFull?.q1_local??0)+(partidoFull?.q2_local??0)+(partidoFull?.q3_local??0)+(partidoFull?.q4_local??0)+(partidoFull?.ot_local??0))
-                        : ((partidoFull?.q1_visit??0)+(partidoFull?.q2_visit??0)+(partidoFull?.q3_visit??0)+(partidoFull?.q4_visit??0)+(partidoFull?.ot_visit??0)));
-                      const pc = h.pc || (esLocal
-                        ? ((partidoFull?.q1_visit??0)+(partidoFull?.q2_visit??0)+(partidoFull?.q3_visit??0)+(partidoFull?.q4_visit??0)+(partidoFull?.ot_visit??0))
-                        : ((partidoFull?.q1_local??0)+(partidoFull?.q2_local??0)+(partidoFull?.q3_local??0)+(partidoFull?.q4_local??0)+(partidoFull?.ot_local??0)));
-
+                      const playoff     = esPartidoPlayoff(partidoFull);
+                      const gano        = h.resultado === 'G';
+                      const suma = lado => ['q1','q2','q3','q4','ot'].reduce((a, q) => a + (partidoFull?.[`${q}_${lado}`] ?? 0), 0);
+                      // pf/pc desde los cuartos si vinieron en 0 y hay parciales
+                      const pf = h.pf || suma(esLocal ? 'local' : 'visit');
+                      const pc = h.pc || suma(esLocal ? 'visit' : 'local');
+                      const dia = partidoFull?.fecha_partido ?? fechaObj?.fecha_dia ?? null;
+                      const diaTxt = dia ? (() => {
+                        const d = new Date(`${dia}T12:00:00`);
+                        return `${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()]} ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+                      })() : null;
+                      const cuartos = partidoFull ? ['q1','q2','q3','q4','ot']
+                        .map(q => [q, esLocal ? partidoFull[`${q}_local`] : partidoFull[`${q}_visit`], esLocal ? partidoFull[`${q}_visit`] : partidoFull[`${q}_local`]])
+                        .filter(([q, a, b]) => q !== 'ot' || (a ?? 0) > 0 || (b ?? 0) > 0) : [];
+                      // Goleador del equipo en ese partido (solo si las stats del partido están cargadas)
+                      const statsP = statsPorPartido?.[h.partidoId];
+                      let goleador = null;
+                      if (statsP) {
+                        for (const j of team.jugadoras ?? []) {
+                          const st = statsP[j.id];
+                          if (st && (st.pts ?? 0) > (goleador?.pts ?? 0)) goleador = { nombre: j.nombre, pts: st.pts };
+                        }
+                      }
                       return (
-                        <div key={idx}
-                          className={`tp-match-card ${h.resultado === 'G' ? 'win' : 'loss'}`}
-                          style={{ background: `linear-gradient(115deg, ${hexA(team.color, '55')}, #1C2535 45%, ${hexA(cRival, '55')})`, cursor: h.partidoId ? 'pointer' : 'default' }}
-                          onClick={() => h.partidoId && setSelectedMatch(h.partidoId)}>
-                          <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
-                          <div className="tp-match-header">
-                            <span className="tp-match-date" style={esPartidoPlayoff(partidoFull) ? { color: '#F0B429' } : {}}>
-                              {esPartidoPlayoff(partidoFull) ? '🏆 ' : ''}
+                        <div key={idx} role={h.partidoId ? 'button' : undefined} tabIndex={h.partidoId ? 0 : undefined}
+                          className={`hx-card ${gano ? 'is-g' : 'is-p'}${playoff ? ' is-playoff' : ''}${h.partidoId ? ' is-link' : ''}`}
+                          style={{ backgroundImage: `linear-gradient(100deg, ${hexA(cRival, '1c')}, transparent 55%)` }}
+                          onClick={() => h.partidoId && setSelectedMatch(h.partidoId)}
+                          onKeyDown={e => { if (h.partidoId && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSelectedMatch(h.partidoId); } }}>
+                          <div className="hx-top">
+                            <span className={`hx-fecha${playoff ? ' is-playoff' : ''}`}>
+                              {playoff ? '🏆 ' : ''}
                               {partidoFull ? (labelPartido(partidoFull, fechaObj) ?? '') : (fechaObj ? labelFecha(fechaObj) : '')}
                             </span>
-                            <span className={`tp-match-result ${h.resultado === 'G' ? 'win' : 'loss'}`}>
-                              {h.resultado === 'G' ? 'GANÓ' : 'PERDIÓ'}
-                            </span>
+                            {diaTxt && <span className="hx-dia">{diaTxt}</span>}
                           </div>
-                          <div className="tp-match-info">
-                            <span className="tp-match-teams">vs {h.rival}</span>
-                            <span className="tp-match-score"
-                              style={{ color: h.resultado === 'G' ? '#22D07A' : '#F04060' }}>
-                              {pf} – {pc}
+                          <div className="hx-main">
+                            <span className="hx-rival">
+                              <span className="hx-escudo" style={{ borderColor: cRival }}>
+                                {rivalTeam?.logo && <img src={rivalTeam.logo} alt="" loading="lazy" decoding="async"
+                                  onError={e => { e.target.style.visibility = 'hidden'; }}/>}
+                              </span>
+                              <span className="hx-rival-txt"><small>{partidoFull && !esLocal ? '@' : 'vs'}</small>{h.rival}</span>
                             </span>
+                            <span className="hx-marcador">
+                              <b className={gano ? 'is-g' : 'is-p'}>{pf}</b><i>-</i><b>{pc}</b>
+                            </span>
+                            <span className={`hx-res ${gano ? 'is-g' : 'is-p'}`} title={gano ? 'Ganó' : 'Perdió'}>{gano ? 'G' : 'P'}</span>
                           </div>
-                          {/* Parciales */}
-                          {partidoFull && (
-                            <div className="tp-match-parciales">
-                              {['q1', 'q2', 'q3', 'q4'].map(q => {
-                                const mio   = esLocal ? partidoFull[`${q}_local`] : partidoFull[`${q}_visit`];
-                                const rival = esLocal ? partidoFull[`${q}_visit`] : partidoFull[`${q}_local`];
-                                const ganoQ = (mio ?? 0) > (rival ?? 0);
-                                return (
-                                  <div key={q} className="tp-parcial">
-                                    <span className="tp-parcial-lbl">{q.toUpperCase()}</span>
-                                    <span className="tp-parcial-val" style={{ color: ganoQ ? '#22D07A' : '#EEF2F8' }}>{mio ?? 0}</span>
-                                    <span className="tp-parcial-sep">-</span>
-                                    <span className="tp-parcial-val" style={{ color: !ganoQ ? '#22D07A' : '#6B7A99' }}>{rival ?? 0}</span>
-                                  </div>
-                                );
-                              })}
-                              {((esLocal ? partidoFull.ot_local : partidoFull.ot_visit) ?? 0) > 0 && (
-                                <div className="tp-parcial">
-                                  <span className="tp-parcial-lbl" style={{ color: '#F0B429' }}>OT</span>
-                                  <span className="tp-parcial-val">{esLocal ? partidoFull.ot_local : partidoFull.ot_visit}</span>
-                                  <span className="tp-parcial-sep">-</span>
-                                  <span className="tp-parcial-val">{esLocal ? partidoFull.ot_visit : partidoFull.ot_local}</span>
-                                </div>
-                              )}
+                          {(cuartos.length > 0 || goleador) && (
+                            <div className="hx-cuartos">
+                              {cuartos.map(([q, a, b]) => (
+                                <span key={q} className={`hx-q ${(a ?? 0) > (b ?? 0) ? 'is-g' : (a ?? 0) < (b ?? 0) ? 'is-p' : ''}`}>
+                                  <small>{q.toUpperCase()}</small>{a ?? 0}<i>-</i>{b ?? 0}
+                                </span>
+                              ))}
+                              {goleador && <span className="hx-gol">⭐ Goleador: {goleador.nombre} ({goleador.pts})</span>}
                             </div>
                           )}
-                          </div>
                         </div>
                       );
                     })}

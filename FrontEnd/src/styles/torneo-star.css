@@ -7352,3 +7352,108 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .bottom-nav-item.active .bottom-nav-label { font-weight: 800; }
   .bottom-nav-item:active { opacity: 1; transform: scale(0.94); }
 }
+
+/* ══ BARRA INFERIOR v3 — isla flotante (rediseño 23/11, como 351 Deportes) ══
+   Va al final para ganarle a las versiones anteriores de .bottom-nav.
+   La barra se esconde al bajar y vuelve al subir (BottomNav.jsx). */
+@media (max-width: 767px) {
+  .bottom-nav {
+    display: block !important;
+    position: fixed;
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    height: auto !important;
+    padding: 0 12px max(env(safe-area-inset-bottom), 10px) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 400;
+    pointer-events: none;
+    transition: transform .3s ease-out;
+  }
+  .bottom-nav.is-oculta { transform: translateY(130%); }
+  .bottom-nav-isla {
+    pointer-events: auto;
+    position: relative;
+    display: flex;
+    max-width: 520px;
+    height: 62px;
+    margin: 0 auto;
+    padding: 0 6px;
+    border-radius: 22px;
+    background: rgba(11, 16, 24, .96);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px -6px rgba(0, 0, 0, .6), 0 2px 6px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .09);
+  }
+  .bottom-nav-brillo {
+    position: absolute; left: 24px; right: 24px; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent);
+    pointer-events: none;
+  }
+  .bottom-nav-pastilla {
+    position: absolute;
+    top: 7px; left: 6px;
+    width: calc((100% - 12px) / 5);
+    height: 32px;
+    pointer-events: none;
+    transition: transform .3s cubic-bezier(.3, .9, .3, 1.15), opacity .2s;
+  }
+  .bottom-nav-pastilla.is-off { opacity: 0; }
+  .bottom-nav-pastilla > span {
+    display: block;
+    width: 50px; height: 32px;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: var(--bnav-color, #3b82f6);
+    box-shadow: 0 0 18px -2px var(--bnav-color, #3b82f6);
+  }
+  .bottom-nav-item {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    min-width: 0;
+    min-height: 0 !important;
+    height: 100%;
+    padding: 7px 0 0 !important;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, .55);
+    -webkit-tap-highlight-color: transparent;
+    transition: color .25s;
+  }
+  .bottom-nav-item::before { display: none !important; }
+  .bottom-nav-item.active { color: #fff; }
+  .bottom-nav-item:active .bottom-nav-icon-wrap { transform: scale(.9); }
+  .bottom-nav-icon-wrap {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 50px; height: 32px;
+    transition: transform .15s, color .25s;
+  }
+  .bottom-nav-item.active .bottom-nav-icon-wrap { color: #0B1018; }
+  .bottom-nav-icon-wrap svg { width: 21px; height: 21px; }
+  .bottom-nav-item.active .bottom-nav-icon-wrap svg { stroke-width: 2.4; }
+  .bottom-nav-dot { top: 4px !important; right: 12px !important; border-color: rgba(11, 16, 24, .96) !important; }
+  .bottom-nav-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  /* Espacio para que la isla no tape el final de la página */
+  #root { padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+  .team-page-overlay { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .install-banner { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+

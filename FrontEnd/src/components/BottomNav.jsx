@@ -1,4 +1,5 @@
 import { useTournament } from '../context/TournamentContext';
+import { useBarraOcultaAlBajar } from '../hooks/useBarraOcultaAlBajar';
 
 function dispatchTab(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
@@ -49,6 +50,7 @@ const Icons = {
 export function BottomNav({ activeTab, onTabChange }) {
   const { mode } = useTournament();
   const modeColor = mode === 'femenino' ? 'var(--fem2)' : '#3b82f6';
+  const oculta = useBarraOcultaAlBajar();
 
   const items = [
     {
@@ -99,28 +101,41 @@ export function BottomNav({ activeTab, onTabChange }) {
     },
   ];
 
+  const activo = items.findIndex(i => i.key === activeTab);
+
+  // Barra tipo "isla" flotante (rediseño 23/11, igual que 351 Deportes): una
+  // pastilla del color de la categoría se desliza hasta la sección activa, y
+  // la barra se esconde al bajar y vuelve al subir para no tapar contenido.
   return (
-    <nav className="bottom-nav" role="navigation" aria-label="Navegación principal">
-      {items.map((item) => {
-        const isActive = activeTab === item.key;
-        return (
-          <button
-            key={item.key}
-            className={`bottom-nav-item${isActive ? ' active' : ''}`}
-            onClick={item.onClick}
-            aria-label={item.label}
-            style={isActive ? { '--bnav-color': modeColor } : {}}
-          >
-            <div className="bottom-nav-icon-wrap">
-              {item.icon}
-              {item.dot && (
-                <span className="bottom-nav-dot" style={{ background: modeColor }} />
-              )}
-            </div>
-            <span className="bottom-nav-label">{item.label}</span>
-          </button>
-        );
-      })}
+    <nav className={`bottom-nav${oculta ? ' is-oculta' : ''}`} role="navigation" aria-label="Navegación principal"
+      style={{ '--bnav-color': modeColor }}>
+      <div className="bottom-nav-isla">
+        <span aria-hidden="true" className="bottom-nav-brillo"/>
+        <span aria-hidden="true" className={`bottom-nav-pastilla${activo < 0 ? ' is-off' : ''}`}
+          style={{ transform: `translateX(${Math.max(activo, 0) * 100}%)` }}>
+          <span/>
+        </span>
+        {items.map((item) => {
+          const isActive = activeTab === item.key;
+          return (
+            <button
+              key={item.key}
+              className={`bottom-nav-item${isActive ? ' active' : ''}`}
+              onClick={item.onClick}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <div className="bottom-nav-icon-wrap">
+                {item.icon}
+                {item.dot && !isActive && (
+                  <span className="bottom-nav-dot" style={{ background: modeColor }} />
+                )}
+              </div>
+              <span className="bottom-nav-label">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }

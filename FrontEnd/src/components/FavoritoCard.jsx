@@ -76,7 +76,7 @@ export function FavoritoCard({ onSelectTeam }) {
     const pc = (local ? p.puntos_visit : p.puntos_local) ?? 0;
     return { pf, pc, gano: pf > pc, rivalId: local ? p.equipo_visit_id : p.equipo_local_id };
   };
-  const forma = jugados.slice(-5).map(p => (resultado(p).gano ? 'G' : 'P'));
+  const forma = jugados.slice(-5).map(p => resultado(p));
 
   // Playoffs: último cruce del equipo.
   const cruces = partidos.filter(p => p.es_playoff && p.copa && (p.equipo_local_id === favoritoId || p.equipo_visit_id === favoritoId));
@@ -162,7 +162,11 @@ export function FavoritoCard({ onSelectTeam }) {
           {playoff && <span className={`fv-chip copa ${playoff.clase}`}>{playoff.icono} {playoff.nombre} · {playoff.detalle}</span>}
           {forma.length > 0 && (
             <span className="fv-forma" aria-label="Últimos partidos">
-              {forma.map((x, i) => <i key={i} className={x === 'G' ? 'g' : 'p'}>{x}</i>)}
+              <small>Últimos {forma.length}</small>
+              {forma.map((r, i) => (
+                <i key={i} className={`${r.gano ? 'g' : 'p'}${i === forma.length - 1 ? ' ult' : ''}`}
+                  title={`${r.gano ? 'Ganó' : 'Perdió'} ${r.pf}-${r.pc}`}>{r.gano ? 'G' : 'P'}</i>
+              ))}
             </span>
           )}
         </div>

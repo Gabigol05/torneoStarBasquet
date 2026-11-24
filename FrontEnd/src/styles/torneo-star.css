@@ -7627,6 +7627,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .rx-ver { grid-column: 2; font-size: 0; }
   .rx-ver::after { content: '›'; font-size: 22px; color: #6B7A99; }
   .rx-mvp-eq { display: none; }
+  /* Sin MVP cargado: no se deja una fila vacía solo con la flechita. */
+  .rx-mvp--solo { display: none; }
 }
 
 /* ══ NAVEGACIÓN v3 — pestañas, chips de fecha y separador de día (23/11) ══ */
@@ -7708,4 +7710,120 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .dia-sep-tit { font-size: 22px; }
   .dia-sep-horas { display: none; }
   .dia-sep-linea { display: none; }
+}
+
+/* ══ PERFIL DE JUGADOR v3 (rediseño 23/11) ══ */
+.pp3-head { text-align: left; padding: 18px 18px 18px; }
+.pp3-head::before { display: none; }
+.pp3-id { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+.pp3-av.pp-avatar-container { width: 92px; height: 92px; margin: 0; flex-shrink: 0; border-width: 3px; }
+.pp3-id-txt { min-width: 0; }
+.pp3-id-txt .pp-name { font-size: 32px; line-height: .95; }
+.pp3-id-txt .pp-team { margin-top: 5px; font-weight: 700; letter-spacing: 1px; }
+.pp3-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pp3-tag {
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11.5px; font-weight: 700; letter-spacing: .8px;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.07); color: #AEB8CB;
+}
+.pp3-tag--rec { background: rgba(46,224,138,.12); color: #2EE08A; }
+.pp3-seg { display: flex; gap: 3px; padding: 3px; margin: 16px auto 0; width: max-content; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); }
+.pp3-seg button { padding: 5px 14px; border: 0; border-radius: 999px; background: none; cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-size: 12.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #7A879E; }
+.pp3-seg button.is-on { background: rgba(255,255,255,.12); color: #fff; }
+.pp3-big { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.pp3-bigc { padding: 12px 6px 10px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); text-align: center; font-family: 'Barlow Condensed', sans-serif; }
+.pp3-bigc b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; font-weight: 400; }
+.pp3-bigc small { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: #8A96AD; }
+.pp3-bigc em { display: block; margin-top: 4px; font-style: normal; font-size: 11.5px; font-weight: 600; color: #5C6880; }
+.pp3-small { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.pp3-smc { padding: 8px 4px; border-radius: 11px; background: rgba(255,255,255,.03); text-align: center; font-family: 'Barlow Condensed', sans-serif; }
+.pp3-smc b { font-family: 'Bebas Neue', sans-serif; font-size: 23px; font-weight: 400; line-height: 1; }
+.pp3-smc small { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7A879E; }
+.pp3-sec { margin-bottom: 22px; }
+.pp3-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.pp3-h h4 { margin: 0; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1.5px; font-weight: 400; color: #EEF2F8; }
+.pp3-h span { font-family: 'Barlow Condensed', sans-serif; font-size: 12.5px; font-weight: 600; color: #6B7A99; }
+.pp3-card { border-radius: 16px; background: #111925; border: 1px solid rgba(255,255,255,.07); padding: 14px; }
+.pp3-esc { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; border: 2px solid; overflow: hidden; background: #0E1420; }
+.pp3-esc--lg { width: 46px; height: 46px; }
+.pp3-esc img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp3-res { margin-left: 6px; padding: 2px 7px; border-radius: 5px; font-size: 12px; font-weight: 700; }
+.pp3-res.g { background: rgba(46,224,138,.14); color: #2EE08A; }
+.pp3-res.p { background: rgba(255,90,90,.14); color: #FF6B6B; }
+.pp3-best { display: flex; align-items: center; gap: 12px; font-family: 'Barlow Condensed', sans-serif; }
+.pp3-best-t { flex: 1; min-width: 0; }
+.pp3-best-t small { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+.pp3-best-t div { font-size: 16px; font-weight: 700; color: #EEF2F8; }
+.pp3-best-t > span { font-size: 12.5px; font-weight: 600; color: #7A879E; }
+.pp3-best-pts { text-align: right; font-family: 'Bebas Neue', sans-serif; font-size: 40px; line-height: 1; }
+.pp3-best-pts small { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #8A96AD; }
+.pp3-anillos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pp3-anillo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-family: 'Barlow Condensed', sans-serif; }
+.pp3-anillo svg { width: 82px; height: 82px; }
+.pp3-anillo-lbl { font-size: 12.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #AEB8CB; }
+.pp3-anillo-sub { margin-top: -3px; font-size: 12px; font-weight: 600; color: #6B7A99; }
+.pp3-mix { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); font-family: 'Barlow Condensed', sans-serif; }
+.pp3-mix-t { display: flex; justify-content: space-between; margin-bottom: 7px; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #7A879E; }
+.pp3-mix-bar { display: flex; gap: 2px; height: 12px; border-radius: 7px; overflow: hidden; }
+.pp3-mix-bar i { display: block; height: 100%; }
+.pp3-mix-ley { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #8A96AD; }
+.pp3-mix-ley b { color: #EEF2F8; }
+.pp3-mix-ley span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--c); }
+.pp3-tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 10px; border-radius: 12px; background: rgba(255,255,255,.04); }
+.pp3-tabs button { flex: 1; padding: 7px 0; border: 0; border-radius: 9px; background: none; cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: #7A879E; }
+.pp3-tabs button.is-on { color: #0B1018; }
+.pp3-graf { display: block; width: 100%; height: auto; overflow: visible; }
+.pp3-sel { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid; font-family: 'Barlow Condensed', sans-serif; }
+.pp3-sel-t { flex: 1; min-width: 0; }
+.pp3-sel-t small { font-size: 11px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; }
+.pp3-sel-t div { font-size: 15px; font-weight: 700; color: #EEF2F8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp3-sel-n { display: flex; gap: 10px; text-align: center; }
+.pp3-sel-n b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 1; font-weight: 400; color: #EEF2F8; }
+.pp3-sel-n small { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #7A879E; }
+@media (max-width: 420px) {
+  .pp3-av.pp-avatar-container { width: 76px; height: 76px; }
+  .pp3-id-txt .pp-name { font-size: 27px; }
+  .pp3-bigc b { font-size: 32px; }
+  .pp3-sel { flex-wrap: wrap; }
+  .pp3-sel-n { width: 100%; justify-content: space-around; }
+}
+
+/* ══ CELULAR — arreglo después de pasar la barra de secciones ABAJO (23/11) ══
+   Un bloque anterior ("barra de secciones ARRIBA") dejaba la página
+   corrida 64px para abajo (#root y la página de equipo con padding-top) y
+   escondía el encabezado chico con el logo y la lupa. Con la barra flotante
+   abajo eso quedaba como un hueco arriba y pantallas corridas. Además la
+   barra flotante (z-index 400) quedaba por encima de los modales (partido,
+   jugador, buscador) y les tapaba la parte de abajo. */
+@media (max-width: 767px) {
+  /* Encabezado chico (logo, lupa, actualizar, redes): vuelve a verse
+     arriba de todo y se va con el scroll — la navegación queda en la
+     barra flotante de abajo, así se aprovecha toda la pantalla. */
+  .mobile-header { display: flex !important; position: relative; top: auto; }
+  #root { padding-top: 0 !important; }
+  .team-page-overlay { padding-top: 0; }
+  section[id], div[id="torneo-view"] { scroll-margin-top: 8px; }
+  /* Las pestañas de arriba (Tabla/Resultados/...) en el celular no van:
+     ahí se usa la barra de abajo. */
+  .torneo-section .tab-nav.tnv { display: none; }
+  /* Página de equipo: el encabezado tenía 68px de espacio arriba (de la
+     barra vieja) y quedaba pegado arriba al bajar — con lo alto que es
+     (escudo, récord, últimos 5, zona y pestañas) tapaba media pantalla. */
+  .team-page-header {
+    position: relative;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 0;
+  }
+  .team-page-back { margin-bottom: 14px; }
+  .team-page-hero { align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .toast-container { top: 12px; }
+  .hero {
+    min-height: calc(100vh - 52px);
+    min-height: calc(100svh - 52px);
+  }
+  /* Modales siempre por encima de la barra flotante */
+  .gc-overlay, .gs-overlay { z-index: 500 !important; }
+  /* Alto real de la pantalla (100vh en iPhone incluye la parte tapada por
+     las barras de Safari y cortaba los modales). */
+  .gc-modal, .pp-modal { max-height: 90vh; max-height: 92dvh; }
+  .gc-modal { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .pp-modal { padding-bottom: env(safe-area-inset-bottom); }
 }

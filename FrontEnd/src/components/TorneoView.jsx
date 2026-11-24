@@ -308,7 +308,7 @@ export function ResultadoCard({ partido, equiposFem, jugadorasMap, fechas, onCli
       )}
 
       {(mvpJug || onClick) && (
-        <div className="rx-mvp">
+        <div className={`rx-mvp${mvpJug ? '' : ' rx-mvp--solo'}`}>
           {mvpJug && (
             <div className="rx-mvp-centro">
               <span className="rx-mvp-tag">MVP</span>

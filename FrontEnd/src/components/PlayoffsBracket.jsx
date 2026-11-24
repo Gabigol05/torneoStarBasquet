@@ -1,20 +1,16 @@
-import { Children, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 import { useStats } from '../context/StatsContext';
 import { GameCenterModal } from './LazyModals';
-import { MatchResultCard, FixtureCard, buildJugadorasMap } from './TorneoView.jsx';
+import { buildJugadorasMap } from './TorneoView.jsx';
+import { logoDeEquipo } from '../lib/escudos';
 
 const CUPS = [
   { key: 'oro',    label: 'Copa de Oro',    color: '#F0B429' },
   { key: 'plata',  label: 'Copa de Plata',  color: '#C7D1DD' },
   { key: 'bronce', label: 'Copa de Bronce', color: '#CD7F32' },
 ];
-
-// Alpha en hex de 2 digitos, concatenado directo al color (igual que en las
-// tarjetas de fixture/resultado/lider/votaciones) — evita color-mix()/
-// variables CSS con alpha dinamico, que no anda bien en navegadores viejos.
-const hexA = (hex, alpha) => `${hex}${alpha}`;
 
 // Mismo criterio de orden que la tabla de posiciones (TorneoView): PTS -> DIF -> PF.
 // Exportada (junto con buildPools/bracketSizeFor/resolveWinner más abajo)
@@ -146,11 +142,6 @@ export function primeraRonda(pool, size) {
   };
 }
 
-// Aviso que se muestra debajo del título "Semifinal" cuando las semis salen
-// de cuartos: los cruces no siguen una regla fija, los define la organización.
-function NotaSemisOrganizacion() {
-  return <span className="bracket-round-nota">Cruces a definir por la organización</span>;
-}
 
 // Devuelve el equipo GANADOR de un partido real de playoff ya finalizado, o
 // null si todavía no se jugó / no se cargó. Es la pieza clave del auto-avance:
@@ -168,417 +159,383 @@ function buscarPartidoSlot(partidosCopa, instancia, llave) {
   return partidosCopa.find(p => p.instancia === instancia && p.llave === llave) ?? null;
 }
 
-function TeamSeed({ team, seed }) {
-  if (!team) {
-    return (
-      <div className="bracket-team tbd">
-        <span className="bracket-team-logo bracket-team-logo--vacio" aria-hidden="true"/>
-        <span className="bracket-team-name">Por definir</span>
-      </div>
-    );
-  }
-  return (
-    <div className="bracket-team">
-      <img src={team.logo} alt="" decoding="async" className="bracket-team-logo"
-        style={{ borderColor: team.color, boxShadow: `0 0 10px ${hexA(team.color, '59')}` }}
-        onError={e => { e.target.style.visibility = 'hidden'; }}/>
-      <span className="bracket-team-name">{team.name}</span>
-      {seed != null && <span className="bracket-team-seed">{seed}</span>}
-    </div>
-  );
-}
-
-// Cruce con equipos SIN resultado todavía: la proyección por semilla (fase
-// regular sin jugar aún el cruce), el casillero de la ronda siguiente ya
-// completado con el ganador real de la ronda anterior (auto-avance), o
-// "Por definir". Degradado con los colores de ambos equipos — mismo lenguaje
-// que fixture/resultado/votaciones. La variante "final" es más grande.
-function BracketMatch({ teamA, teamB, seedA, seedB, variante = null }) {
-  const cA = teamA?.color ?? '#5A6B85';
-  const cB = teamB?.color ?? '#5A6B85';
-  return (
-    <div className={`bracket-match${variante === 'final' ? ' bracket-match--final' : ''}`}
-      style={{ background: `linear-gradient(115deg, ${hexA(cA, '55')}, #1C2535 45%, ${hexA(cB, '55')})` }}>
-      <div className="bracket-match-inner" style={{ background: `linear-gradient(135deg, ${hexA(cA, '14')}, #0B111C 45%, ${hexA(cB, '14')})` }}>
-        <TeamSeed team={teamA} seed={seedA}/>
-        <div className="bracket-vs" aria-hidden="true"><span>VS</span></div>
-        <TeamSeed team={teamB} seed={seedB}/>
-      </div>
-    </div>
-  );
-}
-
-// Una columna del cuadro (Cuartos, Semifinal, Final, Campeón). El cuerpo
-// reparte el alto en partes iguales entre sus partidos y centra cada uno en
-// su parte: como todas las columnas miden lo mismo (la más alta, Cuartos),
-// cada semi queda a la altura del medio de sus dos cuartos y la final en el
-// centro del cuadro, sin márgenes puestos a mano. En celular las columnas
-// se apilan (ver .bracket en el CSS).
-// Final y Campeón llevan el título pegado arriba de su tarjeta (no arriba de
-// la columna, que queda lejos porque la tarjeta va centrada). El título se
-// cuelga por encima sin ocupar lugar, así la tarjeta sigue exactamente en el
-// centro; la cabecera de la columna queda vacía para que los cuerpos de todas
-// las columnas arranquen a la misma altura. La final va además en un marco.
-function Ronda({ tipo, titulo, nota = null, children }) {
-  const tituloSobreTarjeta = tipo === 'final' || tipo === 'campeon';
-  const cabecera = (
-    <>
-      {tipo === 'final' && <span className="bracket-round-trofeo" aria-hidden="true">🏆</span>}
-      <span className="bracket-round-titulo">{titulo}</span>
-      {nota}
-    </>
-  );
-  return (
-    <div className={`bracket-round bracket-round--${tipo}`}>
-      <div className={`bracket-round-label${tituloSobreTarjeta ? ' bracket-round-label--vacio' : ''}`}>
-        {!tituloSobreTarjeta && cabecera}
-      </div>
-      <div className="bracket-round-body">
-        {Children.toArray(children).map((c, i) => (
-          <div key={c.key ?? i} className="bracket-slot">
-            {tituloSobreTarjeta ? (
-              <div className="bracket-slot-ancla">
-                <div className="bracket-slot-titulo">{cabecera}</div>
-                {tipo === 'final' ? <div className="bracket-final-frame">{c}</div> : c}
-              </div>
-            ) : c}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Contenedor del cuadro: pasa el color de la copa como variables CSS (para
-// el marco de la final, el título "Campeón" y los conectores).
-function BracketWrap({ accentColor, children }) {
-  const c = accentColor ?? '#F0B429';
-  return (
-    <div className="bracket-wrap" style={{ '--cup': c, '--cup-a15': hexA(c, '26'), '--cup-a45': hexA(c, '73') }}>
-      <div className="bracket">{children}</div>
-    </div>
-  );
-}
-
-// Bracket "en vivo": arranca proyectando los cruces según la posición actual
-// en la tabla de posiciones (cuando todavía no hay ningún resultado real de
-// esa ronda), y en cuanto se carga un partido de playoff real para un
-// casillero, lo reemplaza por el resultado real — con el ganador resaltado y
-// completando automáticamente el casillero de la ronda siguiente, sin
-// esperar a que ese próximo partido se cree.
-// Cuando el pool no entra justo en un cuadro de potencia de 2 (por ejemplo
-// Copa de Bronce con 12+11 equipos por zona: sobran 7, y bracketSizeFor
-// corta en 4), esos equipos de más se listan aparte para que no desaparezcan
-// silenciosamente.
+// Equipos de la copa que no entran en el cuadro (pool que no es potencia
+// de 2): se listan aparte para que no desaparezcan.
 function EquiposFueraDeCuadro({ teams, accentColor }) {
-  if (!teams.length) return null;
+  if (!teams?.length) return null;
   return (
-    <div style={{ marginTop: 16, fontFamily: "'Barlow Condensed'", fontSize: 12.5, color: 'var(--gray)' }}>
-      <span style={{ color: accentColor ?? 'var(--gold)', fontWeight: 700 }}>
-        También compiten por esta copa (a la espera de que se defina el cuadro):
-      </span>{' '}
+    <div className="pf-fuera">
+      <span style={{ color: accentColor ?? 'var(--gold)' }}>También compiten por esta copa (a la espera de que se defina el cuadro):</span>{' '}
       {teams.map(t => t.name).join(' · ')}
     </div>
   );
 }
 
-// Slot de una ronda: real si ya hay partido cargado para esa copa+instancia+
-// llave, si no la proyección (semilla o auto-avance con el ganador previo).
-// Un cruce real usa la MISMA tarjeta que "Resultados"/"Fixture" de temporada
-// regular — MatchResultCard si ya se jugó (o está en vivo), FixtureCard si
-// todavía está pendiente — en vez de una versión compacta aparte, para que
-// un partido de playoff se vea (colores, parciales, MVP) y se pueda abrir
-// (stats de partido y jugadoras) exactamente igual que cualquier otro.
-function Slot({ partidosCopa, instancia, llave, accentColor, fallbackA, fallbackB, seedA, seedB, equipos, jugadorasMap, fechas, onAbrirPartido }) {
-  const real = buscarPartidoSlot(partidosCopa, instancia, llave);
-  if (real) {
-    if (real.estado === 'pendiente') {
-      return <FixtureCard partido={real} equiposFem={equipos} fechas={fechas}/>;
-    }
+// ═══════════════════════════════════════════════════════════════════════
+// Vista v3 (pedido de Alvaro): una copa por vez con selector, próximo
+// partido arriba, y todos los cruces con la MISMA tarjeta compacta —
+// antes un partido jugado usaba la tarjeta grande de Resultados y uno sin
+// jugar la chica del cuadro, y el cuadro quedaba desparejo.
+// ═══════════════════════════════════════════════════════════════════════
+
+const DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const INSTANCIA_NOMBRE = { cuartos: 'Cuartos', semifinal: 'Semifinal', final: 'Gran final', tercer_puesto: 'Tercer puesto' };
+const RONDA_NOMBRE = { cuartos: 'Cuartos', semifinal: 'Semifinales', final: 'Final' };
+const RONDA_CORTA = { cuartos: 'Cuartos', semifinal: 'Semis', final: 'Final' };
+
+function diaDe(partido, fechas) {
+  const iso = partido?.fecha_partido ?? (fechas ?? []).find(f => f.id === partido?.fecha_id)?.fecha_dia ?? null;
+  if (!iso) return null;
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return { d, txt: `${DIAS_CORTO[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
+    corto: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` };
+}
+const horaDe = p => (p?.hora_inicio ? String(p.hora_inicio).slice(0, 5) : null);
+
+function Escudo({ team, size = 30 }) {
+  const src = team?.logo || logoDeEquipo(team?.id);
+  if (!team) return <span className="pf-ph" style={{ width: size, height: size }} aria-hidden="true"/>;
+  return (
+    <span className="pf-esc" style={{ width: size, height: size, borderColor: team.color ?? '#5A6B85' }}>
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" onError={e => { e.target.style.visibility = 'hidden'; }}/> : null}
+    </span>
+  );
+}
+
+function FilaEquipo({ team, seed, puntos, estado }) {
+  if (!team) {
     return (
-      <MatchResultCard partido={real} equiposFem={equipos} jugadorasMap={jugadorasMap} fechas={fechas}
-        onClick={() => onAbrirPartido?.(real.id)}/>
+      <div className="pf-t pf-t--tbd">
+        <Escudo team={null}/>
+        <span className="pf-n">Por definir</span>
+        <span/>
+        <span className="pf-p"/>
+      </div>
     );
   }
-  return <BracketMatch teamA={fallbackA} teamB={fallbackB} seedA={seedA} seedB={seedB}
-    variante={instancia === 'final' ? 'final' : null}/>;
-}
-
-// ── MEJORA (pedido de Alvaro): el campeón es el logro más importante del
-// cuadro y antes era un ícono chico (40-48px) con el nombre en letra
-// chica, exactamente igual de discreto que cualquier otro casillero del
-// bracket — se perdía. Ahora es una tarjeta propia (solo cuando ya hay
-// campeón definido — mientras está "Por definir" se deja igual de
-// discreto que antes, para no decorar de más algo que todavía no pasó):
-// más aire, el logo bien grande con doble anillo dorado + resplandor, una
-// etiqueta "🏆 CAMPEÓN" arriba, el nombre en letra grande y el marcador de
-// la final abajo — de un vistazo se nota cuál es el cajón importante.
-function CampeonBox({ partidoFinal, equipoMap, accentColor, size }) {
-  const ganador = resolveWinner(partidoFinal, equipoMap);
-  const colorCss = accentColor ?? 'var(--gold)';
-  const colorHex = accentColor ?? '#F0B429';
-  const iconSize = size === 8 ? 92 : size === 4 ? 80 : 68;
-  // Queda centrado a la altura de la Final por el layout de columnas
-  // (ver Ronda), sin corrimientos a mano.
-
-  const pl = partidoFinal?.puntos_local ?? 0;
-  const pv = partidoFinal?.puntos_visit ?? 0;
-  const marcador = ganador && partidoFinal ? `${Math.max(pl, pv)} - ${Math.min(pl, pv)}` : null;
-
-  const contenido = (
-    <div style={{ textAlign: 'center' }}>
-      {ganador && (
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px',
-          borderRadius: 100, border: `1px solid ${hexA(colorHex, '55')}`, background: hexA(colorHex, '1a'),
-          fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 11,
-          letterSpacing: 2, textTransform: 'uppercase', color: colorCss, marginBottom: 16,
-        }}>
-          🏆 Campeón
-        </div>
-      )}
-      {ganador?.logo ? (
-        <img src={ganador.logo} alt="" decoding="async"
-          style={{ width: iconSize, height: iconSize, borderRadius: '50%', objectFit: 'cover',
-            border: `3px solid ${colorCss}`,
-            boxShadow: `0 0 26px ${hexA(colorHex, '80')}, 0 0 0 6px ${hexA(colorHex, '14')}` }}
-          onError={e => { e.target.style.display = 'none'; }}/>
-      ) : (
-        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={colorCss} opacity={ganador ? 1 : .3}>
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>
-      )}
-      <div style={{
-        fontFamily: "'Bebas Neue'", fontSize: size === 8 ? 27 : 20, letterSpacing: 2,
-        marginTop: 14, color: colorCss, opacity: ganador ? 1 : .4, lineHeight: 1.05,
-      }}>
-        {ganador ? ganador.name : 'Por definir'}
-      </div>
-      {marcador && (
-        <div style={{
-          marginTop: 6, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
-          fontSize: 13, letterSpacing: 1, color: '#8899BB',
-        }}>
-          {marcador} en la Final
-        </div>
-      )}
+  return (
+    <div className={`pf-t${estado ? ` pf-t--${estado}` : ''}`}>
+      <Escudo team={team}/>
+      <span className="pf-n">{team.name}</span>
+      {seed ? <span className="pf-sd">{seed}</span> : <span/>}
+      <span className="pf-p">{puntos ?? ''}</span>
     </div>
   );
+}
+
+// Tarjeta compacta de un cruce: real (partido cargado) o proyectado.
+function Cruce({ partido, teamA, teamB, seedMap, titulo, esFinal, esProximo, equipoMap, jugadorasMap, fechas, onAbrirPartido }) {
+  const real = !!partido;
+  const a = real ? (equipoMap[partido.equipo_local_id] ?? teamA) : teamA;
+  const b = real ? (equipoMap[partido.equipo_visit_id] ?? teamB) : teamB;
+  const jugado = real && partido.estado === 'finalizado';
+  const enVivo = real && partido.estado === 'en_juego';
+  const conPuntos = jugado || enVivo;
+  const pa = conPuntos ? (partido.puntos_local ?? 0) : null;
+  const pb = conPuntos ? (partido.puntos_visit ?? 0) : null;
+  let ea = null, eb = null;
+  if (jugado && pa !== pb) { ea = pa > pb ? 'win' : 'lose'; eb = pa > pb ? 'lose' : 'win'; }
+
+  const dia = real ? diaDe(partido, fechas) : null;
+  const hora = real ? horaDe(partido) : null;
+  let st;
+  if (jugado) st = { c: 'fin', t: 'Final' };
+  else if (enVivo) st = { c: 'vivo', t: '● En vivo' };
+  else if (real && (dia || hora)) st = { c: 'prox', t: [dia?.txt, hora].filter(Boolean).join(' · ') };
+  else if (real) st = { c: 'td', t: 'Sin fecha' };
+  else st = { c: 'td', t: 'A definir' };
+
+  const cabecera = jugado && dia ? `${titulo} · ${dia.corto}` : titulo;
+  const mvpId = partido?.mvp_jugadora_id ?? partido?.mvp_jugador_id;
+  const mvp = mvpId ? jugadorasMap[mvpId] : null;
+  const abrir = real ? () => onAbrirPartido?.(partido.id) : null;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      {ganador ? (
-        <div style={{
-          position: 'relative', padding: '26px 24px 22px', borderRadius: 20,
-          border: `1px solid ${hexA(colorHex, '4d')}`,
-          background: `radial-gradient(ellipse 170px 130px at 50% 0%, ${hexA(colorHex, '26')}, transparent 70%), rgba(8,16,26,.5)`,
-          boxShadow: `0 0 36px ${hexA(colorHex, '20')}`,
-        }}>
-          {contenido}
+    <div
+      className={`pf-m${esFinal ? ' pf-m--final' : ''}${esProximo ? ' pf-m--prox' : ''}${abrir ? ' pf-m--click' : ''}`}
+      role={abrir ? 'button' : undefined}
+      tabIndex={abrir ? 0 : undefined}
+      onClick={abrir ?? undefined}
+      onKeyDown={abrir ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); } }) : undefined}
+    >
+      <div className="pf-h">
+        <span>{esFinal ? '🏆 ' : ''}{cabecera}</span>
+        <span className={`pf-st pf-st--${st.c}`}>{st.t}</span>
+      </div>
+      <FilaEquipo team={a} seed={a ? seedMap[a.id] : null} puntos={pa} estado={ea}/>
+      <FilaEquipo team={b} seed={b ? seedMap[b.id] : null} puntos={pb} estado={eb}/>
+      {real && (
+        <div className="pf-f">
+          {jugado || enVivo
+            ? <span>{mvp ? <>MVP <b>{mvp.nombre}</b></> : ''}</span>
+            : <span>📍 {partido.lugar || 'A confirmar'}</span>}
+          <span className="pf-ver">{jugado ? 'Ver partido →' : 'Detalle →'}</span>
         </div>
-      ) : contenido}
+      )}
     </div>
   );
 }
 
-function BracketProyectado({ pool, accentColor, partidosCopa, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido, posGeneral }) {
+// Arma la estructura de una copa: rondas con sus cruces (reales o
+// proyectados), estado de cada ronda, equipos que siguen en carrera y campeón.
+function armarCopa(cup, pool, partidosCopa, equipoMap) {
   const size = bracketSizeFor(pool.length);
-  if (size === 0) return <BracketVacio accentColor={accentColor} />;
+  if (size === 0) return { size, rondas: [], vivos: [], campeon: null, partidoFinal: null, sobrantes: [], seedMap: {} };
+  const r1 = primeraRonda(pool, size);
+  const seedMap = {};
+  r1.pares.forEach(([a, b], i) => {
+    if (a) seedMap[a.id] = r1.seeds[i][0];
+    if (b) seedMap[b.id] = r1.seeds[i][1];
+  });
 
-  // Cruces de la primera ronda (con zonas: 1°A vs 4°B, 2°B vs 3°A, etc. —
-  // ver primeraRonda) — mismo armado que usa el panel para generarlos.
-  const ronda1 = primeraRonda(pool, size);
-  const sobrantes = ronda1.sobrantes;
-  const slotProps = { equipos, jugadorasMap, fechas, onAbrirPartido, accentColor };
+  const slot = (instancia, llave, fa = null, fb = null) => ({
+    instancia, llave, partido: buscarPartidoSlot(partidosCopa, instancia, llave), fa, fb,
+  });
+  const ganadorDe = (instancia, llave) => resolveWinner(buscarPartidoSlot(partidosCopa, instancia, llave), equipoMap);
 
+  const rondas = [];
   if (size === 8) {
-    const pairs = ronda1.pares;
-    // Semis: no se proyectan. Los cruces los arma la organización y, hasta
-    // que se carguen (con copa + instancia + llave), el casillero queda
-    // "Por definir".
-    const ganadoresSemis = [1, 2].map(ll =>
-      resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', ll), equipoMap)
-    );
-    const partidoFinal = buscarPartidoSlot(partidosCopa, 'final', 1);
-
-    return (
-      <>
-      <BracketWrap accentColor={accentColor}>
-        <Ronda tipo="cuartos" titulo="Cuartos">
-          {pairs.map(([a, b], i) => (
-            <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="cuartos" llave={i + 1}
-              fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
-          ))}
-        </Ronda>
-        <Ronda tipo="semis" titulo="Semifinal" nota={<NotaSemisOrganizacion/>}>
-          {[1, 2].map(ll => (
-            <Slot key={ll} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={ll}
-              fallbackA={null} fallbackB={null}/>
-          ))}
-        </Ronda>
-        <Ronda tipo="final" titulo="Final">
-          <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-            fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
-        </Ronda>
-        <Ronda tipo="campeon" titulo="Campeón">
-          <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={8}/>
-        </Ronda>
-      </BracketWrap>
-      <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
-      </>
-    );
+    rondas.push({ key: 'cuartos', slots: r1.pares.map(([a, b], i) => slot('cuartos', i + 1, a, b)) });
+    rondas.push({ key: 'semifinal', nota: 'Cruces a definir por la organización', slots: [slot('semifinal', 1), slot('semifinal', 2)] });
+    rondas.push({ key: 'final', slots: [slot('final', 1, ganadorDe('semifinal', 1), ganadorDe('semifinal', 2))] });
+  } else if (size === 4) {
+    rondas.push({ key: 'semifinal', slots: r1.pares.map(([a, b], i) => slot('semifinal', i + 1, a, b)) });
+    rondas.push({ key: 'final', slots: [slot('final', 1, ganadorDe('semifinal', 1), ganadorDe('semifinal', 2))] });
+  } else {
+    const [a, b] = r1.pares[0] ?? [];
+    rondas.push({ key: 'final', slots: [slot('final', 1, a, b)] });
   }
-
-  if (size === 4) {
-    const pairs = ronda1.pares;
-    const ganadoresSemis = pairs.map((_, i) =>
-      resolveWinner(buscarPartidoSlot(partidosCopa, 'semifinal', i + 1), equipoMap)
-    );
-    const partidoFinal = buscarPartidoSlot(partidosCopa, 'final', 1);
-
-    return (
-      <>
-      <BracketWrap accentColor={accentColor}>
-        <Ronda tipo="semis" titulo="Semifinal">
-          {pairs.map(([a, b], i) => (
-            <Slot key={i} {...slotProps} partidosCopa={partidosCopa} instancia="semifinal" llave={i + 1}
-              fallbackA={a} fallbackB={b} seedA={ronda1.seeds[i][0]} seedB={ronda1.seeds[i][1]}/>
-          ))}
-        </Ronda>
-        <Ronda tipo="final" titulo="Final">
-          <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-            fallbackA={ganadoresSemis[0]} fallbackB={ganadoresSemis[1]}/>
-        </Ronda>
-        <Ronda tipo="campeon" titulo="Campeón">
-          <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={4}/>
-        </Ronda>
-      </BracketWrap>
-      <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
-      </>
-    );
+  for (const r of rondas) {
+    r.jugados = r.slots.filter(s => s.partido?.estado === 'finalizado').length;
+    r.total = r.slots.length;
+    r.completa = r.jugados === r.total;
   }
+  const actual = rondas.find(r => !r.completa) ?? rondas[rondas.length - 1];
+  for (const r of rondas) r.estado = r.completa ? 'ok' : (r === actual ? 'now' : 'next');
 
-  // size === 2 — solo alcanza para una final directa
   const partidoFinal = buscarPartidoSlot(partidosCopa, 'final', 1);
+  const campeon = resolveWinner(partidoFinal, equipoMap);
+  // Siguen en carrera: los del cuadro que todavía no perdieron un cruce.
+  const enCuadro = r1.pares.flat().filter(Boolean);
+  const perdedores = new Set();
+  for (const p of partidosCopa) {
+    if (p.estado !== 'finalizado' || p.instancia === 'tercer_puesto') continue;
+    const g = resolveWinner(p, equipoMap);
+    if (!g) continue;
+    perdedores.add(g.id === p.equipo_local_id ? p.equipo_visit_id : p.equipo_local_id);
+  }
+  const vivos = enCuadro.filter(t => !perdedores.has(t.id));
+
+  return { size, rondas, actual, vivos, campeon, partidoFinal, sobrantes: r1.sobrantes, seedMap };
+}
+
+function CajaCampeon({ cup, info }) {
+  const { campeon, partidoFinal, vivos } = info;
+  if (campeon) {
+    const pl = partidoFinal?.puntos_local ?? 0, pv = partidoFinal?.puntos_visit ?? 0;
+    return (
+      <div className="pf-camp pf-camp--ok">
+        <span className="pf-camp-tag">🏆 Campeón</span>
+        <Escudo team={campeon} size={86}/>
+        <b className="pf-camp-nom">{campeon.name}</b>
+        <span className="pf-camp-sub">{cup.label} 2026 · {Math.max(pl, pv)}-{Math.min(pl, pv)} en la final</span>
+      </div>
+    );
+  }
   return (
-    <>
-    <BracketWrap accentColor={accentColor}>
-      <Ronda tipo="final" titulo="Final">
-        <Slot {...slotProps} partidosCopa={partidosCopa} instancia="final" llave={1}
-          fallbackA={ronda1.pares[0]?.[0]} fallbackB={ronda1.pares[0]?.[1]}
-          seedA={ronda1.seeds[0]?.[0]} seedB={ronda1.seeds[0]?.[1]}/>
-      </Ronda>
-      <Ronda tipo="campeon" titulo="Campeón">
-        <CampeonBox partidoFinal={partidoFinal} equipoMap={equipoMap} accentColor={accentColor} size={2}/>
-      </Ronda>
-    </BracketWrap>
-    <EquiposFueraDeCuadro teams={sobrantes} accentColor={accentColor}/>
-    </>
+    <div className="pf-camp">
+      <div className="pf-camp-cup" aria-hidden="true">🏆</div>
+      <b className="pf-camp-tit">Campeón</b>
+      <span className="pf-camp-sub">{cup.label} 2026</span>
+      {vivos.length > 0 && (
+        <>
+          <div className="pf-camp-vivos">
+            {vivos.map(t => <Escudo key={t.id} team={t} size={34}/>)}
+          </div>
+          <span className="pf-camp-sub pf-camp-q">
+            {vivos.length === 1 ? 'Queda 1 en carrera' : `Quedan ${vivos.length} en carrera`}
+          </span>
+        </>
+      )}
+    </div>
   );
 }
 
-function BracketVacio({ accentColor }) {
+function textoEstadoCopa(info) {
+  if (info.size === 0) return 'Sin equipos';
+  if (info.campeon) return 'Finalizada';
+  const r = info.actual;
+  const nombre = RONDA_NOMBRE[r.key];
+  if (r.jugados === 0) return r.slots.some(s => s.partido) ? `${nombre} programadas` : `${nombre} por jugar`;
+  return `${nombre} en juego`;
+}
+
+function textoTabCopa(info, proximoDeCopa, fechas) {
+  if (info.size === 0) return 'Sin equipos';
+  if (info.campeon) return `Campeón: ${info.campeon.name}`;
+  const corto = RONDA_CORTA[info.actual.key];
+  const dia = proximoDeCopa ? diaDe(proximoDeCopa, fechas) : null;
+  if (dia) return `${corto} · ${dia.txt}`;
+  return info.actual.jugados === 0 ? `${corto} · por jugar` : `${corto} · en juego`;
+}
+
+const HINT = {
+  cuartos: 'Los ganadores pasan a las semifinales',
+  semifinal: 'El ganador de cada semi pasa a la Gran final',
+};
+
+function PanelCopa({ cup, info, partidosCopa, proximoId, equipoMap, jugadorasMap, fechas, onAbrirPartido }) {
+  const [rondaSel, setRondaSel] = useState(null);
+  if (info.size === 0) {
+    return (
+      <div className="pf-panel">
+        <div className="pf-copa"><b>{cup.label}</b><i/></div>
+        <p className="pf-vacio">Todavía no hay equipos para armar este cuadro.</p>
+      </div>
+    );
+  }
+  const sel = rondaSel ?? info.actual.key;
+  const tercer = buscarPartidoSlot(partidosCopa, 'tercer_puesto', 1);
+  const cruceProps = { seedMap: info.seedMap, equipoMap, jugadorasMap, fechas, onAbrirPartido };
+  const titulo = (r, s) => (r.key === 'final' ? 'Gran final' : r.slots.length > 1 ? `${INSTANCIA_NOMBRE[r.key]} ${s.llave}` : INSTANCIA_NOMBRE[r.key]);
+
   return (
-    <BracketWrap accentColor={accentColor}>
-      <Ronda tipo="cuartos" titulo="Cuartos">
-        {[1, 2, 3, 4].map(i => <BracketMatch key={i}/>)}
-      </Ronda>
-      <Ronda tipo="semis" titulo="Semifinal" nota={<NotaSemisOrganizacion/>}>
-        {[1, 2].map(i => <BracketMatch key={i}/>)}
-      </Ronda>
-      <Ronda tipo="final" titulo="Final">
-        <BracketMatch variante="final"/>
-      </Ronda>
-      <Ronda tipo="campeon" titulo="Campeón">
-        <CampeonBox partidoFinal={null} equipoMap={{}} accentColor={accentColor} size={8}/>
-      </Ronda>
-    </BracketWrap>
+    <div className="pf-panel">
+      <div className="pf-copa">
+        <b>{cup.label}</b><i/>
+        <em>{textoEstadoCopa(info)}</em>
+      </div>
+
+      {/* Avance de la copa (en celular sirve además para elegir la ronda) */}
+      <div className="pf-prog" role="tablist">
+        {info.rondas.map(r => (
+          <button key={r.key} type="button" role="tab" aria-selected={sel === r.key}
+            className={`pf-prog-b pf-prog-b--${r.estado}${sel === r.key ? ' is-sel' : ''}`}
+            onClick={() => setRondaSel(r.key)}>
+            <span className="pf-prog-n">{r.estado === 'ok' ? '✓ ' : r.estado === 'now' ? '● ' : ''}{RONDA_NOMBRE[r.key]}</span>
+            <small>{r.key === 'final' && !r.jugados ? '—' : `${r.jugados}/${r.total}`}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className={`pf-br pf-br--${info.rondas.length}`}>
+        {info.rondas.map((r, ri) => (
+          <div key={r.key} className={`pf-col${sel === r.key ? ' is-sel' : ''}${ri === info.rondas.length - 1 ? ' pf-col--ult' : ''}`}>
+            <h4 className="pf-col-h">
+              <span>{RONDA_NOMBRE[r.key] === 'Semifinales' ? 'Semifinal' : RONDA_NOMBRE[r.key]}
+                {r.nota && <span className="pf-nota">{r.nota}</span>}</span>
+              {r.key !== 'final' && <small>{r.jugados}/{r.total}{r.key === 'cuartos' ? ' jugados' : ''}</small>}
+            </h4>
+            <div className="pf-slots">
+              {r.slots.map(s => (
+                <Cruce key={`${s.instancia}-${s.llave}`} {...cruceProps}
+                  partido={s.partido} teamA={s.fa} teamB={s.fb}
+                  titulo={titulo(r, s)} esFinal={r.key === 'final'}
+                  esProximo={!!s.partido && s.partido.id === proximoId}/>
+              ))}
+            </div>
+            {HINT[r.key] && <div className="pf-hint">{HINT[r.key]}</div>}
+            {r.key === 'final' && (
+              <div className="pf-camp-mob"><CajaCampeon cup={cup} info={info}/></div>
+            )}
+          </div>
+        ))}
+        <div className="pf-col pf-col--camp">
+          <h4 className="pf-col-h"><span>&nbsp;</span></h4>
+          <div className="pf-slots"><CajaCampeon cup={cup} info={info}/></div>
+        </div>
+      </div>
+
+      {tercer && (
+        <div className="pf-tercer">
+          <div className="pf-tercer-h">🥉 Tercer puesto</div>
+          <Cruce {...cruceProps} partido={tercer} titulo="Tercer puesto" esProximo={tercer.id === proximoId}/>
+        </div>
+      )}
+      <EquiposFueraDeCuadro teams={info.sobrantes} accentColor={cup.color}/>
+    </div>
   );
 }
 
-// Cruces de "Tercer Puesto" — solo se muestran si ya se cargó ese partido
-// (no se proyecta, porque no hay forma de saber de antemano quién pierde
-// cada semifinal).
-function TercerPuesto({ partido, equipos, jugadorasMap, fechas, onAbrirPartido, accentColor }) {
+function ProximoPlayoff({ partido, equipoMap, fechas, onAbrirPartido }) {
   if (!partido) return null;
+  const a = equipoMap[partido.equipo_local_id], b = equipoMap[partido.equipo_visit_id];
+  const cup = CUPS.find(c => c.key === partido.copa);
+  const dia = diaDe(partido, fechas);
+  const hora = horaDe(partido);
+  const inst = partido.instancia === 'semifinal' || partido.instancia === 'cuartos'
+    ? `${INSTANCIA_NOMBRE[partido.instancia]}${partido.llave ? ` ${partido.llave}` : ''}`
+    : INSTANCIA_NOMBRE[partido.instancia] ?? 'Playoffs';
+  const enVivo = partido.estado === 'en_juego';
   return (
-    <div className="bracket-tercer">
-      <div className="bracket-tercer-label">🥉 Tercer puesto</div>
-      <div className="bracket-tercer-card">
-        {partido.estado === 'pendiente'
-          ? <FixtureCard partido={partido} equiposFem={equipos} fechas={fechas}/>
-          : <MatchResultCard partido={partido} equiposFem={equipos} jugadorasMap={jugadorasMap} fechas={fechas}
-              onClick={() => onAbrirPartido?.(partido.id)}/>}
-      </div>
-    </div>
-  );
-}
-
-function CupBracket({ cup, pool, partidosPlayoff, equipoMap, equipos, jugadorasMap, fechas, onAbrirPartido, posGeneral }) {
-  const partidosCopa = useMemo(
-    () => partidosPlayoff.filter(p => p.copa === cup.key),
-    [partidosPlayoff, cup.key]
-  );
-  const tercerPuesto = buscarPartidoSlot(partidosCopa, 'tercer_puesto', 1);
-
-  return (
-    <div className="cup-bracket" style={{ '--cup': cup.color, '--cup-a15': hexA(cup.color, '26') }}>
-      <div className="cup-bracket-titulo">
-        <span className="cup-bracket-marca" aria-hidden="true"/>
-        {cup.label}
-      </div>
-      <BracketProyectado pool={pool} accentColor={cup.color} partidosCopa={partidosCopa} equipoMap={equipoMap}
-        equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={onAbrirPartido}
-        posGeneral={posGeneral}/>
-      <TercerPuesto partido={tercerPuesto} equipos={equipos} jugadorasMap={jugadorasMap} fechas={fechas}
-        onAbrirPartido={onAbrirPartido} accentColor={cup.color}/>
-    </div>
+    <button type="button" className={`pf-next${enVivo ? ' pf-next--vivo' : ''}`} onClick={() => onAbrirPartido?.(partido.id)}>
+      <span className="pf-next-lb">{enVivo ? '● En vivo' : 'Próximo partido'}
+        <b style={{ color: cup?.color }}>{cup ? cup.label.replace('Copa de ', '') : ''} · {inst}</b></span>
+      <span className="pf-next-vs">
+        <Escudo team={a} size={40}/>
+        <span className="pf-next-n">{a?.name ?? 'Por definir'}</span>
+        <i>VS</i>
+        <span className="pf-next-n">{b?.name ?? 'Por definir'}</span>
+        <Escudo team={b} size={40}/>
+      </span>
+      <span className="pf-next-h">
+        <b>{enVivo ? `${partido.puntos_local ?? 0} - ${partido.puntos_visit ?? 0}` : [dia?.txt, hora].filter(Boolean).join(' · ') || 'A confirmar'}</b>
+        <small>📍 {partido.lugar || 'A confirmar'}</small>
+      </span>
+    </button>
   );
 }
 
 export function PlayoffsBracket() {
   const { mode } = useTournament();
   const { equipos, partidos, fechas } = useStats();
-  // Click en un resultado o próximo cruce de playoff abre el mismo Game
-  // Center (marcador, parciales, box score por jugadora/jugador) que se abre
-  // desde "Resultados" — mismo patrón que ya usa TorneoView.jsx.
+  // Click en un cruce abre el mismo Game Center que "Resultados".
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [copaSel, setCopaSel] = useState(null);
 
-  // Mismo criterio de "juega esta temporada" que TorneoView.jsx/Hero.jsx/
-  // SeasonKpis.jsx: `zona` (A/B) es un dato GLOBAL en la base, no algo fijado
-  // por temporada — sin este filtro, el cuadro de playoffs de una temporada
-  // archivada terminaba armándose con equipos de la temporada actual (o al
-  // revés), dando cruces y campeón mal armados (reporte de Alvaro sobre el
-  // cuadro de Copa de Bronce). Se usa la participación real (pj/historial
-  // dentro de ESA temporada) y la zona solo entra como fallback cuando la
-  // temporada mirada es la ACTIVA ahora mismo.
+  // Mismo criterio de "juega esta temporada" que TorneoView/Hero (ver
+  // useEquiposDeTemporada): la zona es un dato global, así que en una
+  // temporada archivada se arma sin zonas (tabla general en tercios).
   const { equiposDeTemporada, activaCategoria } = useEquiposDeTemporada(equipos, mode);
-
-  // `zona` (A/B) es un valor GLOBAL/actual, no algo guardado por temporada —
-  // para la temporada ACTIVA coincide con la realidad, pero para una
-  // temporada archivada ya no significa nada (esos equipos pueden tener hoy
-  // la zona de la temporada nueva, o ninguna). Por eso acá se le "saca" la
-  // zona a los equipos antes de armar los pools cuando se está mirando una
-  // temporada archivada — buildPools() cae solo en su modo sin zonas (tabla
-  // general dividida en tercios), que es el método que ya se usaba antes de
-  // que existieran las zonas, y que no depende de ningún dato mutable de hoy.
   const equiposParaPools = useMemo(
     () => activaCategoria ? equiposDeTemporada : equiposDeTemporada.map(t => ({ ...t, zona: null })),
     [equiposDeTemporada, activaCategoria]
   );
-
   const pools = useMemo(() => buildPools(equiposParaPools, mode), [equiposParaPools, mode]);
-  // Puesto de cada equipo en la tabla general (las dos zonas juntas) — es el
-  // que define los cruces de semifinal.
-  const posGeneral = useMemo(
-    () => Object.fromEntries(sortByStandings(equiposParaPools).map((t, i) => [t.id, i + 1])),
-    [equiposParaPools]
-  );
   const equipoMap = useMemo(() => Object.fromEntries(equiposDeTemporada.map(t => [t.id, t])), [equiposDeTemporada]);
   const jugadorasMap = useMemo(() => buildJugadorasMap(equiposDeTemporada), [equiposDeTemporada]);
-  // Solo partidos de playoff (cargados desde el admin con "¿Es Playoff?"
-  // tildado) — el resto de partidos de temporada regular no entra acá.
   const partidosPlayoff = useMemo(() => (partidos ?? []).filter(p => p.es_playoff), [partidos]);
+
+  const copas = useMemo(() => CUPS.map(cup => {
+    const partidosCopa = partidosPlayoff.filter(p => p.copa === cup.key);
+    return { cup, partidosCopa, info: armarCopa(cup, pools[cup.key] ?? [], partidosCopa, equipoMap) };
+  }), [pools, partidosPlayoff, equipoMap]);
+
+  // Próximo partido de playoffs: uno en vivo, o el pendiente más cercano.
+  const ordenProx = p => {
+    const iso = p.fecha_partido ?? (fechas ?? []).find(f => f.id === p.fecha_id)?.fecha_dia ?? '9999-12-31';
+    return `${String(iso).slice(0, 10)} ${horaDe(p) ?? '99:99'}`;
+  };
+  const proximo = useMemo(() => {
+    const vivo = partidosPlayoff.find(p => p.estado === 'en_juego');
+    if (vivo) return vivo;
+    return [...partidosPlayoff].filter(p => p.estado === 'pendiente')
+      .sort((a, b) => ordenProx(a).localeCompare(ordenProx(b)))[0] ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partidosPlayoff, fechas]);
+  const proximoPorCopa = useMemo(() => Object.fromEntries(CUPS.map(c => [c.key,
+    [...partidosPlayoff].filter(p => p.copa === c.key && (p.estado === 'pendiente' || p.estado === 'en_juego'))
+      .sort((a, b) => ordenProx(a).localeCompare(ordenProx(b)))[0] ?? null])),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [partidosPlayoff, fechas]);
+
+  // Copa que se abre al entrar: la del próximo partido; si no, la primera
+  // que todavía no terminó; si no, Oro.
+  const copaInicial = proximo?.copa
+    ?? copas.find(c => c.info.size > 0 && !c.info.campeon)?.cup.key
+    ?? 'oro';
+  const actual = copas.find(c => c.cup.key === (copaSel ?? copaInicial)) ?? copas[0];
 
   return (
     <>
@@ -589,15 +546,38 @@ export function PlayoffsBracket() {
         partidoId={selectedMatch}
         mode={mode}
       />
-      <section className="page-section" id="bracket">
-        <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Postemporada</p>
-        <h2 className="section-heading" style={{ marginBottom: 28 }}>Playoffs <span className="gold">2026</span></h2>
+      <section className="page-section pf" id="bracket">
+        <div className="pf-top">
+          <div>
+            <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Postemporada</p>
+            <h2 className="section-heading" style={{ marginBottom: 0 }}>Playoffs <span className="gold">2026</span></h2>
+          </div>
+          <ProximoPlayoff partido={proximo} equipoMap={equipoMap} fechas={fechas} onAbrirPartido={setSelectedMatch}/>
+        </div>
 
-        {CUPS.map(cup => (
-          <CupBracket key={cup.key} cup={cup} pool={pools[cup.key]} partidosPlayoff={partidosPlayoff} equipoMap={equipoMap}
-            equipos={equiposDeTemporada} jugadorasMap={jugadorasMap} fechas={fechas} onAbrirPartido={setSelectedMatch}
-            posGeneral={posGeneral}/>
-        ))}
+        <div className="pf-cups" role="tablist">
+          {copas.map(({ cup, info }) => (
+            <button key={cup.key} type="button" role="tab" aria-selected={actual.cup.key === cup.key}
+              className={`pf-cup${actual.cup.key === cup.key ? ' is-on' : ''}`}
+              style={{ '--k': cup.color }}
+              onClick={() => setCopaSel(cup.key)}>
+              <span className="pf-cup-ic" aria-hidden="true">{cup.key === 'oro' ? '🥇' : cup.key === 'plata' ? '🥈' : '🥉'}</span>
+              <span className="pf-cup-tx">
+                <b><span className="pf-cup-pre">Copa de </span>{cup.label.replace('Copa de ', '')}</b>
+                <small>{textoTabCopa(info, proximoPorCopa[cup.key], fechas)}</small>
+              </span>
+              <span className="pf-cup-dots" aria-hidden="true">
+                {info.rondas.map(r => <i key={r.key} className={r.estado}/>)}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ '--c': actual.cup.color }}>
+          <PanelCopa key={actual.cup.key} cup={actual.cup} info={actual.info} partidosCopa={actual.partidosCopa}
+            proximoId={proximo?.id} equipoMap={equipoMap} jugadorasMap={jugadorasMap} fechas={fechas}
+            onAbrirPartido={setSelectedMatch}/>
+        </div>
       </section>
     </>
   );

@@ -237,6 +237,9 @@ async function fetchTodo(temporadaId) {
         if (!proximosMap[myId]) proximosMap[myId] = [];
         proximosMap[myId].push({
           rival:     equipoMap[rivalId]?.name ?? rivalId,
+          rivalId,
+          // Día del partido (o, si no tiene, el de la fecha) para la tarjeta.
+          dia:       p.fecha_partido ?? fecha?.fecha_dia ?? null,
           fechaNum:  fecha?.numero,
           fechaDesc: fecha?.descripcion,
           lugar:     p.lugar,

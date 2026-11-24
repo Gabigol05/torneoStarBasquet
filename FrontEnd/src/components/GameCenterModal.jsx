@@ -67,66 +67,127 @@ function EvolucionMarcador({ partido, eqL, eqV }) {
   const qs = ['q1', 'q2', 'q3', 'q4'].map(q => [partido[`${q}_local`] ?? 0, partido[`${q}_visit`] ?? 0]);
   if ((partido.ot_local ?? 0) > 0 || (partido.ot_visit ?? 0) > 0) qs.push([partido.ot_local ?? 0, partido.ot_visit ?? 0]);
   if (qs.every(([a, b]) => !a && !b)) return null;
-  const etiquetas = ['Inicio', 'Q1', 'Q2', 'Q3', 'Q4', 'OT'].slice(0, qs.length + 1);
+  const etiquetas = ['', 'Q1', 'Q2', 'Q3', 'Q4', 'OT'].slice(0, qs.length + 1);
   const acum = [[0, 0]];
   qs.forEach(([a, b]) => { const [x, y] = acum[acum.length - 1]; acum.push([x + a, y + b]); });
   let maxL = 0, maxV = 0;
   acum.forEach(([a, b]) => { maxL = Math.max(maxL, a - b); maxV = Math.max(maxV, b - a); });
   const dif = qs.map(([a, b]) => Math.abs(a - b));
   const iClave = dif.indexOf(Math.max(...dif));
-  const W = 420, H = 196, l = 30, r = 14, t = 18, base = 164;
-  const tope = Math.max(...acum.flat(), 10) * 1.1;
+  const [qa, qb] = qs[iClave];
+
+  const W = 440, H = 232, l = 14, r = 54, t = 20, base = 176;
+  const tope = Math.max(...acum.flat(), 10) * 1.08;
   const X = i => l + (i * (W - l - r)) / qs.length;
   const Y = v => base - (v / tope) * (base - t);
-  const linea = k => acum.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p[k]).toFixed(1)}`).join(' ');
-  const paso = tope > 60 ? 20 : 10;
-  const ticks = []; for (let v = 0; v <= tope; v += paso) ticks.push(v);
+  const P = (i, k) => [X(i), Y(acum[i][k])];
+  const uid = `${partido.id ?? 'p'}`;
+
+  // Franja entre las dos líneas, pintada con el color del que va ganando
+  // (si en un cuarto se dan vuelta, el tramo se corta en el cruce).
+  const franjas = [];
+  for (let i = 0; i < qs.length; i++) {
+    const d0 = acum[i][0] - acum[i][1], d1 = acum[i + 1][0] - acum[i + 1][1];
+    const tramo = (u0, u1) => {
+      const lerp = (a, b, u) => a + (b - a) * u;
+      const pt = (k, u) => [lerp(X(i), X(i + 1), u), Y(lerp(acum[i][k], acum[i + 1][k], u))];
+      const [a0, a1, b0, b1] = [pt(0, u0), pt(0, u1), pt(1, u0), pt(1, u1)];
+      const dm = lerp(d0, d1, (u0 + u1) / 2);
+      if (Math.abs(dm) < 0.01) return null;
+      return <polygon key={`${i}-${u0}`} points={`${a0} ${a1} ${b1} ${b0}`} fill={dm > 0 ? cL : cV} opacity=".22"/>;
+    };
+    if (d0 * d1 < 0) { const u = d0 / (d0 - d1); franjas.push(tramo(0, u), tramo(u, 1)); }
+    else franjas.push(tramo(0, 1));
+  }
+  const linea = k => acum.map((_, i) => `${i ? 'L' : 'M'}${P(i, k)[0].toFixed(1)},${P(i, k)[1].toFixed(1)}`).join(' ');
+  const area = k => `${linea(k)} L${X(qs.length)},${base} L${X(0)},${base} Z`;
   const fin = acum[acum.length - 1];
+  const ganaL = fin[0] >= fin[1];
+  // Etiquetas finales a la derecha, separadas si quedan pegadas.
+  let yL = Y(fin[0]), yV = Y(fin[1]);
+  if (Math.abs(yL - yV) < 22) { const m = (yL + yV) / 2; if (yL <= yV) { yL = m - 11; yV = m + 11; } else { yL = m + 11; yV = m - 11; } }
+
   return (
-    <div className="rsm-card">
-      <LeyendaEquipos eqL={eqL} eqV={eqV}/>
+    <div className="rsm-card rsm-evo">
       <svg viewBox={`0 0 ${W} ${H}`} className="rsm-svg" role="img" aria-label="Evolución del marcador por cuarto">
-        {ticks.map(v => (
-          <g key={v}>
-            <line x1={l} x2={W - r} y1={Y(v)} y2={Y(v)} stroke="rgba(255,255,255,.06)"/>
-            <text x={l - 8} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="#5C6880" fontFamily="'Barlow Condensed',sans-serif">{v}</text>
+        <defs>
+          <linearGradient id={`gL${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={cL} stopOpacity=".28"/><stop offset="1" stopColor={cL} stopOpacity="0"/></linearGradient>
+          <linearGradient id={`gV${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={cV} stopOpacity=".28"/><stop offset="1" stopColor={cV} stopOpacity="0"/></linearGradient>
+          <filter id={`gl${uid}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+        </defs>
+        {/* fondo de cada cuarto, alternado */}
+        {qs.map((_, i) => i % 2 === 0 && (
+          <rect key={i} x={X(i)} y={t - 8} width={X(i + 1) - X(i)} height={base - t + 8} fill="rgba(255,255,255,.025)"/>
+        ))}
+        <line x1={X(0)} x2={X(qs.length)} y1={base} y2={base} stroke="rgba(255,255,255,.12)"/>
+        <path d={area(ganaL ? 1 : 0)} fill={`url(#${ganaL ? 'gV' : 'gL'}${uid})`}/>
+        <path d={area(ganaL ? 0 : 1)} fill={`url(#${ganaL ? 'gL' : 'gV'}${uid})`}/>
+        {franjas}
+        {[[0, cL], [1, cV]].map(([k, c]) => (
+          <g key={k}>
+            <path d={linea(k)} fill="none" stroke={c} strokeWidth="6" opacity=".35" filter={`url(#gl${uid})`}/>
+            <path d={linea(k)} fill="none" stroke={c} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+            {acum.map((_, i) => i > 0 && (
+              <circle key={i} cx={P(i, k)[0]} cy={P(i, k)[1]} r={i === qs.length ? 5.5 : 3.5} fill={i === qs.length ? c : '#0F1622'} stroke={c} strokeWidth="2.5"/>
+            ))}
           </g>
         ))}
-        {acum.slice(1, -1).map((_, i) => (
-          <line key={i} x1={X(i + 1)} x2={X(i + 1)} y1={t} y2={base} stroke="rgba(255,255,255,.05)" strokeDasharray="3 4"/>
-        ))}
-        <path d={linea(0)} fill="none" stroke={cL} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
-        <path d={linea(1)} fill="none" stroke={cV} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
-        {acum.map((p, i) => (
-          <g key={i}>
-            <circle cx={X(i)} cy={Y(p[0])} r="4" fill={cL}/>
-            <circle cx={X(i)} cy={Y(p[1])} r="4" fill={cV}/>
-          </g>
-        ))}
-        <text x={X(qs.length) - 6} y={Y(Math.max(...fin)) - 9} textAnchor="end" fontFamily="'Bebas Neue',sans-serif" fontSize="18"
-          fill={fin[0] >= fin[1] ? cL : cV}>{Math.max(...fin)}</text>
-        <text x={X(qs.length) - 6} y={Y(Math.min(...fin)) + 20} textAnchor="end" fontFamily="'Bebas Neue',sans-serif" fontSize="18"
-          fill={fin[0] >= fin[1] ? cV : cL}>{Math.min(...fin)}</text>
-        {etiquetas.map((e, i) => (
-          <text key={e} x={X(i)} y={H - 8} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#6B7A99"
-            fontFamily="'Barlow Condensed',sans-serif">{e.toUpperCase()}</text>
-        ))}
+        {/* marcador final */}
+        <g fontFamily="'Bebas Neue',sans-serif">
+          <rect x={X(qs.length) + 10} y={yL - 12} width="38" height="24" rx="7" fill={cL} opacity={ganaL ? 1 : .55}/>
+          <text x={X(qs.length) + 29} y={yL + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[0]}</text>
+          <rect x={X(qs.length) + 10} y={yV - 12} width="38" height="24" rx="7" fill={cV} opacity={!ganaL ? 1 : .55}/>
+          <text x={X(qs.length) + 29} y={yV + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[1]}</text>
+        </g>
+        {/* parcial de cada cuarto, con el color del que lo ganó */}
+        {qs.map(([a, b], i) => {
+          const cx = (X(i) + X(i + 1)) / 2;
+          const c = a > b ? cL : b > a ? cV : '#8A96AD';
+          return (
+            <g key={i} fontFamily="'Barlow Condensed',sans-serif" fontWeight="700" textAnchor="middle">
+              <text x={cx} y={base + 20} fontSize="11" fill="#6B7A99" letterSpacing="1">{etiquetas[i + 1]}</text>
+              <text x={cx} y={base + 40} fontSize="15" fill={c}>{a}-{b}</text>
+            </g>
+          );
+        })}
       </svg>
       <div className="rsm-chips">
-        <div className="rsm-chip"><b style={{ color: cL }}>{maxL > 0 ? `+${maxL}` : '—'}</b><small>Máx. ventaja {eqL?.name}</small></div>
-        <div className="rsm-chip"><b style={{ color: cV }}>{maxV > 0 ? `+${maxV}` : '—'}</b><small>Máx. ventaja {eqV?.name}</small></div>
-        <div className="rsm-chip"><b>{etiquetas[iClave + 1]}</b><small>Cuarto clave ({qs[iClave][0]}-{qs[iClave][1]})</small></div>
+        <div className="rsm-chip" style={{ '--c': cL }}>
+          <b style={{ color: maxL > 0 ? cL : '#6B7A99' }}>{maxL > 0 ? `+${maxL}` : '0'}</b>
+          <small>Mayor ventaja</small><em style={{ color: cL }}>{eqL?.name}</em>
+        </div>
+        <div className="rsm-chip" style={{ '--c': cV }}>
+          <b style={{ color: maxV > 0 ? cV : '#6B7A99' }}>{maxV > 0 ? `+${maxV}` : '0'}</b>
+          <small>Mayor ventaja</small><em style={{ color: cV }}>{eqV?.name}</em>
+        </div>
+        <div className="rsm-chip" style={{ '--c': qa > qb ? cL : qb > qa ? cV : '#8A96AD' }}>
+          <b>{etiquetas[iClave + 1]}</b>
+          <small>Cuarto clave</small><em style={{ color: qa > qb ? cL : qb > qa ? cV : '#8A96AD' }}>{qa}-{qb}</em>
+        </div>
       </div>
     </div>
   );
 }
 
+// Celda del mapa de tiros: fondo más intenso cuanto mejor el %, y un
+// puntito por cada tiro intentado (lleno = convertido).
 function CeldaCalor({ color, pct, conv, int, gana }) {
-  const alpha = Math.round(25 + (Math.min(pct, 60) / 60) * 200).toString(16).padStart(2, '0');
+  const alpha = Math.round(30 + (Math.min(pct, 60) / 60) * 190).toString(16).padStart(2, '0');
+  const max = 30;
+  const escala = int > max ? max / int : 1;
+  const llenos = Math.round(conv * escala), total = Math.round(int * escala);
   return (
-    <div className={`rsm-cell${gana ? ' is-gana' : ''}`} style={{ background: hexA(color, alpha) }}>
-      <b>{pct}%</b>
-      {int > 0 && <small>{conv} de {int}</small>}
+    <div className={`rsm-cell${gana ? ' is-gana' : ''}`}
+      style={{ background: `linear-gradient(145deg, ${hexA(color, alpha)}, ${hexA(color, '14')})`, borderColor: gana ? hexA(color, 'aa') : undefined }}>
+      <div className="rsm-cell-top">
+        <b>{pct}<small>%</small></b>
+        {int > 0 && <span>{conv} de {int}</span>}
+      </div>
+      {total > 0 && (
+        <div className="rsm-dots" aria-hidden="true">
+          {Array.from({ length: total }, (_, i) => <i key={i} className={i < llenos ? 'on' : ''}/>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -136,17 +197,32 @@ function MapaCalorTiros({ data }) {
   const cL = eqL?.color ?? '#8899BB', cV = eqV?.color ?? '#F0B429';
   const suma = (rows, k) => (rows ?? []).reduce((a, r) => a + (r[k] ?? 0), 0);
   const tipos = [
-    ['TL', 'sc', 'sf', 'pct_simples'],
-    ['2P', 'dc', 'df', 'pct_dobles'],
-    ['3P', 'tc', 'tf', 'pct_triples'],
-  ].map(([lbl, c, f, pk]) => {
+    ['Libres', 'TL', 1, 'sc', 'sf', 'pct_simples'],
+    ['Dobles', '2P', 2, 'dc', 'df', 'pct_dobles'],
+    ['Triples', '3P', 3, 'tc', 'tf', 'pct_triples'],
+  ].map(([nom, lbl, val, c, f, pk]) => {
     const lado = (rows, pctGuardado) => {
       const conv = suma(rows, c), int = conv + suma(rows, f);
-      return { conv, int, pct: int > 0 ? Math.round((conv / int) * 100) : Math.round(Number(pctGuardado) || 0) };
+      return { conv, int, pts: conv * val, pct: int > 0 ? Math.round((conv / int) * 100) : Math.round(Number(pctGuardado) || 0) };
     };
-    return { lbl, a: lado(statsLocal, partido[`${pk}_local`]), b: lado(statsVisit, partido[`${pk}_visit`]) };
+    return { nom, lbl, val, a: lado(statsLocal, partido[`${pk}_local`]), b: lado(statsVisit, partido[`${pk}_visit`]) };
   });
   if (tipos.every(t => !t.a.pct && !t.b.pct && !t.a.int && !t.b.int)) return null;
+  const hayTiros = tipos.some(t => t.a.int || t.b.int);
+  const ptsL = tipos.reduce((a, t) => a + t.a.pts, 0), ptsV = tipos.reduce((a, t) => a + t.b.pts, 0);
+  const tonos = ['#22D07A', '#F0B429', '#60A5FA'];
+  const Reparto = ({ eq, c, lado, total }) => (
+    <div className="rsm-rep">
+      <div className="rsm-rep-t"><span style={{ color: c }}>{eq?.name}</span><b>{total} pts</b></div>
+      <div className="rsm-rep-bar">
+        {tipos.map((t, i) => t[lado].pts > 0 && (
+          <i key={t.lbl} style={{ flex: t[lado].pts, background: tonos[i] }}>
+            {t[lado].pts / Math.max(total, 1) > .14 && <span>{t[lado].pts}</span>}
+          </i>
+        ))}
+      </div>
+    </div>
+  );
   return (
     <div className="rsm-card">
       <div className="rsm-heat">
@@ -154,12 +230,23 @@ function MapaCalorTiros({ data }) {
         <span className="rsm-heat-h" style={{ color: cL }}>{eqL?.name}</span>
         <span className="rsm-heat-h" style={{ color: cV }}>{eqV?.name}</span>
         {tipos.map(t => [
-          <span key={t.lbl + 'r'} className="rsm-heat-r">{t.lbl}</span>,
+          <span key={t.lbl + 'r'} className="rsm-heat-r"><b>{t.lbl}</b><small>×{t.val}</small></span>,
           <CeldaCalor key={t.lbl + 'a'} color={cL} {...t.a} gana={t.a.pct > t.b.pct}/>,
           <CeldaCalor key={t.lbl + 'b'} color={cV} {...t.b} gana={t.b.pct > t.a.pct}/>,
         ])}
       </div>
-      <div className="rsm-escala">0%<span/>60%+</div>
+      {hayTiros && (ptsL > 0 || ptsV > 0) && (
+        <div className="rsm-reparto">
+          <div className="rsm-reparto-h">
+            <span>De dónde salieron los puntos</span>
+            <span className="rsm-reparto-ley">
+              {tipos.map((t, i) => <span key={t.lbl}><i style={{ background: tonos[i] }}/>{t.lbl}</span>)}
+            </span>
+          </div>
+          <Reparto eq={eqL} c={cL} lado="a" total={ptsL}/>
+          <Reparto eq={eqV} c={cV} lado="b" total={ptsV}/>
+        </div>
+      )}
     </div>
   );
 }
@@ -177,16 +264,14 @@ function CaraACara({ data }) {
     ['Pérdidas', sL('pe'), sV('pe'), true],
     ['Faltas', sL('fp'), sV('fp'), true],
   ];
-  let gL = 0, gV = 0;
   const filas = rubros.map(([lbl, a, b, menos]) => {
     const ganaL = menos ? a < b : a > b, ganaV = menos ? b < a : b > a;
-    if (ganaL) gL++; if (ganaV) gV++;
     const mx = Math.max(a, b, 1);
     return (
       <div key={lbl} className="rsm-mr">
         <span className="rsm-n" style={ganaL ? { color: cL } : undefined}>{a}</span>
         <span className="rsm-b rsm-b--izq"><i style={{ width: `${(a / mx) * 100}%`, background: cL, opacity: ganaL ? 1 : .35 }}/></span>
-        <span className="rsm-l">{lbl}{menos && <small>menos es mejor</small>}</span>
+        <span className="rsm-l">{lbl}</span>
         <span className="rsm-b"><i style={{ width: `${(b / mx) * 100}%`, background: cV, opacity: ganaV ? 1 : .35 }}/></span>
         <span className="rsm-n" style={ganaV ? { color: cV } : undefined}>{b}</span>
       </div>
@@ -195,11 +280,6 @@ function CaraACara({ data }) {
   return (
     <div className="rsm-card">
       <div className="rsm-mar">{filas}</div>
-      <div className="rsm-tot">
-        <span style={{ color: cL }}>{eqL?.name} ganó <b>{gL}</b></span>
-        <span className="rsm-tot-m">rubros</span>
-        <span style={{ color: cV }}>{eqV?.name} ganó <b>{gV}</b></span>
-      </div>
     </div>
   );
 }
@@ -423,54 +503,43 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
                 )}
               </div>
 
-              <div className="gc-score-board">
-                <div className="gc-team">
-                  <img src={data.eqLocal?.logo} alt={data.eqLocal?.name}
-                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8,
-                      border: `2px solid ${data.eqLocal?.color ?? '#8899BB'}`, boxShadow: `0 0 14px ${hexA(data.eqLocal?.color ?? '#8899BB', '59')}` }}
-                    onError={e => { e.target.style.display='none'; }}/>
-                  <div className="gc-team-name" style={{ color: data.eqLocal?.color }}>
-                    {data.eqLocal?.name}
-                  </div>
-                </div>
-                <div className="gc-final-score">
-                  <span style={{ color: data.eqLocal?.color }}>{data.partido.puntos_local}</span>
-                  <span style={{ color:'#4A566E', fontSize:28, margin:'0 8px' }}>-</span>
-                  <span style={{ color: data.eqVisit?.color }}>{data.partido.puntos_visit}</span>
-                </div>
-                <div className="gc-team">
-                  <img src={data.eqVisit?.logo} alt={data.eqVisit?.name}
-                    style={{ width:52, height:52, borderRadius:'50%', objectFit:'cover', marginBottom:8,
-                      border: `2px solid ${data.eqVisit?.color ?? '#8899BB'}`, boxShadow: `0 0 14px ${hexA(data.eqVisit?.color ?? '#8899BB', '59')}` }}
-                    onError={e => { e.target.style.display='none'; }}/>
-                  <div className="gc-team-name" style={{ color: data.eqVisit?.color }}>
-                    {data.eqVisit?.name}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:16, flexWrap:'wrap' }}>
-                {['q1','q2','q3','q4'].map(q => (
-                  <div key={q} style={{ background:'#141C2A', borderRadius:8, padding:'6px 14px', textAlign:'center', minWidth:52 }}>
-                    <div style={{ fontSize:9, color:'#4A566E', letterSpacing:1, fontFamily:"'Barlow Condensed'", textTransform:'uppercase' }}>{q.toUpperCase()}</div>
-                    <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16 }}>
-                      <span style={{ color: data.eqLocal?.color }}>{data.partido[`${q}_local`] ?? 0}</span>
-                      <span style={{ color:'#4A566E', margin:'0 4px' }}>-</span>
-                      <span style={{ color: data.eqVisit?.color }}>{data.partido[`${q}_visit`] ?? 0}</span>
+              {(() => {
+                const p = data.partido, eL = data.eqLocal, eV = data.eqVisit;
+                const cLh = eL?.color ?? '#8899BB', cVh = eV?.color ?? '#8899BB';
+                const gL = (p.puntos_local ?? 0) > (p.puntos_visit ?? 0), gV = (p.puntos_visit ?? 0) > (p.puntos_local ?? 0);
+                const cuartos = ['q1', 'q2', 'q3', 'q4'].map(q => [q.toUpperCase(), p[`${q}_local`] ?? 0, p[`${q}_visit`] ?? 0]);
+                if ((p.ot_local ?? 0) > 0 || (p.ot_visit ?? 0) > 0) cuartos.push(['OT', p.ot_local ?? 0, p.ot_visit ?? 0]);
+                const esc = (eq, c, g) => (
+                  <span className="rx-escudo" style={{ borderColor: c, boxShadow: g ? `0 0 18px ${hexA(c, '80')}` : 'none', opacity: g ? 1 : .7 }}>
+                    {eq?.logo && <img src={eq.logo} alt={eq.name}/>}
+                  </span>
+                );
+                return (
+                  <div className="gc-tv">
+                    <div className="rx-main">
+                      <div className={`rx-lado${gL ? ' is-gano' : ''}`}><span className="rx-nombre">{eL?.name}</span>{esc(eL, cLh, !gV)}</div>
+                      <div className="rx-marcador">
+                        <span className="rx-pts" style={gL ? { color: cLh } : undefined}>{p.puntos_local}</span>
+                        <span className="rx-guion">-</span>
+                        <span className="rx-pts" style={gV ? { color: cVh } : undefined}>{p.puntos_visit}</span>
+                      </div>
+                      <div className={`rx-lado rx-lado--v${gV ? ' is-gano' : ''}`}>{esc(eV, cVh, !gL)}<span className="rx-nombre">{eV?.name}</span></div>
                     </div>
+                    {p.q1_local != null && (
+                      <div className="rx-cuartos">
+                        {cuartos.map(([l, x, y]) => (
+                          <span key={l} className={`rx-q${l === 'OT' ? ' is-ot' : ''}`}>
+                            <small>{l}</small>
+                            <b className={x > y ? '' : 'is-pierde'} style={x > y ? { color: cLh } : undefined}>{x}</b>
+                            <i>-</i>
+                            <b className={y > x ? '' : 'is-pierde'} style={y > x ? { color: cVh } : undefined}>{y}</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-                {(data.partido.ot_local ?? 0) > 0 && (
-                  <div style={{ background:'#141C2A', borderRadius:8, padding:'6px 14px', textAlign:'center', minWidth:52 }}>
-                    <div style={{ fontSize:9, color:'#F0B429', letterSpacing:1, fontFamily:"'Barlow Condensed'" }}>OT</div>
-                    <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:16 }}>
-                      <span style={{ color: data.eqLocal?.color }}>{data.partido.ot_local}</span>
-                      <span style={{ color:'#4A566E', margin:'0 4px' }}>-</span>
-                      <span style={{ color: data.eqVisit?.color }}>{data.partido.ot_visit}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+                );
+              })()}
             </div>
 
             {data.mvpNombre && (
@@ -504,11 +573,11 @@ export function GameCenterModal({ isOpen, onClose, partidoId, mode }) {
 
             {tab === 'resumen' && (
               <div className="rsm">
-                <div className="rsm-h"><h4>Cómo fue el partido</h4><span>marcador por cuarto</span></div>
+                <div className="rsm-h"><h4>Cómo fue el partido</h4></div>
                 <EvolucionMarcador partido={data.partido} eqL={data.eqLocal} eqV={data.eqVisit}/>
-                <div className="rsm-h"><h4>Tiros</h4><span>más color = mejor %</span></div>
+                <div className="rsm-h"><h4>Tiros</h4></div>
                 <MapaCalorTiros data={data}/>
-                <div className="rsm-h"><h4>Cara a cara</h4><span>se resalta quién ganó cada rubro</span></div>
+                <div className="rsm-h"><h4>Cara a cara</h4></div>
                 <CaraACara data={data}/>
               </div>
             )}

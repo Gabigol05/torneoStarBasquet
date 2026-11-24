@@ -7862,3 +7862,54 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
 .rsm-tot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 700; }
 .rsm-tot b { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 24px; }
 .rsm-tot-m { color: #6B7A99; }
+
+/* ── Detalle de partido: encabezado estilo TV y gráfico v2 (23/11) ── */
+.gc-tv { container: rxcard / inline-size; padding: 6px 0 4px; }
+.gc-tv .rx-cuartos { margin-top: 14px; }
+.gc-tv .rx-q { background: rgba(0,0,0,.28); }
+.rsm-evo { padding: 12px 10px 12px; }
+.rsm-chip { position: relative; overflow: hidden; padding: 10px 4px 8px; }
+.rsm-chip::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--c, #6B7A99); opacity: .9; }
+.rsm-chip small { display: block; margin-top: 3px; }
+.rsm-chip em { display: block; margin-top: 2px; font-style: normal; font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) {
+  .rsm-chip small { font-size: 10px; letter-spacing: .3px; }
+  .rsm-chip b { font-size: 21px; }
+}
+
+/* ── Mapa de tiros v2 (23/11) ── */
+.rsm-heat { grid-template-columns: 50px 1fr 1fr; gap: 8px; }
+.rsm-heat-r { flex-direction: column; align-items: flex-start; justify-content: center; line-height: 1; }
+.rsm-heat-r b { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 22px; color: #EEF2F8; }
+.rsm-heat-r small { margin-top: 3px; font-family: 'Barlow Condensed', sans-serif; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; color: #6B7A99; text-transform: uppercase; }
+.rsm-cell { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 10px; text-align: left; border: 1px solid rgba(255,255,255,.07); overflow: hidden; }
+.rsm-cell.is-gana { box-shadow: 0 8px 22px -12px rgba(0,0,0,.6); }
+.rsm-cell.is-gana::after { content: none; }
+.rsm-cell-top { display: flex; flex-direction: column; gap: 2px; }
+.rsm-cell-top b { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 30px; line-height: 1; color: #fff; }
+.rsm-cell-top b small { font-size: 17px; margin-left: 1px; opacity: .8; }
+.rsm-cell-top span { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); }
+.rsm-cell-mejor {
+  position: absolute; top: 0; right: 0; padding: 2px 7px 2px 8px; border-bottom-left-radius: 8px;
+  background: rgba(255,255,255,.92); color: #0B1018;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 9.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+}
+
+.rsm-dots { display: flex; flex-wrap: wrap; gap: 3px; }
+.rsm-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.rsm-dots i.on { background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.55); }
+.rsm-reparto { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; gap: 10px; font-family: 'Barlow Condensed', sans-serif; }
+.rsm-reparto-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #7A879E; }
+.rsm-reparto-ley { display: flex; gap: 10px; }
+.rsm-reparto-ley i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; }
+.rsm-rep-t { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13.5px; font-weight: 700; }
+.rsm-rep-t b { color: #C9D2E3; }
+.rsm-rep-bar { display: flex; gap: 2px; height: 18px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.04); }
+.rsm-rep-bar i { display: flex; align-items: center; justify-content: center; min-width: 4px; font-style: normal; }
+.rsm-rep-bar i span { font-family: 'Bebas Neue', sans-serif; font-size: 14px; color: #0B1018; line-height: 1; }
+@media (max-width: 480px) {
+  .rsm-heat { grid-template-columns: 40px 1fr 1fr; gap: 6px; }
+  .rsm-cell-top b { font-size: 26px; }
+  .rsm-dots i { width: 6px; height: 6px; }
+  .rsm-reparto-h { flex-direction: column; align-items: flex-start; }
+}

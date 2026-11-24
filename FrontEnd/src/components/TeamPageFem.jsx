@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PlayerProfileModal, GameCenterModal } from './LazyModals';
 import { labelFecha, labelPartido, esPartidoPlayoff } from '../lib/fechaLabel';
 import { EscudoJugador } from './EscudoJugador.jsx';
@@ -406,37 +406,47 @@ export function TeamPageFem({ team, onBack, allTeams, isLoadingStats, statsPorPa
                     <div className="tp-empty-sub">Los próximos partidos aparecerán aquí cuando se cargue el fixture</div>
                   </div>
                 ) : (
-                  <div className="tp-matches-list">
+                  <div className="tp-proximos">
                     {team.proximos.map((p, idx) => {
-                      const rivalTeam = allTeams?.find(t => t.name === p.rival);
-                      const cRival    = rivalTeam?.color ?? '#5A6B85';
+                      const rivalTeam = allTeams?.find(t => t.id === p.rivalId) ?? allTeams?.find(t => t.name === p.rival);
+                      const cT = team.color ?? '#8899BB';
+                      const cR = rivalTeam?.color ?? '#5A6B85';
+                      const etiqueta = p.esPlayoff
+                        ? (labelPartido({ es_playoff: true, copa: p.copa, instancia: p.instancia }) ?? 'Playoffs').replace(/^playoffs?\s*·\s*/i, '')
+                        : ((p.fechaNum || p.fechaDesc) ? labelFecha({ numero: p.fechaNum, descripcion: p.fechaDesc }) : 'Próximo');
+                      const d = p.dia ? new Date(p.dia + 'T00:00:00') : null;
+                      const diaTxt = d ? `${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()]} ${p.dia.split('-').reverse().slice(0, 2).join('/')}` : null;
                       return (
-                        <div key={idx} className="tp-match-card upcoming"
-                          style={{ background: `linear-gradient(115deg, ${hexA(team.color, '55')}, #1C2535 45%, ${hexA(cRival, '55')})` }}>
-                          <div className="tp-match-card-inner" style={{ background: `linear-gradient(135deg, ${hexA(team.color, '14')}, #0B111C 45%, ${hexA(cRival, '14')})` }}>
-                          <div className="tp-match-header">
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span className="tp-match-date" style={p.esPlayoff ? { color: '#F0B429' } : {}}>
-                                {p.esPlayoff ? '🏆 ' : ''}
-                                {p.esPlayoff
-                                  ? (labelPartido({ es_playoff:true, copa:p.copa, instancia:p.instancia }) ?? 'Próximo')
-                                  : ((p.fechaNum || p.fechaDesc)
-                                      ? labelFecha({ numero: p.fechaNum, descripcion: p.fechaDesc })
-                                      : 'Próximo')}
+                        <div key={idx} className="rx-card rx-card--fixture"
+                          style={{ backgroundImage: `linear-gradient(100deg, ${hexA(cT, '24')}, transparent 38%, transparent 62%, ${hexA(cR, '24')})` }}>
+                          {team.logo && <img aria-hidden="true" alt="" src={team.logo} className="rx-marca rx-marca--l" loading="lazy"/>}
+                          {rivalTeam?.logo && <img aria-hidden="true" alt="" src={rivalTeam.logo} className="rx-marca rx-marca--v" loading="lazy"/>}
+                          <div className="rx-top">
+                            <span className="rx-badge">
+                              <b style={p.esPlayoff ? { color: '#F0B429' } : undefined}>{p.esPlayoff ? '🏆 ' : ''}{etiqueta}</b>
+                              {diaTxt && ` · ${diaTxt}`}
+                            </span>
+                            <span className="rx-top-der"><span className={`rx-estado ${p.estado === 'en_juego' ? 'is-vivo' : 'is-proximo'}`}>{p.estado === 'en_juego' ? 'En vivo' : 'Próximo'}</span></span>
+                          </div>
+                          <div className="rx-main">
+                            <div className="rx-lado is-gano">
+                              <span className="rx-nombre">{team.name}</span>
+                              <span className="rx-escudo" style={{ borderColor: cT, boxShadow: `0 0 16px ${hexA(cT, '73')}` }}>
+                                {team.logo && <img src={team.logo} alt={team.name} loading="lazy"/>}
                               </span>
-                              {p.hora && (
-                                <span style={{ fontSize: 12, color: '#F0B429', fontFamily: "'Bebas Neue',sans-serif", letterSpacing: .5 }}>
-                                  🕐 {p.hora}
-                                </span>
-                              )}
                             </div>
-                            <span className="tp-match-result upcoming">PRÓXIMO</span>
+                            <div className="rx-hora">
+                              <span className="rx-hora-num">{p.hora ?? 'VS'}</span>
+                              {p.hora && <span className="rx-hora-lbl">hs</span>}
+                            </div>
+                            <div className="rx-lado rx-lado--v is-gano">
+                              <span className="rx-escudo" style={{ borderColor: cR, boxShadow: `0 0 16px ${hexA(cR, '73')}` }}>
+                                {rivalTeam?.logo && <img src={rivalTeam.logo} alt={p.rival} loading="lazy"/>}
+                              </span>
+                              <span className="rx-nombre">{p.rival}</span>
+                            </div>
                           </div>
-                          <div className="tp-match-info">
-                            <span className="tp-match-teams">vs {p.rival}</span>
-                            {p.lugar && <span className="tp-match-lugar">📍 {p.lugar}</span>}
-                          </div>
-                          </div>
+                          {p.lugar && <div className="rx-lugar">📍 {p.lugar}</div>}
                         </div>
                       );
                     })}

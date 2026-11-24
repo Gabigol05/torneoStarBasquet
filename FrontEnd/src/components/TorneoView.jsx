@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
 function Skel({ w = '100%', h = 16, radius = 6, mb = 8, style = {} }) {
   return (
@@ -147,6 +147,197 @@ function PlayoffTag({ partido }) {
   );
 }
 
+// Tarjetas de partido (rediseño 23/11): todo centrado en un eje, marcador
+// "estilo TV" (nombre · escudo · 53 - 45 · escudo · nombre), cuartos en
+// pastillas con el ganador de cada uno en su color, % de tiro en barras
+// enfrentadas y MVP con el escudo de su equipo. Los escudos grandes y
+// transparentes a los costados llenan el ancho en PC. Se adapta por container
+// query (.rx-card), así también se ve bien en columnas angostas (playoffs).
+function EscudoRx({ eq, color, destacado = true }) {
+  return (
+    <span className="rx-escudo" style={{
+      borderColor: color,
+      boxShadow: destacado ? `0 0 16px ${hexA(color,'73')}` : 'none',
+      opacity: destacado ? 1 : .7,
+    }}>
+      <img src={eq.logo} alt={eq.name} loading="lazy" onError={e => { e.target.style.display = 'none'; }}/>
+    </span>
+  );
+}
+
+function MarcasAgua({ localEq, visitEq }) {
+  return (
+    <>
+      <img aria-hidden="true" alt="" src={localEq.logo} className="rx-marca rx-marca--l" loading="lazy"/>
+      <img aria-hidden="true" alt="" src={visitEq.logo} className="rx-marca rx-marca--v" loading="lazy"/>
+    </>
+  );
+}
+
+function BadgePartido({ partido, fecha, defecto }) {
+  const diaCal = partido.fecha_partido ?? fecha?.fecha_dia;
+  return (
+    <span className="rx-badge">
+      {/* En playoffs el label ya dice la copa y la instancia: se saca el
+          "Playoffs ·" del principio para que entre en una línea. */}
+      <b>{(labelPartido(partido, fecha) ?? defecto).replace(/^playoffs?\s*·\s*/i, '')}</b>
+      {diaCal && ` · ${diaCal.split('-').reverse().slice(0,2).join('/')}`}
+      {partido.hora_inicio && ` · ${String(partido.hora_inicio).slice(0, 5)}`}
+    </span>
+  );
+}
+
+export function ResultadoCard({ partido, equiposFem, jugadorasMap, fechas, onClick }) {
+  const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
+  const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
+  const fecha   = fechas.find(f => f.id === partido.fecha_id);
+  const enVivo  = partido.estado === 'en_juego';
+
+  const ptsLocal = partido.puntos_local ??
+    ((partido.q1_local ?? 0) + (partido.q2_local ?? 0) +
+     (partido.q3_local ?? 0) + (partido.q4_local ?? 0) + (partido.ot_local ?? 0));
+  const ptsVisit = partido.puntos_visit ??
+    ((partido.q1_visit ?? 0) + (partido.q2_visit ?? 0) +
+     (partido.q3_visit ?? 0) + (partido.q4_visit ?? 0) + (partido.ot_visit ?? 0));
+  const ganLocal = ptsLocal > ptsVisit;
+  const ganVisit = ptsVisit > ptsLocal;
+
+  if (!localEq || !visitEq) return null;
+
+  // partidos_masculino guarda la columna como "mvp_jugador_id" (sin "a"),
+  // partidos_femenino como "mvp_jugadora_id" — sin este fallback el MVP
+  // nunca se mostraba en los partidos de masculino.
+  const mvpJugId = partido.mvp_jugadora_id ?? partido.mvp_jugador_id;
+  const mvpJug = mvpJugId ? jugadorasMap[mvpJugId] : null;
+  const mvpEq = mvpJug ? equiposFem.find(e => e.name === mvpJug.equipoNombre) : null;
+  const cL = localEq.color ?? '#8899BB', cV = visitEq.color ?? '#8899BB';
+
+  const cuartos = ['q1', 'q2', 'q3', 'q4'].map(q => [q.toUpperCase(), partido[`${q}_local`] ?? 0, partido[`${q}_visit`] ?? 0]);
+  if ((partido.ot_local ?? 0) > 0 || (partido.ot_visit ?? 0) > 0) cuartos.push(['OT', partido.ot_local ?? 0, partido.ot_visit ?? 0]);
+  const pcts = partido.pct_dobles_local != null ? [
+    ['TL', partido.pct_simples_local, partido.pct_simples_visit],
+    ['2P', partido.pct_dobles_local,  partido.pct_dobles_visit],
+    ['3P', partido.pct_triples_local, partido.pct_triples_visit],
+  ].map(([l, x, y]) => [l, Math.round(Number(x) || 0), Math.round(Number(y) || 0)]) : null;
+
+  return (
+    <div className="rx-card" onClick={onClick} style={{
+      cursor: onClick ? 'pointer' : 'default',
+      backgroundImage: `linear-gradient(100deg, ${hexA(cL,'24')}, transparent 38%, transparent 62%, ${hexA(cV,'24')})`,
+    }}>
+      <MarcasAgua localEq={localEq} visitEq={visitEq}/>
+      <div className="rx-top">
+        <BadgePartido partido={partido} fecha={fecha} defecto="Partido"/>
+        <span className="rx-top-der">
+          <span className={`rx-estado${enVivo ? ' is-vivo' : ''}`}>{enVivo ? 'En vivo' : 'Final'}</span>
+        </span>
+      </div>
+
+      <div className="rx-main">
+        <div className={`rx-lado${ganLocal ? ' is-gano' : ''}`}>
+          <span className="rx-nombre">{localEq.name}</span>
+          <EscudoRx eq={localEq} color={cL} destacado={!ganVisit}/>
+        </div>
+        <div className="rx-marcador">
+          <span className="rx-pts" style={ganLocal ? { color: cL } : undefined}>{ptsLocal}</span>
+          <span className="rx-guion">-</span>
+          <span className="rx-pts" style={ganVisit ? { color: cV } : undefined}>{ptsVisit}</span>
+        </div>
+        <div className={`rx-lado rx-lado--v${ganVisit ? ' is-gano' : ''}`}>
+          <EscudoRx eq={visitEq} color={cV} destacado={!ganLocal}/>
+          <span className="rx-nombre">{visitEq.name}</span>
+        </div>
+      </div>
+
+      {partido.q1_local != null && (
+        <div className="rx-cuartos">
+          {cuartos.map(([l, x, y]) => (
+            <span key={l} className={`rx-q${l === 'OT' ? ' is-ot' : ''}`}>
+              <small>{l}</small>
+              <b className={x > y ? '' : 'is-pierde'} style={x > y ? { color: cL } : undefined}>{x}</b>
+              <i>-</i>
+              <b className={y > x ? '' : 'is-pierde'} style={y > x ? { color: cV } : undefined}>{y}</b>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {pcts && (
+        <div className="rx-pcts">
+          {pcts.map(([l, x, y]) => (
+            <div key={l} className="rx-pct">
+              <span className={x >= y ? 'is-mejor' : ''}>{x}%</span>
+              <span className="rx-pct-barras">
+                <i style={{ width: `${Math.min(x, 100)}%`, background: cL }}/>
+                <b>{l}</b>
+                <i style={{ width: `${Math.min(y, 100)}%`, background: cV }}/>
+              </span>
+              <span className={y > x ? 'is-mejor' : ''}>{y}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(mvpJug || onClick) && (
+        <div className="rx-mvp">
+          {mvpJug && (
+            <div className="rx-mvp-centro">
+              <span className="rx-mvp-tag">MVP</span>
+              {mvpEq && (
+                <span className="rx-mvp-escudo" style={{ borderColor: mvpEq.color }}>
+                  <img src={mvpEq.logo} alt="" loading="lazy"/>
+                </span>
+              )}
+              <span className="rx-mvp-nombre">{mvpJug.nombre}</span>
+              <span className="rx-mvp-eq" style={{ color: mvpJug.equipoColor }}>{mvpJug.equipoNombre}</span>
+            </div>
+          )}
+          {onClick && <span className="rx-ver">Ver partido ›</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ProximoCard({ partido, equiposFem, fechas }) {
+  const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
+  const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
+  const fecha   = fechas.find(f => f.id === partido.fecha_id);
+  if (!localEq || !visitEq) return null;
+  const cL = localEq.color ?? '#8899BB', cV = visitEq.color ?? '#8899BB';
+  const hora = partido.hora_inicio ? String(partido.hora_inicio).slice(0, 5) : null;
+  return (
+    <div className="rx-card rx-card--fixture" style={{
+      backgroundImage: `linear-gradient(100deg, ${hexA(cL,'24')}, transparent 38%, transparent 62%, ${hexA(cV,'24')})`,
+    }}>
+      <MarcasAgua localEq={localEq} visitEq={visitEq}/>
+      <div className="rx-top">
+        <BadgePartido partido={{ ...partido, hora_inicio: null }} fecha={fecha} defecto="Próximo"/>
+        <span className="rx-top-der">
+          <span className="rx-estado is-proximo">Próximo</span>
+        </span>
+      </div>
+      <div className="rx-main">
+        <div className="rx-lado is-gano">
+          <span className="rx-nombre">{localEq.name}</span>
+          <EscudoRx eq={localEq} color={cL}/>
+        </div>
+        <div className="rx-hora">
+          <span className="rx-hora-num">{hora ?? 'VS'}</span>
+          {hora && <span className="rx-hora-lbl">hs</span>}
+        </div>
+        <div className="rx-lado rx-lado--v is-gano">
+          <EscudoRx eq={visitEq} color={cV}/>
+          <span className="rx-nombre">{visitEq.name}</span>
+        </div>
+      </div>
+      {partido.lugar && <div className="rx-lugar">📍 {partido.lugar}</div>}
+    </div>
+  );
+}
+
+// Versiones anteriores: se siguen usando en el cuadro de playoffs
+// (PlayoffsBracket.jsx), que tiene su propio estilo para estas tarjetas.
 export function MatchResultCard({ partido, equiposFem, jugadorasMap, fechas, onClick }) {
   const localEq = equiposFem.find(e => e.id === partido.equipo_local_id);
   const visitEq = equiposFem.find(e => e.id === partido.equipo_visit_id);
@@ -757,7 +948,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                   ) : (
                     <div className="results-grid">
                       {partidosFinalizados.map(p => (
-                        <MatchResultCard key={p.id} partido={p}
+                        <ResultadoCard key={p.id} partido={p}
                           equiposFem={equiposFemenino}
                           jugadorasMap={jugadorasMap}
                           fechas={fechas}
@@ -790,13 +981,13 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                                 <div className="fixture-date-divider">{formatDiaLargo(diaCal)}</div>
                               )}
                               {p.estado === 'finalizado' ? (
-                                <MatchResultCard partido={p}
+                                <ResultadoCard partido={p}
                                   equiposFem={equiposFemenino}
                                   jugadorasMap={jugadorasMap}
                                   fechas={fechas}
                                   onClick={() => setSelectedMatch(p.id)}/>
                               ) : (
-                                <FixtureCard partido={p}
+                                <ProximoCard partido={p}
                                   equiposFem={equiposFemenino} fechas={fechas}/>
                               )}
                             </div>

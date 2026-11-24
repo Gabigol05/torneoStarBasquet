@@ -7434,7 +7434,7 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .bottom-nav-pastilla {
     position: absolute;
     top: 7px; left: 6px;
-    width: calc((100% - 12px) / 5);
+    width: calc((100% - 12px) / var(--bnav-n, 5));
     height: 32px;
     pointer-events: none;
     transition: transform .3s cubic-bezier(.3, .9, .3, 1.15), opacity .2s;
@@ -7484,9 +7484,9 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .bottom-nav-dot { top: 4px !important; right: 12px !important; border-color: rgba(11, 16, 24, .96) !important; }
   .bottom-nav-label {
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: .6px;
+    letter-spacing: .3px;
     text-transform: uppercase;
     line-height: 1;
     white-space: nowrap;
@@ -7497,3 +7497,134 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .install-banner { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
 
+
+/* ══ TARJETAS DE PARTIDO v3 — Resultados y Fixture (rediseño 23/11) ══
+   Todo centrado en un eje: badge arriba, marcador "estilo TV", cuartos,
+   % de tiro en barras enfrentadas y MVP. Escudos grandes y transparentes a
+   los costados para llenar el ancho en PC. Se adapta con container query
+   (no media query) para verse bien en cualquier ancho de columna. */
+.rx-card {
+  container: rxcard / inline-size;
+  position: relative; overflow: hidden; isolation: isolate;
+  border-radius: 16px; padding: 14px 18px;
+  background-color: #0D1522; border: 1px solid rgba(255,255,255,.08);
+  transition: border-color .15s, transform .15s;
+}
+.rx-card[style*="pointer"]:hover { border-color: rgba(255,255,255,.2); transform: translateY(-1px); }
+.rx-marca {
+  position: absolute; top: 50%; z-index: -1; pointer-events: none;
+  width: 210px; height: 210px; object-fit: cover; border-radius: 50%;
+  opacity: .06; filter: saturate(.8);
+  -webkit-mask-image: radial-gradient(circle, #000 55%, transparent 71%);
+          mask-image: radial-gradient(circle, #000 55%, transparent 71%);
+}
+.rx-marca--l { left: -34px;  transform: translateY(-50%) rotate(-12deg); }
+.rx-marca--v { right: -34px; transform: translateY(-50%) rotate(12deg); }
+.rx-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 10px; }
+.rx-badge {
+  grid-column: 2; text-align: center; white-space: nowrap;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 13.5px; font-weight: 700;
+  letter-spacing: 1.4px; text-transform: uppercase; color: #8A96AD;
+}
+.rx-badge b { color: #F0B429; font-weight: 700; }
+.rx-top-der { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 6px; }
+.rx-estado {
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: #2EE08A; background: rgba(34,208,122,.12); padding: 3px 8px; border-radius: 6px;
+}
+.rx-estado.is-vivo { color: #FF5A5A; background: rgba(255,80,80,.14); animation: rxVivo 1.6s ease-in-out infinite; }
+.rx-estado.is-proximo { color: #7FB2FF; background: rgba(90,150,255,.13); }
+@keyframes rxVivo { 50% { opacity: .55; } }
+
+.rx-main { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 22px; }
+.rx-lado { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.rx-lado--v { justify-content: flex-start; }
+.rx-escudo {
+  width: 60px; height: 60px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid; overflow: hidden; background: #0E1420;
+}
+.rx-escudo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rx-nombre {
+  min-width: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 23px; font-weight: 700;
+  color: #7A879E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rx-lado.is-gano .rx-nombre { color: #F1F4FA; }
+.rx-marcador { display: flex; align-items: center; gap: 12px; font-family: 'Bebas Neue', sans-serif; line-height: 1; }
+.rx-pts { font-size: 58px; color: #5A6B85; min-width: 62px; text-align: center; }
+.rx-guion { color: #4A566E; font-size: 30px; }
+.rx-hora { display: flex; flex-direction: column; align-items: center; min-width: 110px; font-family: 'Bebas Neue', sans-serif; line-height: 1; }
+.rx-hora-num { font-size: 44px; color: #EEF2F8; letter-spacing: 1px; }
+.rx-hora-lbl { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #6B7A99; margin-top: 2px; }
+.rx-lugar { text-align: center; margin-top: 10px; font-family: 'Barlow Condensed', sans-serif; font-size: 13.5px; font-weight: 600; color: #8A96AD; letter-spacing: .5px; }
+
+.rx-cuartos { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.rx-q {
+  display: inline-flex; align-items: baseline; gap: 3px; padding: 5px 11px; border-radius: 7px;
+  background: rgba(255,255,255,.045); font-family: 'Barlow Condensed', sans-serif; font-size: 16px;
+}
+.rx-q.is-ot { box-shadow: inset 0 0 0 1px rgba(240,180,41,.35); }
+.rx-q small { font-size: 11px; color: #6B7A99; margin-right: 4px; font-weight: 700; }
+.rx-q.is-ot small { color: #F0B429; }
+.rx-q b { font-weight: 700; }
+.rx-q b.is-pierde { color: #6B7A99; }
+.rx-q i { font-style: normal; color: #4A566E; }
+
+.rx-pcts { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 460px; margin: 12px auto 0; }
+.rx-pct {
+  display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 8px;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; color: #6B7A99;
+}
+.rx-pct > span:first-child { text-align: right; }
+.rx-pct .is-mejor { color: #EEF2F8; }
+.rx-pct-barras { display: grid; grid-template-columns: 1fr 28px 1fr; align-items: center; }
+.rx-pct-barras i { display: block; height: 6px; border-radius: 3px; opacity: .85; }
+.rx-pct-barras i:first-child { justify-self: end; }
+.rx-pct-barras b { text-align: center; font-size: 11px; letter-spacing: 1px; color: #6B7A99; font-weight: 700; }
+
+.rx-mvp {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07);
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.rx-mvp-centro { grid-column: 2; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rx-mvp-tag { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; color: #0B1018; background: #F0B429; border-radius: 5px; padding: 2px 6px 1px; }
+.rx-mvp-escudo { width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid; overflow: hidden; background: #0E1420; }
+.rx-mvp-escudo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rx-mvp-nombre { font-size: 17px; font-weight: 700; color: #F1F4FA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rx-mvp-eq { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.rx-ver { grid-column: 3; justify-self: end; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #6B7A99; }
+.rx-card:hover .rx-ver { color: #F0B429; }
+
+@container rxcard (max-width: 700px) {
+  .rx-marca { width: 150px; height: 150px; opacity: .05; }
+  .rx-nombre { font-size: 19px; }
+  .rx-escudo { width: 50px; height: 50px; }
+  .rx-pts { font-size: 48px; min-width: 50px; }
+}
+@container rxcard (max-width: 560px) {
+  .rx-marca { display: none; }
+  .rx-top { grid-template-columns: 1fr auto; }
+  .rx-badge { grid-column: 1; text-align: left; font-size: 11.5px; letter-spacing: .8px; white-space: normal; }
+  .rx-card--fixture .rx-estado.is-proximo { display: none; }
+  .rx-main { align-items: start; }
+  .rx-marcador, .rx-hora { margin-top: 2px; }
+  .rx-top-der { grid-column: 2; }
+  .rx-main { gap: 8px; }
+  .rx-lado, .rx-lado--v { flex-direction: column; justify-content: center; gap: 5px; }
+  .rx-lado:not(.rx-lado--v) { flex-direction: column-reverse; }
+  .rx-nombre { font-size: 14.5px; max-width: 100%; text-align: center; white-space: normal; line-height: 1.1; }
+  .rx-escudo { width: 40px; height: 40px; }
+  .rx-pts { font-size: 38px; min-width: 40px; }
+  .rx-guion { font-size: 22px; }
+  .rx-marcador { gap: 6px; }
+  .rx-hora { min-width: 70px; }
+  .rx-hora-num { font-size: 32px; }
+  .rx-q { padding: 3px 7px; font-size: 13px; }
+  .rx-pct { font-size: 12.5px; grid-template-columns: 36px 1fr 36px; }
+  .rx-mvp { grid-template-columns: 1fr auto; }
+  .rx-mvp-centro { grid-column: 1; }
+  .rx-ver { grid-column: 2; font-size: 0; }
+  .rx-ver::after { content: '›'; font-size: 22px; color: #6B7A99; }
+  .rx-mvp-eq { display: none; }
+}

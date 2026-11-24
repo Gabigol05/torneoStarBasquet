@@ -118,14 +118,43 @@ function EmptyState({ icon, title, sub, showIG = true }) {
 // alpha dinamico, que no anda bien en navegadores viejos de celulares.
 const hexA = (hex, alpha) => `${hex}${alpha}`;
 
-const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-function formatDiaLargo(fechaISO) {
-  if (!fechaISO) return '';
+const DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DIAS_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const ddmm = iso => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : '');
+
+// Separador de día del fixture: cajita tipo calendario + "Sábado 21 de
+// noviembre" + cantidad de partidos, cancha(s) y horario de ese día.
+function DiaSeparador({ fechaISO, partidosDia }) {
   const d = new Date(fechaISO + 'T00:00:00');
-  const dia = DIAS_SEMANA[d.getDay()];
-  const corta = fechaISO.split('-').reverse().slice(0, 2).join('/');
-  return `${dia} ${corta}`;
+  const lugares = [...new Set(partidosDia.map(p => p.lugar).filter(Boolean))];
+  const horas = partidosDia.map(p => p.hora_inicio).filter(Boolean).map(h => String(h).slice(0, 5)).sort();
+  const n = partidosDia.length;
+  return (
+    <div className="dia-sep">
+      <div className="dia-sep-cal"><small>{DIAS_CORTO[d.getDay()]}</small><b>{d.getDate()}</b></div>
+      <div className="dia-sep-txt">
+        <span className="dia-sep-tit">{DIAS_LARGO[d.getDay()]} {d.getDate()} de {MESES[d.getMonth()]}</span>
+        <span className="dia-sep-sub">
+          <b>{n} {n === 1 ? 'partido' : 'partidos'}</b>
+          {lugares.length > 0 && <> · 📍 {lugares.join(' / ')}</>}
+          {horas.length > 0 && <span className="dia-sep-horas"> · {horas[0]}{horas.length > 1 && horas[horas.length - 1] !== horas[0] ? ` a ${horas[horas.length - 1]}` : ' hs'}</span>}
+        </span>
+      </div>
+      <span className="dia-sep-linea"/>
+    </div>
+  );
 }
+
+const TAB_ICONOS = {
+  tabla: <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></>,
+  resultados: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></>,
+  fixture: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+  jugadores: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></>,
+  equipos: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+};
+
+const INSTANCIA_CHIP = { cuartos: 'Cuartos', semifinal: 'Semis', tercer_puesto: '3er puesto', final: 'Final' };
 
 // Color de acento por copa — mismo lenguaje visual que el cuadro de playoffs
 // y la referencia de bandas de la tabla de posiciones (Oro/Plata/Bronce).
@@ -540,6 +569,10 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // aparezca revuelto entre los de la fase regular.
   const [resultadosView,  setResultadosView]  = useState('regular'); // 'regular' | 'playoffs'
   const [copaSelId,       setCopaSelId]       = useState(null);
+  // Fixture: igual que en Resultados, los playoffs van aparte y solo se ven
+  // al tocar el chip "Playoffs" (por defecto se muestra la temporada regular).
+  const [fixtureView,     setFixtureView]     = useState('regular'); // 'regular' | 'playoffs'
+  const [instanciaSel,    setInstanciaSel]    = useState(null);
 
   const jugadorasMap = useMemo(() => buildJugadorasMap(equiposFemenino), [equiposFemenino]);
 
@@ -678,15 +711,68 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
   const partidosPendientes = useMemo(() =>
     partidos
-      .filter(p => !fechaSelId || p.fecha_id === fechaSelId)
+      .filter(p => fixtureView === 'playoffs' ? !!p.es_playoff : !p.es_playoff)
+      .filter(p => fixtureView === 'playoffs'
+        ? (!instanciaSel || p.instancia === instanciaSel)
+        : (!fechaSelId || p.fecha_id === fechaSelId))
       .sort((a, b) => {
+        if (fixtureView === 'playoffs') {
+          const oi = (ORDEN_INSTANCIA[a.instancia] ?? 9) - (ORDEN_INSTANCIA[b.instancia] ?? 9);
+          if (oi !== 0) return oi;
+        }
         const df = (a.fecha_id ?? 0) - (b.fecha_id ?? 0);
         if (df !== 0) return df;
         const dd = fechaCalendario(a).localeCompare(fechaCalendario(b));
         if (dd !== 0) return dd;
         return (a.hora_inicio ?? '99:99').localeCompare(b.hora_inicio ?? '99:99');
       }),
-    [partidos, fechaSelId, fechaDiaPorId]);
+    [partidos, fechaSelId, fechaDiaPorId, fixtureView, instanciaSel]);
+
+  // Fechas de temporada regular para el fixture: se saca la jornada cuyos
+  // partidos son todos de playoffs (ej: "Fecha 12" = cuartos), que ahora va
+  // en el chip de Playoffs con su nombre (Cuartos, Semis, Final).
+  const fechasRegulares = useMemo(() => fechas.filter(f => {
+    const ps = partidos.filter(p => p.fecha_id === f.id);
+    return !(ps.length > 0 && ps.every(p => p.es_playoff));
+  }), [fechas, partidos]);
+
+  // Próxima jornada a jugarse (punto verde en su chip).
+  const fechaProximaId = useMemo(() => {
+    const pend = fechasRegulares
+      .filter(f => partidos.some(p => p.fecha_id === f.id && p.estado !== 'finalizado' && !p.es_playoff))
+      .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
+    return pend[0]?.id ?? null;
+  }, [fechasRegulares, partidos]);
+
+  // Instancias de playoff cargadas (Cuartos, Semis, ...) con su día.
+  const instanciasPlayoff = useMemo(() => {
+    const porInst = {};
+    for (const p of partidos) {
+      if (!p.es_playoff || !p.instancia) continue;
+      (porInst[p.instancia] ??= []).push(p);
+    }
+    return Object.entries(porInst)
+      .sort(([a], [b]) => (ORDEN_INSTANCIA[a] ?? 9) - (ORDEN_INSTANCIA[b] ?? 9))
+      .map(([inst, ps]) => ({
+        inst,
+        dia: ps.map(fechaCalendario).filter(Boolean).sort()[0] ?? '',
+        pendiente: ps.some(p => p.estado !== 'finalizado'),
+      }));
+  }, [partidos, fechaDiaPorId]);
+  const instanciaProxima = instanciasPlayoff.find(i => i.pendiente)?.inst ?? null;
+
+  // En el celular la fila de chips se desliza: se centra en el chip elegido
+  // (o en la próxima fecha) para no tener que buscarlo al final de la fila.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      document.querySelectorAll('.fecha-chips--v3').forEach(fila => {
+        if (fila.scrollWidth <= fila.clientWidth) return;
+        const chip = fila.querySelector('.fx-chip.is-on:not(.fx-chip--acum)') ?? fila.querySelector('.fx-chip.is-prox');
+        if (chip) fila.scrollLeft = chip.offsetLeft - fila.clientWidth / 2 + chip.offsetWidth / 2;
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeTab, fechaSelId, fixtureView, instanciaSel, resultadosView, copaSelId, partidos.length]);
 
   const equiposOrdenados = useMemo(() =>
     [...equiposDeTemporada].sort((a, b) => {
@@ -744,22 +830,40 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     [fechas, partidos]);
 
   const FechaChips = ({ modo }) => {
-    const lista = modo === 'resultados' ? fechasConResultadoRegular : fechas;
+    const lista = modo === 'resultados' ? fechasConResultadoRegular : fechasRegulares;
     if (lista.length === 0) return null;
     return (
-      <div className="fecha-chips" ref={fechaChipsWheelRef} style={{ marginBottom: 16 }}>
+      <div className="fecha-chips fecha-chips--v3" ref={fechaChipsWheelRef} style={{ marginBottom: 16, '--chip-c': modeColor }}>
         <button
-          className={`fecha-chip ${!fechaSelId ? 'active' : ''}`}
-          onClick={() => setFechaSelId(null)}
-          style={!fechaSelId ? { borderColor: modeColor, color: modeColor } : {}}>
-          ACUM
+          className={`fx-chip fx-chip--acum${!fechaSelId ? ' is-on' : ''}`}
+          onClick={() => setFechaSelId(null)}>
+          <b>ACUM</b><small>Todas</small>
         </button>
         {lista.map(f => (
           <button key={f.id}
-            className={`fecha-chip ${fechaSelId === f.id ? 'active' : ''}`}
-            onClick={() => setFechaSelId(prev => prev === f.id ? null : f.id)}
-            style={fechaSelId === f.id ? { borderColor: modeColor, color: modeColor } : {}}>
-            F{f.numero}
+            className={`fx-chip${fechaSelId === f.id ? ' is-on' : ''}${modo === 'fixture' && f.id === fechaProximaId ? ' is-prox' : ''}`}
+            onClick={() => setFechaSelId(prev => prev === f.id ? null : f.id)}>
+            <b>F{f.numero}</b><small>{ddmm(f.fecha_dia) || '—'}</small>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  // Fixture / Playoffs: un chip por instancia (Cuartos, Semis, Final) con su día.
+  const InstanciaChips = () => {
+    if (instanciasPlayoff.length === 0) return null;
+    return (
+      <div className="fecha-chips fecha-chips--v3" style={{ marginBottom: 16 }}>
+        <button className={`fx-chip fx-chip--po fx-chip--acum${!instanciaSel ? ' is-on' : ''}`}
+          onClick={() => setInstanciaSel(null)}>
+          <b>Todos</b><small>Playoffs</small>
+        </button>
+        {instanciasPlayoff.map(({ inst, dia }) => (
+          <button key={inst}
+            className={`fx-chip fx-chip--po${instanciaSel === inst ? ' is-on' : ''}${inst === instanciaProxima ? ' is-prox' : ''}`}
+            onClick={() => setInstanciaSel(prev => prev === inst ? null : inst)}>
+            <b>{INSTANCIA_CHIP[inst] ?? inst}</b><small>{ddmm(dia) || 'A definir'}</small>
           </button>
         ))}
       </div>
@@ -769,20 +873,20 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   // Temporada Regular / Playoffs — dos chips grandes que separan por completo
   // los resultados de fase regular de los de postemporada. El chip de
   // Playoffs solo aparece si ya hay al menos un partido cargado como tal.
-  const ResultadosViewChips = () => {
+  const ResultadosViewChips = (vista = resultadosView, setVista = setResultadosView) => {
     if (!hayPlayoffsCargados) return null;
     return (
       <div className="fecha-chips view-toggle" style={{ marginBottom: 14 }}>
         <button
-          className={`fecha-chip ${resultadosView === 'regular' ? 'active' : ''}`}
-          onClick={() => setResultadosView('regular')}
-          style={resultadosView === 'regular' ? { borderColor: modeColor, color: modeColor } : {}}>
+          className={`fecha-chip ${vista === 'regular' ? 'active' : ''}`}
+          onClick={() => setVista('regular')}
+          style={vista === 'regular' ? { borderColor: modeColor, color: modeColor } : {}}>
           Temporada Regular
         </button>
         <button
-          className={`fecha-chip ${resultadosView === 'playoffs' ? 'active' : ''}`}
-          onClick={() => setResultadosView('playoffs')}
-          style={resultadosView === 'playoffs' ? { borderColor: '#F0B429', color: '#F0B429' } : {}}>
+          className={`fecha-chip ${vista === 'playoffs' ? 'active' : ''}`}
+          onClick={() => setVista('playoffs')}
+          style={vista === 'playoffs' ? { borderColor: '#F0B429', color: '#F0B429' } : {}}>
           Playoffs
         </button>
       </div>
@@ -794,19 +898,18 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
   const CopaChips = () => {
     if (resultadosView !== 'playoffs' || copasConPlayoff.length < 2) return null;
     return (
-      <div className="fecha-chips" style={{ marginBottom: 16 }}>
+      <div className="fecha-chips fecha-chips--v3" style={{ marginBottom: 16 }}>
         <button
-          className={`fecha-chip ${!copaSelId ? 'active' : ''}`}
-          onClick={() => setCopaSelId(null)}
-          style={!copaSelId ? { borderColor: '#F0B429', color: '#F0B429' } : {}}>
-          TODAS
+          className={`fx-chip fx-chip--po fx-chip--acum${!copaSelId ? ' is-on' : ''}`}
+          onClick={() => setCopaSelId(null)}>
+          <b>Todas</b><small>Copas</small>
         </button>
         {copasConPlayoff.map(c => (
           <button key={c}
-            className={`fecha-chip ${copaSelId === c ? 'active' : ''}`}
+            className={`fx-chip fx-chip--po${copaSelId === c ? ' is-on' : ''}`}
             onClick={() => setCopaSelId(prev => prev === c ? null : c)}
-            style={copaSelId === c ? { borderColor: COPA_COLOR[c], color: COPA_COLOR[c] } : {}}>
-            {COPA_LABEL[c]}
+            style={{ '--po-c': COPA_COLOR[c] }}>
+            <b>{COPA_LABEL[c].replace('Copa de ', '')}</b><small>Copa</small>
           </button>
         ))}
       </div>
@@ -884,12 +987,14 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
             </div>
           )}
 
-          <div className="tab-nav">
+          <div className="tab-nav tnv" style={{ '--tnv-c': modeColor }}>
             {TABS.map(tab => (
               <button key={tab.key} type="button"
-                className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-                style={activeTab === tab.key ? { color: modeColor, borderBottomColor: modeColor } : {}}
+                className={`tnv-tab${activeTab === tab.key ? ' is-on' : ''}`}
                 onClick={() => setActiveTab(tab.key)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {TAB_ICONOS[tab.key]}
+                </svg>
                 {tab.key === 'jugadores' ? (mode === 'femenino' ? 'Jugadoras' : 'Jugadores') : tab.label}
               </button>
             ))}
@@ -962,7 +1067,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'fixture' && (
               <div>
-                {FechaChips({ modo: 'fixture' })}
+                {ResultadosViewChips(fixtureView, setFixtureView)}
+                {fixtureView === 'playoffs' ? InstanciaChips() : FechaChips({ modo: 'fixture' })}
                 {isLoadingStats ? <ResultSkeleton/> : (
                   partidosPendientes.length === 0 ? (
                     <EmptyState icon="📅" title="Sin partidos en esta fecha"
@@ -971,6 +1077,8 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                     <div className="fixture-grid">
                       {(() => {
                         let lastDia = null;
+                        const porDia = {};
+                        for (const q of partidosPendientes) (porDia[fechaCalendario(q)] ??= []).push(q);
                         return partidosPendientes.map(p => {
                           const diaCal = fechaCalendario(p);
                           const mostrarDivisor = diaCal && diaCal !== lastDia;
@@ -978,7 +1086,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
                           return (
                             <div key={p.id} style={{ display: 'contents' }}>
                               {mostrarDivisor && (
-                                <div className="fixture-date-divider">{formatDiaLargo(diaCal)}</div>
+                                <DiaSeparador fechaISO={diaCal} partidosDia={porDia[diaCal] ?? []}/>
                               )}
                               {p.estado === 'finalizado' ? (
                                 <ResultadoCard partido={p}

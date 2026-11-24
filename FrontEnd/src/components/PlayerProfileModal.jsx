@@ -486,7 +486,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
     const tablas = TABLAS_POR_MODO[mode] ?? TABLAS_POR_MODO.femenino;
     let cancelado = false;
     supabase.from(tablas.statsPartido)
-      .select('partido_id,pts,rd,ro,as_,sc,sf,dc,df,tc,tf,val')
+      .select('partido_id,pts,rd,ro,as_,sc,sf,dc,df,tc,tf,val,rb,tp,pe,fp')
       .eq(tablas.idCol, player.id)
       .in('partido_id', partidosHomeIds)
       .then(({ data, error }) => {
@@ -543,9 +543,14 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
           dc: st?.dc ?? 0, df: st?.df ?? 0,
           tc: st?.tc ?? 0, tf: st?.tf ?? 0,
           val: st?.val ?? 0,
+          // ¿Participó? Cualquier número cargado en la planilla cuenta (antes
+          // solo PTS/REB/AST: un partido con 0 puntos pero con tiros errados,
+          // robos o faltas no aparecía y no coincidía con "partidos jugados").
+          jugo: !!st && ['pts','rd','ro','as_','sc','sf','dc','df','tc','tf','val','rb','tp','pe','fp']
+            .some(k => (Number(st[k]) || 0) !== 0),
         };
       })
-      .filter(d => d.pts > 0 || d.reb > 0 || d.ast > 0);
+      .filter(d => d.jugo);
   }, [effectiveStatsPorPartido, effectivePartidos, effectiveFechas, player?.id, player?.equipoId]);
 
   const mejorPartido = useMemo(() => {
@@ -624,6 +629,10 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
   const hayStats = pj > 0;
 
   const acento = player.color ?? '#F0B429';
+  // Récord en los partidos que jugó (si ya están sus planillas); si no, el del equipo.
+  const recordJug = historialGrafico.length
+    ? { g: historialGrafico.filter(d => d.gano).length, p: historialGrafico.filter(d => !d.gano && d.pf !== d.pc).length }
+    : record;
   const fmt1 = v => (Number.isInteger(Number(v)) ? Number(v) : Number(v).toFixed(1));
   const tirosIntentados = scTotal + sfTotal + dcTotal + dfTotal + tcTotal + tfTotal;
   const mezcla = [
@@ -661,7 +670,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               <div className="pp3-tags">
                 {copaEquipo && <span className="pp3-tag" style={{ color: COPA_COLOR[copaEquipo], background: hexA(COPA_COLOR[copaEquipo], '22') }}>🏆 {COPA_NOMBRE[copaEquipo]}</span>}
                 {pj > 0 && <span className="pp3-tag pp3-tag--pj">{pj} {pj === 1 ? 'partido jugado' : 'partidos jugados'}</span>}
-                {(record.g + record.p) > 0 && <span className="pp3-tag pp3-tag--rec">{record.g}G · {record.p}P</span>}
+                {(recordJug.g + recordJug.p) > 0 && <span className="pp3-tag pp3-tag--rec">{recordJug.g}G · {recordJug.p}P</span>}
                 {edadDesde(player.fechaNac) != null && <span className="pp3-tag">🎂 {edadDesde(player.fechaNac)} años</span>}
               </div>
               <ModalTemporadaChip

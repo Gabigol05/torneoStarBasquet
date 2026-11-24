@@ -8504,3 +8504,47 @@ nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3);
   .eqs-busca { width: 100%; margin-left: 0; }
   .eqs-seg { width: 100%; } .eqs-seg button { flex: 1; text-align: center; padding: 7px 0; }
 }
+
+/* ═══ JUGADORES: buscador + chips v2 ═══ */
+.jf { margin-bottom: 16px; font-family: 'Barlow Condensed', sans-serif; }
+.jf-busca { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); transition: border-color .2s, background .2s; }
+.jf-busca:focus-within { border-color: var(--color-accent, #3b82f6); background: rgba(255,255,255,.06); }
+.jf-busca svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: #6B7A99; stroke-width: 2.2; stroke-linecap: round; }
+.jf-busca input { all: unset; flex: 1; min-width: 0; height: 100%; font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; color: #EEF2F8; }
+.jf-busca input::placeholder { color: #4B5670; }
+.jf-busca input::-webkit-search-cancel-button { display: none; }
+.jf-kbd { font-family: inherit; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,.12); color: #6B7A99; }
+.jf-limpiar { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; color: #AEB8CB; background: rgba(255,255,255,.08); }
+.jf-limpiar:hover { color: #fff; background: rgba(255,255,255,.14); }
+
+.jf-fila { position: relative; margin-top: 12px; }
+.jf-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; touch-action: pan-x; }
+.jf-chips::-webkit-scrollbar { display: none; }
+.jf-chip { all: unset; box-sizing: border-box; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 5px; border-radius: 999px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); font-family: 'Barlow Condensed', sans-serif; font-size: 14.5px; font-weight: 700; color: #C7D1DD; white-space: nowrap; transition: background .2s, border-color .2s, color .2s, box-shadow .2s; -webkit-tap-highlight-color: transparent; }
+.jf-chip:hover { border-color: color-mix(in srgb, var(--k) 55%, transparent); color: #fff; }
+.jf-chip img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--k); object-fit: cover; background: #0E1420; flex-shrink: 0; }
+.jf-chip small { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.07); color: #7A879E; }
+.jf-chip--todos { padding: 0 10px 0 14px; }
+.jf-chip.is-on { color: #0B1018; background: var(--k); border-color: var(--k); box-shadow: 0 6px 20px color-mix(in srgb, var(--k) 35%, transparent); }
+.jf-chip.is-on img { border-color: rgba(0,0,0,.25); }
+.jf-chip.is-on small { background: rgba(0,0,0,.18); color: #0B1018; }
+.jf-flecha { all: unset; cursor: pointer; position: absolute; top: 2px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; font-size: 22px; line-height: 1; color: #EEF2F8; background: rgba(20,28,43,.92); border: 1px solid rgba(255,255,255,.14); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 2; }
+.jf-flecha--izq { left: 0; } .jf-flecha--der { right: 0; }
+.jf-fila::before, .jf-fila::after { content: ''; position: absolute; top: 0; bottom: 4px; width: 90px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 1; }
+.jf-fila::before { left: 0; background: linear-gradient(270deg, transparent, var(--bg-main, #07090f) 75%); }
+.jf-fila::after { right: 0; background: linear-gradient(90deg, transparent, var(--bg-main, #07090f) 75%); }
+.jf-fila.hay-izq::before, .jf-fila.hay-der::after { opacity: 1; }
+.jf-fila.hay-izq .jf-flecha--izq, .jf-fila.hay-der .jf-flecha--der { opacity: 1; pointer-events: auto; }
+.jf-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; font-size: 12.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #6B7A99; }
+.jf-meta b { color: #EEF2F8; }
+.jf-quitar { all: unset; cursor: pointer; color: #7FB2FF; letter-spacing: 1.5px; white-space: nowrap; }
+.jf-quitar:hover { color: #fff; }
+@media (hover: none) {
+  .jf-kbd { display: none; }
+  .jf-flecha { display: none; }
+  .jf-fila::before, .jf-fila::after { width: 40px; }
+}
+@media (max-width: 480px) {
+  .jf-chip { height: 36px; font-size: 13.5px; gap: 6px; }
+  .jf-chip img { width: 24px; height: 24px; }
+}

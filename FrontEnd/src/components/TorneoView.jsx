@@ -627,6 +627,90 @@ function TarjetaEquipo({ team, info, mode, fav, onFav, tapped, onCardClick, onLe
   );
 }
 
+
+// ── Buscador + chips de equipo (pestaña Jugadores) ─────────────────────────
+function FiltroJugadores({ equipos, mode, busca, setBusca, filtro, setFiltro, total, totalSinFiltro }) {
+  const wheelRef = useWheelHorizontal();
+  const filaRef = useRef(null);
+  const inputRef = useRef(null);
+  const [bordes, setBordes] = useState({ izq: false, der: false });
+  const fem = mode === 'femenino';
+
+  const medir = useCallback(() => {
+    const el = filaRef.current;
+    if (!el) return;
+    setBordes({ izq: el.scrollLeft > 4, der: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  const setFila = useCallback(el => { wheelRef(el); filaRef.current = el; if (el) requestAnimationFrame(medir); }, [wheelRef, medir]);
+  useEffect(() => {
+    window.addEventListener('resize', medir);
+    return () => window.removeEventListener('resize', medir);
+  }, [medir]);
+  useEffect(() => { medir(); }, [equipos, medir]);
+
+  // "/" lleva directo al buscador (en la compu)
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const q = busca.trim().toLowerCase();
+  const conteo = id => {
+    const eq = equipos.find(e => e.id === id);
+    if (!eq) return 0;
+    return q ? eq.jugadoras.filter(j => j.nombre.toLowerCase().includes(q)).length : eq.jugadoras.length;
+  };
+  const mover = dir => filaRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' });
+  const elegido = filtro ? equipos.find(e => e.id === filtro) : null;
+
+  return (
+    <div className="jf">
+      <label className="jf-busca">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input ref={inputRef} type="search" value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder={fem ? 'Buscar jugadora por nombre...' : 'Buscar jugador por nombre...'}/>
+        {busca
+          ? <button type="button" className="jf-limpiar" onClick={() => setBusca('')} aria-label="Borrar búsqueda">✕</button>
+          : <kbd className="jf-kbd" aria-hidden="true">/</kbd>}
+      </label>
+
+      <div className={`jf-fila${bordes.izq ? ' hay-izq' : ''}${bordes.der ? ' hay-der' : ''}`}>
+        <div className="jf-chips" ref={setFila} onScroll={medir}>
+          <button type="button" className={`jf-chip jf-chip--todos${!filtro ? ' is-on' : ''}`} style={{ '--k': '#F0B429' }}
+            onClick={() => setFiltro(null)}>
+            Todos<small>{totalSinFiltro}</small>
+          </button>
+          {equipos.map(eq => (
+            <button key={eq.id} type="button" className={`jf-chip${filtro === eq.id ? ' is-on' : ''}`}
+              style={{ '--k': eq.color ?? '#5A6B85' }}
+              onClick={() => setFiltro(prev => (prev === eq.id ? null : eq.id))}>
+              <img src={eq.logo} alt="" loading="lazy" decoding="async" onError={e => { e.target.style.visibility = 'hidden'; }}/>
+              {eq.name}
+              <small>{conteo(eq.id)}</small>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="jf-flecha jf-flecha--izq" onClick={() => mover(-1)} aria-label="Ver equipos anteriores" tabIndex={-1}>‹</button>
+        <button type="button" className="jf-flecha jf-flecha--der" onClick={() => mover(1)} aria-label="Ver más equipos" tabIndex={-1}>›</button>
+      </div>
+
+      <div className="jf-meta">
+        <span><b>{total}</b> {fem ? 'jugadoras' : 'jugadores'}{elegido ? ` · ${elegido.name}` : ''}{q ? ` · "${busca.trim()}"` : ''}</span>
+        {(filtro || q) && (
+          <button type="button" className="jf-quitar" onClick={() => { setFiltro(null); setBusca(''); }}>✕ Quitar filtro</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extSelectTeam }) {
   const { mode } = useTournament();
   const {
@@ -638,7 +722,6 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     statsPorPartido = {},
   } = useStats();
   const { toggleFavorito, esFavorito } = useFavorito();
-  const filterChipsWheelRef = useWheelHorizontal();
   const fechaChipsWheelRef  = useWheelHorizontal();
 
   const [activeTab,       setActiveTab]       = useState('tabla');
@@ -771,6 +854,12 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
         .map(j => ({ ...j, equipo: team.name, equipoColor: team.color, equipoId: team.id, equipoLogo: team.logo }))
     );
   }, [equiposDeTemporada, searchJugadoras, filterEquipoId]);
+
+  // Cantidad con la búsqueda aplicada pero sin filtro de equipo (chip "Todos").
+  const totalJugadorasBusqueda = useMemo(() => {
+    const q = searchJugadoras.trim().toLowerCase();
+    return equiposDeTemporada.reduce((n, t) => n + (q ? t.jugadoras.filter(j => j.nombre.toLowerCase().includes(q)).length : t.jugadoras.length), 0);
+  }, [equiposDeTemporada, searchJugadoras]);
 
   // Volver a la primera tanda cada vez que cambia la búsqueda o el filtro
   useEffect(() => { setPlayersVisible(PLAYERS_PAGE_SIZE); }, [searchJugadoras, filterEquipoId]);
@@ -1243,37 +1332,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
 
             {activeTab === 'jugadores' && (
               <div>
-                <input type="text" className="search-bar"
-                  placeholder={mode === 'femenino' ? 'Buscar jugadora...' : 'Buscar jugador...'}
-                  value={searchJugadoras}
-                  onChange={e => setSearchJugadoras(e.target.value)}
-                  style={{ marginBottom: '12px' }}/>
-
-                <div className="chips-fade-wrap">
-                  <div className="filter-chips" ref={filterChipsWheelRef}>
-                    <button
-                      className={`chip ${!filterEquipoId ? 'chip-active' : ''}`}
-                      style={!filterEquipoId ? { borderColor: modeColor, color: modeColor } : {}}
-                      onClick={() => setFilterEquipoId(null)}>
-                      Todos
-                    </button>
-                    {equiposDeTemporada.map(eq => (
-                      <button key={eq.id}
-                        className={`chip ${filterEquipoId === eq.id ? 'chip-active' : ''}`}
-                        style={filterEquipoId === eq.id ? { borderColor: eq.color, color: eq.color, background: `${eq.color}15` } : {}}
-                        onClick={() => setFilterEquipoId(prev => prev === eq.id ? null : eq.id)}>
-                        <img src={eq.logo} alt="" loading="lazy" decoding="async"
-                          style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
-                          onError={e => { e.target.style.display = 'none'; }}/>
-                        {eq.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="jugadoras-count" style={{ marginBottom: '16px' }}>
-                  {jugadorasFiltradas.length} {mode === 'femenino' ? 'jugadoras' : 'jugadores'}
-                </div>
+                <FiltroJugadores equipos={equiposDeTemporada} mode={mode}
+                  busca={searchJugadoras} setBusca={setSearchJugadoras}
+                  filtro={filterEquipoId} setFiltro={setFilterEquipoId}
+                  total={jugadorasFiltradas.length}
+                  totalSinFiltro={totalJugadorasBusqueda}/>
 
                 <div className="players-grid">
                   {isLoadingStats ? (

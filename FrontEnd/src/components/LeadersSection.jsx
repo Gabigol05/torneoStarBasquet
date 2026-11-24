@@ -157,7 +157,7 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, unidad,
   const top = lideres[0];
   const hayDatos = top && top.val > 0;
   const esPct = statKey.startsWith('pct_');
-  const [abierta, setAbierta] = useState(false);
+  const [flipped, setFlipped] = useState(false);
   const modeClass = mode === 'masculino' ? 'masc' : 'fem';
 
   if (!hayDatos) {
@@ -188,67 +188,90 @@ function LeaderCard({ titulo, emoji, statKey, promKey, minAttempts, sub, unidad,
   const segundo = lideres[1];
   const dif = segundo ? top.val - segundo.val : null;
   const marca = top.logo || logoDeEquipo(top.equipoId);
-  const visibles = abierta ? lideres.slice(1) : lideres.slice(1, 5);
 
+  const flip = () => setFlipped(f => !f);
   return (
-    <div className={`ld reveal-on-scroll ${modeClass}`} style={{ '--a': color, '--t': top.color }}>
-      <div className="ld-top" style={{ background: `radial-gradient(120% 120% at 100% 0%, ${top.color}61, transparent 60%)` }}>
-        {marca && <img className="ld-marca" src={marca} alt="" loading="lazy" aria-hidden="true"/>}
-        <div className="ld-cat">
-          <b><i/>{titulo}</b>
-          <em>Líder</em>
-        </div>
-        <div className="ld-hero">
-          <div className="ld-av" style={{ borderColor: top.color, boxShadow: `0 0 22px ${top.color}8c` }}>
-            <EscudoJugador logo={top.logo} equipoId={top.equipoId} nombre={top.nombre} color={top.color}/>
-            <span className="ld-n1">1</span>
+    <div
+      className={`ld-flip reveal-on-scroll ${modeClass}`}
+      style={{ '--a': color, '--t': top.color }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${titulo}: tocar para ver el top ${lideres.length}`}
+      onClick={flip}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } }}
+    >
+      <div className={`ld-flip-in${flipped ? ' is-flipped' : ''}`}>
+        <div className="ld ld-front" aria-hidden={flipped}>
+        <div className="ld-top" style={{ background: `radial-gradient(120% 120% at 100% 0%, ${top.color}61, transparent 60%)` }}>
+          {marca && <img className="ld-marca" src={marca} alt="" loading="lazy" aria-hidden="true"/>}
+          <div className="ld-cat">
+            <b><i/>{titulo}</b>
+            <em>Líder</em>
           </div>
-          <div className="ld-quien">
-            <b>{nombreCorto(top.nombre)}</b>
-            <span style={{ color: top.color }}>{top.equipo}</span>
-          </div>
-        </div>
-        <div className="ld-num">
-          <span className="ld-big">{formatVal(top.val, esPct)}{unidad && <small>{unidad}</small>}</span>
-          <div className="ld-mini">
-            {top.prom !== null && <div><b>{formatVal(top.prom)}</b><small>Por partido</small></div>}
-            <div><b>{top.pj}</b><small>PJ</small></div>
-            {record !== null && <div><b>{formatVal(record)}</b><small>Récord</small></div>}
-          </div>
-        </div>
-        {serie.length > 1 && (
-          <div className="ld-graf">
-            <div className="ld-graf-t">
-              <span>Últimos {Math.min(serie.length, 8)} partidos</span>
-              <span>Máx. {formatVal(Math.max(...serie.slice(-8).map(d => d.v)))}</span>
+          <div className="ld-hero">
+            <div className="ld-av" style={{ borderColor: top.color, boxShadow: `0 0 22px ${top.color}8c` }}>
+              <EscudoJugador logo={top.logo} equipoId={top.equipoId} nombre={top.nombre} color={top.color}/>
+              <span className="ld-n1">1</span>
             </div>
-            <Barras serie={serie}/>
+            <div className="ld-quien">
+              <b>{nombreCorto(top.nombre)}</b>
+              <span style={{ color: top.color }}>{top.equipo}</span>
+            </div>
+          </div>
+          <div className="ld-num">
+            <span className="ld-big">{formatVal(top.val, esPct)}{unidad && <small>{unidad}</small>}</span>
+            <div className="ld-mini">
+              {top.prom !== null && <div><b>{formatVal(top.prom)}</b><small>Por partido</small></div>}
+              <div><b>{top.pj}</b><small>PJ</small></div>
+              {record !== null && <div><b>{formatVal(record)}</b><small>Récord</small></div>}
+            </div>
+          </div>
+          {serie.length > 1 && (
+            <div className="ld-graf">
+              <div className="ld-graf-t">
+                <span>Últimos {Math.min(serie.length, 8)} partidos</span>
+                <span>Máx. {formatVal(Math.max(...serie.slice(-8).map(d => d.v)))}</span>
+              </div>
+              <Barras serie={serie}/>
+            </div>
+          )}
+        </div>
+
+        {dif !== null && (
+          <div className="ld-dif">
+            {dif > 0
+              ? <>Le saca <b>+{formatVal(dif, esPct)}</b> al segundo</>
+              : <>Empatado con <b>{nombreCorto(segundo.nombre)}</b></>}
           </div>
         )}
+
+
+          {lideres.length > 1 && (
+            <div className="ld-list">
+              {lideres.slice(1, 5).map((l, i) => (
+                <FilaLider key={l.id ?? i} l={l} puesto={i + 2} top={top} esPct={esPct}/>
+              ))}
+            </div>
+          )}
+
+          {lideres.length > 5 && (
+            <div className="ld-pie"><span>Ver top {lideres.length}</span><span>↻</span></div>
+          )}
+        </div>
+
+        <div className="ld ld-back" aria-hidden={!flipped}>
+          <div className="ld-cat ld-back-cat">
+            <b><i/>{titulo} · Top {lideres.length}</b>
+            <em>{unidad}</em>
+          </div>
+          <div className="ld-list ld-list--full">
+            {lideres.map((l, i) => (
+              <FilaLider key={l.id ?? i} l={l} puesto={i + 1} top={top} esPct={esPct}/>
+            ))}
+          </div>
+          <div className="ld-pie"><span>Volver</span><span>↻</span></div>
+        </div>
       </div>
-
-      {dif !== null && (
-        <div className="ld-dif">
-          {dif > 0
-            ? <>Le saca <b>+{formatVal(dif, esPct)}</b> al segundo</>
-            : <>Empatado con <b>{nombreCorto(segundo.nombre)}</b></>}
-        </div>
-      )}
-
-      {visibles.length > 0 && (
-        <div className="ld-list">
-          {visibles.map((l, i) => (
-            <FilaLider key={l.id ?? i} l={l} puesto={i + 2} top={top} esPct={esPct}/>
-          ))}
-        </div>
-      )}
-
-      {lideres.length > 5 && (
-        <button type="button" className="ld-pie" onClick={() => setAbierta(a => !a)}>
-          <span>{abierta ? 'Ver menos' : `Ver top ${lideres.length}`}</span>
-          <span>{abierta ? '↑' : '→'}</span>
-        </button>
-      )}
     </div>
   );
 }

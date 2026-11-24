@@ -8147,7 +8147,7 @@ nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3);
 .leaders-grid.ld-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
 @media (max-width: 1080px) { .leaders-grid.ld-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px)  { .leaders-grid.ld-grid { grid-template-columns: 1fr; } }
-.ld { --a: #F0B429; --t: #6B7A99; position: relative; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,.09); background: linear-gradient(160deg, #111827, #0a0e16); font-family: 'Barlow Condensed', sans-serif; color: #EEF2F8; }
+.ld { position: relative; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,.09); background: linear-gradient(160deg, #111827, #0a0e16); font-family: 'Barlow Condensed', sans-serif; color: #EEF2F8; }
 .ld-top { position: relative; padding: 16px 16px 14px; }
 .ld-marca { position: absolute; right: -30px; top: -20px; width: 170px; height: 170px; border-radius: 50%; opacity: .08; object-fit: cover; pointer-events: none; }
 .ld-cat { position: relative; display: flex; align-items: center; justify-content: space-between; }
@@ -8201,3 +8201,18 @@ nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3);
 .ld-pie { all: unset; box-sizing: border-box; cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: calc(100% - 32px); margin: 0 16px 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); font-family: 'Barlow Condensed', sans-serif; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7A879E; }
 .ld-pie:hover { color: #EEF2F8; }
 .ld-pie span:last-child { color: var(--a); }
+
+/* Líderes v3: card que se da vuelta para ver el top 10 */
+.ld-flip { --a: #F0B429; --t: #6B7A99; perspective: 1600px; cursor: pointer; outline: none; }
+.ld-flip:focus-visible .ld { box-shadow: 0 0 0 2px var(--a); }
+.ld-flip-in { position: relative; transition: transform .6s cubic-bezier(.4,.2,.2,1); transform-style: preserve-3d; }
+.ld-flip-in.is-flipped { transform: rotateY(180deg); }
+.ld-front, .ld-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.ld-back { position: absolute; inset: 0; transform: rotateY(180deg); display: flex; flex-direction: column; overflow: hidden; }
+.ld-back-cat { padding: 16px 16px 4px; background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--t) 30%, transparent), transparent 60%); }
+.ld-list--full { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--a) transparent; }
+.ld-list--full .ld-row:first-child { background: linear-gradient(90deg, color-mix(in srgb, var(--a) 14%, transparent), transparent 70%); border-radius: 10px; }
+.ld-row-p--1 { color: var(--a); }
+.ld-back .ld-pie { margin-top: auto; }
+.ld-flip:hover .ld-pie { color: #EEF2F8; }
+.ld-list--full { padding-top: 4px; padding-bottom: 4px; } .ld-list--full .ld-row { padding-top: 5px; padding-bottom: 5px; }

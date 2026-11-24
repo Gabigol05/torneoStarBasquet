@@ -62,95 +62,173 @@ function LeyendaEquipos({ eqL, eqV }) {
   );
 }
 
+// Gráfico interactivo del partido (rediseño 24/11):
+//  • "Marcador": las dos líneas de puntos acumulados, con la franja del
+//    color del que va ganando entre ellas.
+//  • "Ventaja": la diferencia de puntos cuarto a cuarto, arriba del cero
+//    para el local y abajo para el visitante.
+//  Las líneas se dibujan con animación al abrir, y al tocar un cuarto se
+//  resalta y aparece su detalle (parcial, marcador y ventaja en ese momento).
 function EvolucionMarcador({ partido, eqL, eqV }) {
   const cL = eqL?.color ?? '#8899BB', cV = eqV?.color ?? '#F0B429';
   const qs = ['q1', 'q2', 'q3', 'q4'].map(q => [partido[`${q}_local`] ?? 0, partido[`${q}_visit`] ?? 0]);
   if ((partido.ot_local ?? 0) > 0 || (partido.ot_visit ?? 0) > 0) qs.push([partido.ot_local ?? 0, partido.ot_visit ?? 0]);
+  const dif = qs.map(([a, b]) => Math.abs(a - b));
+  const iClaveIni = dif.indexOf(Math.max(...dif));
+  const [modo, setModo] = useState('marcador');
+  const [sel, setSel] = useState(iClaveIni);
+  const [anim, setAnim] = useState(0);
   if (qs.every(([a, b]) => !a && !b)) return null;
-  const etiquetas = ['', 'Q1', 'Q2', 'Q3', 'Q4', 'OT'].slice(0, qs.length + 1);
+
+  const nombres = ['1° cuarto', '2° cuarto', '3° cuarto', '4° cuarto', 'Suplementario'];
+  const cortos = ['Q1', 'Q2', 'Q3', 'Q4', 'OT'];
   const acum = [[0, 0]];
   qs.forEach(([a, b]) => { const [x, y] = acum[acum.length - 1]; acum.push([x + a, y + b]); });
+  const lead = acum.map(([a, b]) => a - b);
   let maxL = 0, maxV = 0;
-  acum.forEach(([a, b]) => { maxL = Math.max(maxL, a - b); maxV = Math.max(maxV, b - a); });
-  const dif = qs.map(([a, b]) => Math.abs(a - b));
-  const iClave = dif.indexOf(Math.max(...dif));
-  const [qa, qb] = qs[iClave];
-
-  const W = 440, H = 232, l = 14, r = 54, t = 20, base = 176;
-  const tope = Math.max(...acum.flat(), 10) * 1.08;
-  const X = i => l + (i * (W - l - r)) / qs.length;
-  const Y = v => base - (v / tope) * (base - t);
-  const P = (i, k) => [X(i), Y(acum[i][k])];
+  lead.forEach(d => { maxL = Math.max(maxL, d); maxV = Math.max(maxV, -d); });
+  const [qa, qb] = qs[iClaveIni];
   const uid = `${partido.id ?? 'p'}`;
 
-  // Franja entre las dos líneas, pintada con el color del que va ganando
-  // (si en un cuarto se dan vuelta, el tramo se corta en el cruce).
-  const franjas = [];
-  for (let i = 0; i < qs.length; i++) {
-    const d0 = acum[i][0] - acum[i][1], d1 = acum[i + 1][0] - acum[i + 1][1];
-    const tramo = (u0, u1) => {
-      const lerp = (a, b, u) => a + (b - a) * u;
-      const pt = (k, u) => [lerp(X(i), X(i + 1), u), Y(lerp(acum[i][k], acum[i + 1][k], u))];
-      const [a0, a1, b0, b1] = [pt(0, u0), pt(0, u1), pt(1, u0), pt(1, u1)];
-      const dm = lerp(d0, d1, (u0 + u1) / 2);
-      if (Math.abs(dm) < 0.01) return null;
-      return <polygon key={`${i}-${u0}`} points={`${a0} ${a1} ${b1} ${b0}`} fill={dm > 0 ? cL : cV} opacity=".22"/>;
-    };
-    if (d0 * d1 < 0) { const u = d0 / (d0 - d1); franjas.push(tramo(0, u), tramo(u, 1)); }
-    else franjas.push(tramo(0, 1));
-  }
-  const linea = k => acum.map((_, i) => `${i ? 'L' : 'M'}${P(i, k)[0].toFixed(1)},${P(i, k)[1].toFixed(1)}`).join(' ');
-  const area = k => `${linea(k)} L${X(qs.length)},${base} L${X(0)},${base} Z`;
-  const fin = acum[acum.length - 1];
-  const ganaL = fin[0] >= fin[1];
-  // Etiquetas finales a la derecha, separadas si quedan pegadas.
-  let yL = Y(fin[0]), yV = Y(fin[1]);
-  if (Math.abs(yL - yV) < 22) { const m = (yL + yV) / 2; if (yL <= yV) { yL = m - 11; yV = m + 11; } else { yL = m + 11; yV = m - 11; } }
+  const W = 440, H = 220, l = 16, r = 56, t = 22, base = 182;
+  const n = qs.length;
+  const X = i => l + (i * (W - l - r)) / n;
+  const fin = acum[n];
+
+  // ── escalas
+  const topeM = Math.max(...acum.flat(), 10) * 1.1;
+  const YM = v => base - (v / topeM) * (base - t);
+  const topeD = Math.max(maxL, maxV, 5) * 1.25;
+  const mid = (t + base) / 2;
+  const YD = v => mid - (v / topeD) * ((base - t) / 2);
+
+  const camino = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const ptsL = acum.map((p, i) => [X(i), YM(p[0])]);
+  const ptsV = acum.map((p, i) => [X(i), YM(p[1])]);
+  const ptsD = lead.map((d, i) => [X(i), YD(d)]);
+
+  // Franja entre líneas (marcador) / área sobre-bajo cero (ventaja), cortadas en los cruces.
+  const tramos = (f0, f1, yA, yB) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const d0 = lead[i], d1 = lead[i + 1];
+      const corte = (u0, u1) => {
+        const lp = (a, b, u) => a + (b - a) * u;
+        const dm = lp(d0, d1, (u0 + u1) / 2);
+        if (Math.abs(dm) < 0.01) return null;
+        const xa = lp(X(i), X(i + 1), u0), xb = lp(X(i), X(i + 1), u1);
+        const p = [[xa, yA(i, u0)], [xb, yA(i, u1)], [xb, yB(i, u1)], [xa, yB(i, u0)]];
+        return <polygon key={`${i}-${u0}`} points={p.map(q => q.join(',')).join(' ')} fill={dm > 0 ? cL : cV} opacity={f0}/>;
+      };
+      if (d0 * d1 < 0) { const u = d0 / (d0 - d1); out.push(corte(0, u), corte(u, 1)); }
+      else out.push(corte(0, 1));
+    }
+    return out;
+  };
+  const lpA = (k) => (i, u) => YM(acum[i][k] + (acum[i + 1][k] - acum[i][k]) * u);
+  const franjaM = tramos(.24, 0, lpA(0), lpA(1));
+  const franjaD = tramos(.38, 0, (i, u) => YD(lead[i] + (lead[i + 1] - lead[i]) * u), () => YD(0));
+
+  let yL = YM(fin[0]), yV = YM(fin[1]);
+  if (Math.abs(yL - yV) < 24) { const m = (yL + yV) / 2; if (yL <= yV) { yL = m - 12; yV = m + 12; } else { yL = m + 12; yV = m - 12; } }
+
+  const [sa, sb] = qs[sel];
+  const sd = lead[sel + 1];
+  const cSel = sa > sb ? cL : sb > sa ? cV : '#AEB8CB';
+  const cambiar = m => { setModo(m); setAnim(a => a + 1); };
 
   return (
     <div className="rsm-card rsm-evo">
-      <svg viewBox={`0 0 ${W} ${H}`} className="rsm-svg" role="img" aria-label="Evolución del marcador por cuarto">
+      <div className="rsm-evo-top">
+        <div className="rsm-seg" role="tablist">
+          <button type="button" className={modo === 'marcador' ? 'is-on' : ''} onClick={() => cambiar('marcador')}>Marcador</button>
+          <button type="button" className={modo === 'ventaja' ? 'is-on' : ''} onClick={() => cambiar('ventaja')}>Ventaja</button>
+        </div>
+        <div className="rsm-ley rsm-ley--mini">
+          <span style={{ color: cL }}><i style={{ background: cL }}/>{eqL?.name}</span>
+          <span style={{ color: cV }}><i style={{ background: cV }}/>{eqV?.name}</span>
+        </div>
+      </div>
+
+      <svg key={`${modo}-${anim}`} viewBox={`0 0 ${W} ${H}`} className="rsm-svg rsm-anim" role="img"
+        aria-label={modo === 'marcador' ? 'Marcador acumulado por cuarto' : 'Ventaja por cuarto'}>
         <defs>
-          <linearGradient id={`gL${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={cL} stopOpacity=".28"/><stop offset="1" stopColor={cL} stopOpacity="0"/></linearGradient>
-          <linearGradient id={`gV${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={cV} stopOpacity=".28"/><stop offset="1" stopColor={cV} stopOpacity="0"/></linearGradient>
-          <filter id={`gl${uid}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+          <filter id={`gl${uid}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2"/></filter>
+          <linearGradient id={`sel${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={cSel} stopOpacity=".22"/><stop offset="1" stopColor={cSel} stopOpacity=".02"/>
+          </linearGradient>
         </defs>
-        {/* fondo de cada cuarto, alternado */}
-        {qs.map((_, i) => i % 2 === 0 && (
-          <rect key={i} x={X(i)} y={t - 8} width={X(i + 1) - X(i)} height={base - t + 8} fill="rgba(255,255,255,.025)"/>
+
+        {/* columnas de cada cuarto (se tocan) */}
+        {qs.map((_, i) => (
+          <rect key={`c${i}`} x={X(i) + 1} y={t - 12} width={X(i + 1) - X(i) - 2} height={base - t + 12} rx="8"
+            fill={i === sel ? `url(#sel${uid})` : (i % 2 === 0 ? 'rgba(255,255,255,.022)' : 'transparent')}
+            stroke={i === sel ? cSel : 'none'} strokeOpacity=".35"/>
         ))}
-        <line x1={X(0)} x2={X(qs.length)} y1={base} y2={base} stroke="rgba(255,255,255,.12)"/>
-        <path d={area(ganaL ? 1 : 0)} fill={`url(#${ganaL ? 'gV' : 'gL'}${uid})`}/>
-        <path d={area(ganaL ? 0 : 1)} fill={`url(#${ganaL ? 'gL' : 'gV'}${uid})`}/>
-        {franjas}
-        {[[0, cL], [1, cV]].map(([k, c]) => (
-          <g key={k}>
-            <path d={linea(k)} fill="none" stroke={c} strokeWidth="6" opacity=".35" filter={`url(#gl${uid})`}/>
-            <path d={linea(k)} fill="none" stroke={c} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
-            {acum.map((_, i) => i > 0 && (
-              <circle key={i} cx={P(i, k)[0]} cy={P(i, k)[1]} r={i === qs.length ? 5.5 : 3.5} fill={i === qs.length ? c : '#0F1622'} stroke={c} strokeWidth="2.5"/>
+
+        {modo === 'marcador' ? (
+          <>
+            <line x1={X(0)} x2={X(n)} y1={base} y2={base} stroke="rgba(255,255,255,.12)"/>
+            <g className="rsm-fade">{franjaM}</g>
+            {[[ptsL, cL, 0], [ptsV, cV, 1]].map(([pts, c, k]) => (
+              <g key={k}>
+                <path d={camino(pts)} fill="none" stroke={c} strokeWidth="7" opacity=".3" filter={`url(#gl${uid})`} className="rsm-draw" pathLength="1"/>
+                <path d={camino(pts)} fill="none" stroke={c} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" className="rsm-draw" pathLength="1"/>
+                {pts.map(([x, y], i) => i > 0 && (
+                  <circle key={i} cx={x} cy={y} r={i === sel + 1 ? 6 : 3.8} fill={i === sel + 1 || i === n ? c : '#0F1622'} stroke={c} strokeWidth="2.5"
+                    className="rsm-pop" style={{ animationDelay: `${0.15 + i * 0.12}s` }}/>
+                ))}
+              </g>
             ))}
-          </g>
-        ))}
-        {/* marcador final */}
-        <g fontFamily="'Bebas Neue',sans-serif">
-          <rect x={X(qs.length) + 10} y={yL - 12} width="38" height="24" rx="7" fill={cL} opacity={ganaL ? 1 : .55}/>
-          <text x={X(qs.length) + 29} y={yL + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[0]}</text>
-          <rect x={X(qs.length) + 10} y={yV - 12} width="38" height="24" rx="7" fill={cV} opacity={!ganaL ? 1 : .55}/>
-          <text x={X(qs.length) + 29} y={yV + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[1]}</text>
-        </g>
-        {/* parcial de cada cuarto, con el color del que lo ganó */}
+            <g fontFamily="'Bebas Neue',sans-serif" className="rsm-pop" style={{ animationDelay: '.75s' }}>
+              <rect x={X(n) + 10} y={yL - 12} width="40" height="24" rx="7" fill={cL} opacity={fin[0] >= fin[1] ? 1 : .5}/>
+              <text x={X(n) + 30} y={yL + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[0]}</text>
+              <rect x={X(n) + 10} y={yV - 12} width="40" height="24" rx="7" fill={cV} opacity={fin[1] >= fin[0] ? 1 : .5}/>
+              <text x={X(n) + 30} y={yV + 7} textAnchor="middle" fontSize="19" fill="#0B1018">{fin[1]}</text>
+            </g>
+          </>
+        ) : (
+          <>
+            <line x1={X(0)} x2={X(n)} y1={YD(0)} y2={YD(0)} stroke="rgba(255,255,255,.25)" strokeDasharray="4 4"/>
+            <text x={X(n) + 8} y={YD(0) + 4} fontSize="11" fontWeight="700" fill="#6B7A99" fontFamily="'Barlow Condensed',sans-serif">EMPATE</text>
+            <g className="rsm-fade">{franjaD}</g>
+            <path d={camino(ptsD)} fill="none" stroke="#EEF2F8" strokeWidth="2.5" strokeLinejoin="round" className="rsm-draw" pathLength="1"/>
+            {ptsD.map(([x, y], i) => i > 0 && (
+              <g key={i} className="rsm-pop" style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+                <circle cx={x} cy={y} r={i === sel + 1 ? 6 : 4} fill={lead[i] > 0 ? cL : lead[i] < 0 ? cV : '#AEB8CB'} stroke="#0F1622" strokeWidth="2"/>
+                <text x={x} y={lead[i] >= 0 ? y - 11 : y + 20} textAnchor="middle" fontFamily="'Bebas Neue',sans-serif" fontSize="15"
+                  fill={lead[i] > 0 ? cL : lead[i] < 0 ? cV : '#AEB8CB'}>{lead[i] > 0 ? `+${lead[i]}` : lead[i] < 0 ? `+${-lead[i]}` : '0'}</text>
+              </g>
+            ))}
+          </>
+        )}
+
+        {/* etiquetas y zona táctil por cuarto */}
         {qs.map(([a, b], i) => {
-          const cx = (X(i) + X(i + 1)) / 2;
-          const c = a > b ? cL : b > a ? cV : '#8A96AD';
+          const cx = (X(i) + X(i + 1)) / 2, on = i === sel;
           return (
-            <g key={i} fontFamily="'Barlow Condensed',sans-serif" fontWeight="700" textAnchor="middle">
-              <text x={cx} y={base + 20} fontSize="11" fill="#6B7A99" letterSpacing="1">{etiquetas[i + 1]}</text>
-              <text x={cx} y={base + 40} fontSize="15" fill={c}>{a}-{b}</text>
+            <g key={`t${i}`} onClick={() => setSel(i)} onMouseEnter={() => setSel(i)} style={{ cursor: 'pointer' }}>
+              <rect x={X(i)} y={t - 12} width={X(i + 1) - X(i)} height={H - t + 12} fill="transparent"/>
+              <text x={cx} y={base + 22} textAnchor="middle" fontSize="12" fontWeight="700" letterSpacing="1"
+                fill={on ? '#EEF2F8' : '#6B7A99'} fontFamily="'Barlow Condensed',sans-serif">{cortos[i]}</text>
             </g>
           );
         })}
       </svg>
+
+      {/* detalle del cuarto elegido */}
+      <div className="rsm-det" key={`d${sel}`} style={{ borderColor: hexA(cSel === '#AEB8CB' ? '#8899BB' : cSel, '55') }}>
+        <div className="rsm-det-q">
+          <small>{nombres[sel]}</small>
+          <b style={{ color: cSel }}>{sa > sb ? eqL?.name : sb > sa ? eqV?.name : 'Empate'}</b>
+        </div>
+        <div className="rsm-det-n">
+          <div><b><span style={{ color: cL }}>{sa}</span><i>-</i><span style={{ color: cV }}>{sb}</span></b><small>Parcial</small></div>
+          <div><b>{acum[sel + 1][0]}<i>-</i>{acum[sel + 1][1]}</b><small>Marcador</small></div>
+          <div><b style={{ color: sd > 0 ? cL : sd < 0 ? cV : '#AEB8CB' }}>{sd === 0 ? '0' : `+${Math.abs(sd)}`}</b><small>Ventaja</small></div>
+        </div>
+      </div>
+
       <div className="rsm-chips">
         <div className="rsm-chip" style={{ '--c': cL }}>
           <b style={{ color: maxL > 0 ? cL : '#6B7A99' }}>{maxL > 0 ? `+${maxL}` : '0'}</b>
@@ -160,10 +238,11 @@ function EvolucionMarcador({ partido, eqL, eqV }) {
           <b style={{ color: maxV > 0 ? cV : '#6B7A99' }}>{maxV > 0 ? `+${maxV}` : '0'}</b>
           <small>Mayor ventaja</small><em style={{ color: cV }}>{eqV?.name}</em>
         </div>
-        <div className="rsm-chip" style={{ '--c': qa > qb ? cL : qb > qa ? cV : '#8A96AD' }}>
-          <b>{etiquetas[iClave + 1]}</b>
+        <button type="button" className="rsm-chip rsm-chip--btn" onClick={() => setSel(iClaveIni)}
+          style={{ '--c': qa > qb ? cL : qb > qa ? cV : '#8A96AD' }}>
+          <b>{cortos[iClaveIni]}</b>
           <small>Cuarto clave</small><em style={{ color: qa > qb ? cL : qb > qa ? cV : '#8A96AD' }}>{qa}-{qb}</em>
-        </div>
+        </button>
       </div>
     </div>
   );
@@ -215,7 +294,7 @@ function MapaCalorTiros({ data }) {
         <span className="rsm-heat-h" style={{ color: cL }}>{eqL?.name}</span>
         <span className="rsm-heat-h" style={{ color: cV }}>{eqV?.name}</span>
         {tipos.map(t => [
-          <span key={t.lbl + 'r'} className="rsm-heat-r"><b>{t.lbl}</b><small>×{t.val}</small></span>,
+          <span key={t.lbl + 'r'} className="rsm-heat-r"><b>{t.lbl}</b></span>,
           <CeldaCalor key={t.lbl + 'a'} color={cL} {...t.a} gana={t.a.pct > t.b.pct}/>,
           <CeldaCalor key={t.lbl + 'b'} color={cV} {...t.b} gana={t.b.pct > t.a.pct}/>,
         ])}

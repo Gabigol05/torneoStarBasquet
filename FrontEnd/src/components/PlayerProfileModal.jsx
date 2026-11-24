@@ -660,6 +660,7 @@ export function PlayerProfileModal({ player, isOpen, onClose, statsPorPartido, p
               <div className="pp-team" style={{ color: acento }}>{player.team}</div>
               <div className="pp3-tags">
                 {copaEquipo && <span className="pp3-tag" style={{ color: COPA_COLOR[copaEquipo], background: hexA(COPA_COLOR[copaEquipo], '22') }}>🏆 {COPA_NOMBRE[copaEquipo]}</span>}
+                {pj > 0 && <span className="pp3-tag pp3-tag--pj">{pj} {pj === 1 ? 'partido jugado' : 'partidos jugados'}</span>}
                 {(record.g + record.p) > 0 && <span className="pp3-tag pp3-tag--rec">{record.g}G · {record.p}P</span>}
                 {edadDesde(player.fechaNac) != null && <span className="pp3-tag">🎂 {edadDesde(player.fechaNac)} años</span>}
               </div>

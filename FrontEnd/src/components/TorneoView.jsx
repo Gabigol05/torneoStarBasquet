@@ -829,6 +829,17 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     () => fechas.filter(f => partidos.some(p => p.fecha_id === f.id && p.estado === 'finalizado' && !p.es_playoff)),
     [fechas, partidos]);
 
+  // Día de cada jornada para el chip: si la fecha no tiene `fecha_dia`
+  // cargado (pasaba con la Fecha 11), se usa el primer día de sus partidos.
+  const diaDeFecha = useMemo(() => {
+    const m = {};
+    for (const f of fechas) {
+      const dias = partidos.filter(p => p.fecha_id === f.id).map(p => p.fecha_partido).filter(Boolean).sort();
+      m[f.id] = f.fecha_dia ?? dias[0] ?? null;
+    }
+    return m;
+  }, [fechas, partidos]);
+
   const FechaChips = ({ modo }) => {
     const lista = modo === 'resultados' ? fechasConResultadoRegular : fechasRegulares;
     if (lista.length === 0) return null;
@@ -843,7 +854,7 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
           <button key={f.id}
             className={`fx-chip${fechaSelId === f.id ? ' is-on' : ''}${modo === 'fixture' && f.id === fechaProximaId ? ' is-prox' : ''}`}
             onClick={() => setFechaSelId(prev => prev === f.id ? null : f.id)}>
-            <b>F{f.numero}</b><small>{ddmm(f.fecha_dia) || '—'}</small>
+            <b>F{f.numero}</b><small>{ddmm(diaDeFecha[f.id]) || '—'}</small>
           </button>
         ))}
       </div>

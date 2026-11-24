@@ -7795,10 +7795,10 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
    barra flotante (z-index 400) quedaba por encima de los modales (partido,
    jugador, buscador) y les tapaba la parte de abajo. */
 @media (max-width: 767px) {
-  /* Encabezado chico (logo, lupa, actualizar, redes): vuelve a verse
-     arriba de todo y se va con el scroll — la navegación queda en la
-     barra flotante de abajo, así se aprovecha toda la pantalla. */
-  .mobile-header { display: flex !important; position: relative; top: auto; }
+  /* Encabezado chico (logo, lupa, actualizar, redes): oculto en el
+     celular, como estaba (pedido de Alvaro). Sin el hueco de 64px de la
+     barra vieja de arriba. */
+  .mobile-header { display: none !important; }
   #root { padding-top: 0 !important; }
   .team-page-overlay { padding-top: 0; }
   section[id], div[id="torneo-view"] { scroll-margin-top: 8px; }
@@ -7816,8 +7816,8 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .team-page-hero { align-items: flex-start; gap: 16px; margin-bottom: 18px; }
   .toast-container { top: 12px; }
   .hero {
-    min-height: calc(100vh - 52px);
-    min-height: calc(100svh - 52px);
+    min-height: 100vh;
+    min-height: 100svh;
   }
   /* Modales siempre por encima de la barra flotante */
   .gc-overlay, .gs-overlay { z-index: 500 !important; }
@@ -7827,3 +7827,38 @@ body.theme-masculino .tab-btn.active { border-bottom-color: var(--masc2, #3b82f6
   .gc-modal { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .pp-modal { padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* ══ RESUMEN DEL PARTIDO v3 (detalle de partido) — rediseño 23/11 ══ */
+.rsm { display: flex; flex-direction: column; font-family: 'Barlow Condensed', sans-serif; color: #EEF2F8; }
+.rsm-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 18px 0 8px; }
+.rsm-h:first-child { margin-top: 2px; }
+.rsm-h h4 { margin: 0; font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 20px; letter-spacing: 1.5px; }
+.rsm-h span { font-size: 12.5px; font-weight: 600; color: #6B7A99; }
+.rsm-card { border-radius: 16px; background: #0F1622; border: 1px solid rgba(255,255,255,.08); padding: 14px; }
+.rsm-ley { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.rsm-ley i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.rsm-svg { display: block; width: 100%; height: auto; }
+.rsm-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.rsm-chip { padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,.04); text-align: center; }
+.rsm-chip b { display: block; font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 22px; line-height: 1; }
+.rsm-chip small { font-size: 10.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #7A879E; }
+.rsm-heat { display: grid; grid-template-columns: 44px 1fr 1fr; gap: 6px; }
+.rsm-heat-h { text-align: center; font-size: 12.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding-bottom: 2px; }
+.rsm-heat-r { display: flex; align-items: center; font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: #AEB8CB; }
+.rsm-cell { position: relative; padding: 10px 6px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,.06); }
+.rsm-cell b { display: block; font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 26px; line-height: 1; }
+.rsm-cell small { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.8); }
+.rsm-cell.is-gana::after { content: '▲'; position: absolute; top: 5px; right: 7px; font-size: 9px; color: #fff; }
+.rsm-escala { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 11px; font-weight: 700; color: #6B7A99; }
+.rsm-escala span { flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.55)); }
+.rsm-mar { display: flex; flex-direction: column; gap: 9px; }
+.rsm-mr { display: grid; grid-template-columns: 34px 1fr 78px 1fr 34px; align-items: center; gap: 6px; }
+.rsm-n { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: #6B7A99; text-align: center; }
+.rsm-l { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #8A96AD; line-height: 1.05; }
+.rsm-l small { display: block; font-size: 9.5px; color: #5C6880; letter-spacing: .6px; }
+.rsm-b { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(255,255,255,.05); }
+.rsm-b--izq { justify-content: flex-end; }
+.rsm-b i { display: block; height: 100%; border-radius: 5px; }
+.rsm-tot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 700; }
+.rsm-tot b { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 24px; }
+.rsm-tot-m { color: #6B7A99; }

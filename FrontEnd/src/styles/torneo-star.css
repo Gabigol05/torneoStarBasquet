@@ -8392,3 +8392,11 @@ nav.navbar-sticky.nv3--femenino .nv3-b.is-on { background: var(--fem2, #ff4fa3);
   .gc-btn-share[style*="auto"] { width: auto !important; }
   .gc-badges { flex-wrap: wrap; row-gap: 6px; }
 }
+
+/* Celular: al ir a Tabla/Resultados/Fixture/Equipos/Jugadores desde la
+   barra de abajo quedaba un hueco arriba (48px de padding + 8px de margen
+   de scroll, pensados para la barra vieja de arriba). */
+@media (max-width: 767px) {
+  .torneo-section { padding-top: calc(14px + env(safe-area-inset-top)); }
+  div[id="torneo-view"] { scroll-margin-top: 0; }
+}

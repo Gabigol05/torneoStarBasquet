@@ -458,35 +458,6 @@ function PanelCopa({ cup, info, partidosCopa, proximoId, equipoMap, jugadorasMap
   );
 }
 
-function ProximoPlayoff({ partido, equipoMap, fechas, onAbrirPartido }) {
-  if (!partido) return null;
-  const a = equipoMap[partido.equipo_local_id], b = equipoMap[partido.equipo_visit_id];
-  const cup = CUPS.find(c => c.key === partido.copa);
-  const dia = diaDe(partido, fechas);
-  const hora = horaDe(partido);
-  const inst = partido.instancia === 'semifinal' || partido.instancia === 'cuartos'
-    ? `${INSTANCIA_NOMBRE[partido.instancia]}${partido.llave ? ` ${partido.llave}` : ''}`
-    : INSTANCIA_NOMBRE[partido.instancia] ?? 'Playoffs';
-  const enVivo = partido.estado === 'en_juego';
-  return (
-    <button type="button" className={`pf-next${enVivo ? ' pf-next--vivo' : ''}`} onClick={() => onAbrirPartido?.(partido.id)}>
-      <span className="pf-next-lb">{enVivo ? '● En vivo' : 'Próximo partido'}
-        <b style={{ color: cup?.color }}>{cup ? cup.label.replace('Copa de ', '') : ''} · {inst}</b></span>
-      <span className="pf-next-vs">
-        <Escudo team={a} size={40}/>
-        <span className="pf-next-n">{a?.name ?? 'Por definir'}</span>
-        <i>VS</i>
-        <span className="pf-next-n">{b?.name ?? 'Por definir'}</span>
-        <Escudo team={b} size={40}/>
-      </span>
-      <span className="pf-next-h">
-        <b>{enVivo ? `${partido.puntos_local ?? 0} - ${partido.puntos_visit ?? 0}` : [dia?.txt, hora].filter(Boolean).join(' · ') || 'A confirmar'}</b>
-        <small>📍 {partido.lugar || 'A confirmar'}</small>
-      </span>
-    </button>
-  );
-}
-
 export function PlayoffsBracket() {
   const { mode } = useTournament();
   const { equipos, partidos, fechas } = useStats();
@@ -552,7 +523,6 @@ export function PlayoffsBracket() {
             <p className="section-eyebrow" style={{ color: 'var(--gold)' }}>Postemporada</p>
             <h2 className="section-heading" style={{ marginBottom: 0 }}>Playoffs <span className="gold">2026</span></h2>
           </div>
-          <ProximoPlayoff partido={proximo} equipoMap={equipoMap} fechas={fechas} onAbrirPartido={setSelectedMatch}/>
         </div>
 
         <div className="pf-cups" role="tablist">

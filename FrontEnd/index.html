@@ -70,6 +70,39 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Recuperación de "pantalla negra": si durante un deploy el navegador
+         llegó a guardar un 404 para el JS/CSS nuevo, la app no arranca. Si a los
+         pocos segundos #root sigue vacío (o falla la carga de un script/estilo),
+         se vuelven a pedir esos archivos salteando la caché y se recarga UNA vez. -->
+    <script>
+      (function () {
+        var KEY = 'ts-recupero';
+        function recuperar() {
+          try { if (sessionStorage.getItem(KEY)) return; sessionStorage.setItem(KEY, '1'); } catch (e) {}
+          var urls = [];
+          document.querySelectorAll('script[type="module"][src], link[rel="stylesheet"][href], link[rel="modulepreload"][href]').forEach(function (el) {
+            urls.push(el.src || el.href);
+          });
+          Promise.all(urls.map(function (u) { return fetch(u, { cache: 'reload' }).catch(function () {}); }))
+            .then(function () {
+              if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                return navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.update(); }); });
+              }
+            })
+            .catch(function () {})
+            .then(function () { location.reload(); });
+        }
+        window.addEventListener('error', function (e) {
+          var t = e && e.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) recuperar();
+        }, true);
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.children.length === 0) recuperar();
+          else { try { sessionStorage.removeItem(KEY); } catch (e) {} }
+        }, 6000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

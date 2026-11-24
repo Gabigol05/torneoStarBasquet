@@ -208,21 +208,6 @@ function MapaCalorTiros({ data }) {
     return { nom, lbl, val, a: lado(statsLocal, partido[`${pk}_local`]), b: lado(statsVisit, partido[`${pk}_visit`]) };
   });
   if (tipos.every(t => !t.a.pct && !t.b.pct && !t.a.int && !t.b.int)) return null;
-  const hayTiros = tipos.some(t => t.a.int || t.b.int);
-  const ptsL = tipos.reduce((a, t) => a + t.a.pts, 0), ptsV = tipos.reduce((a, t) => a + t.b.pts, 0);
-  const tonos = ['#22D07A', '#F0B429', '#60A5FA'];
-  const Reparto = ({ eq, c, lado, total }) => (
-    <div className="rsm-rep">
-      <div className="rsm-rep-t"><span style={{ color: c }}>{eq?.name}</span><b>{total} pts</b></div>
-      <div className="rsm-rep-bar">
-        {tipos.map((t, i) => t[lado].pts > 0 && (
-          <i key={t.lbl} style={{ flex: t[lado].pts, background: tonos[i] }}>
-            {t[lado].pts / Math.max(total, 1) > .14 && <span>{t[lado].pts}</span>}
-          </i>
-        ))}
-      </div>
-    </div>
-  );
   return (
     <div className="rsm-card">
       <div className="rsm-heat">
@@ -235,18 +220,6 @@ function MapaCalorTiros({ data }) {
           <CeldaCalor key={t.lbl + 'b'} color={cV} {...t.b} gana={t.b.pct > t.a.pct}/>,
         ])}
       </div>
-      {hayTiros && (ptsL > 0 || ptsV > 0) && (
-        <div className="rsm-reparto">
-          <div className="rsm-reparto-h">
-            <span>De dónde salieron los puntos</span>
-            <span className="rsm-reparto-ley">
-              {tipos.map((t, i) => <span key={t.lbl}><i style={{ background: tonos[i] }}/>{t.lbl}</span>)}
-            </span>
-          </div>
-          <Reparto eq={eqL} c={cL} lado="a" total={ptsL}/>
-          <Reparto eq={eqV} c={cV} lado="b" total={ptsV}/>
-        </div>
-      )}
     </div>
   );
 }

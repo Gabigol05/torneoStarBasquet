@@ -27,35 +27,12 @@ function dispatchTabChange(tabKey) {
 export function Navbar() {
   const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
   const { mode } = useTournament();
-  // Sección visible según el scroll (la línea de referencia es justo debajo
-  // del menú fijo). useActiveSection no servía acá: pide que el 30% de la
-  // sección esté en pantalla y la vista del torneo es más alta que la
-  // pantalla, así que nunca se marcaba y quedaba siempre "Inicio".
-  const [seccion, setSeccion] = useState('inicio');
-  useEffect(() => {
-    let raf = 0;
-    const calcular = () => {
-      raf = 0;
-      const linea = 120;
-      const torneo = document.getElementById('torneo-view')?.getBoundingClientRect();
-      const hero = document.getElementById('inicio')?.getBoundingClientRect();
-      if (torneo && torneo.top <= linea && torneo.bottom > linea) setSeccion('torneo');
-      else if (!hero || hero.bottom > linea) setSeccion('inicio');
-      else setSeccion('otra');
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(calcular); };
-    calcular();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   // Pestaña abierta en la vista del torneo (la avisa TorneoView).
-  const [tabActual, setTabActual] = useState('tabla');
+  // Sección elegida: queda marcada aunque después vuelvas a subir. Arranca
+  // en "Inicio" y cambia al tocar un botón del menú (o al cambiar de
+  // pestaña dentro de la vista del torneo).
+  const [seleccion, setSeleccion] = useState('inicio');
   // ⚠️ FIX: el buscador global recibía `equipos` sin filtrar por temporada —
   // buscando mientras se mira una temporada archivada, podía devolver un
   // equipo que solo juega en la otra temporada (y su plantel actual, no el
@@ -64,11 +41,18 @@ export function Navbar() {
   const { equiposDeTemporada } = useEquiposDeTemporada(equipos, mode);
 
   useEffect(() => {
-    const onTab = e => { if (e.detail?.tab) setTabActual(e.detail.tab); };
-    window.addEventListener('star:tab-actual', onTab);
+    // TorneoView avisa su pestaña también al montarse (siempre "tabla"):
+    // ese primer aviso se ignora para que al entrar quede marcado "Inicio".
+    let primero = true;
+    const onTabActual = e => {
+      if (primero) { primero = false; return; }
+      if (e.detail?.tab) setSeleccion(e.detail.tab);
+    };
+    const onTab = e => { if (e.detail?.tab) setSeleccion(e.detail.tab); };
+    window.addEventListener('star:tab-actual', onTabActual);
     window.addEventListener('star:tab', onTab);
     return () => {
-      window.removeEventListener('star:tab-actual', onTab);
+      window.removeEventListener('star:tab-actual', onTabActual);
       window.removeEventListener('star:tab', onTab);
     };
   }, []);
@@ -76,11 +60,11 @@ export function Navbar() {
   const irATab = useCallback((tab) => (e) => {
     e.preventDefault();
     document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-    setTabActual(tab);
+    setSeleccion(tab);
     setTimeout(() => dispatchTabChange(tab), 400);
   }, []);
 
-  const activo = seccion === 'inicio' ? 'inicio' : seccion === 'torneo' ? tabActual : null;
+  const activo = seleccion;
 
   const izq = [
     { key: 'inicio',     label: 'Inicio',     href: '#inicio' },
@@ -96,7 +80,7 @@ export function Navbar() {
     <a key={it.key} href={it.href}
       className={`nv3-b${activo === it.key ? ' is-on' : ''}`}
       aria-current={activo === it.key ? 'page' : undefined}
-      onClick={it.key === 'inicio' ? undefined : irATab(it.key)}>
+      onClick={it.key === 'inicio' ? () => setSeleccion('inicio') : irATab(it.key)}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         {ICONOS[it.key]}
       </svg>

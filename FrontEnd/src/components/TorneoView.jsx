@@ -605,6 +605,11 @@ export function TorneoView({ onSelectPlayer: extSelectPlayer, onSelectTeam: extS
     return () => window.removeEventListener('star:tab', handler);
   }, []);
 
+  // Avisa qué pestaña quedó abierta (lo usa el menú de arriba para marcarla).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('star:tab-actual', { detail: { tab: activeTab } }));
+  }, [activeTab]);
+
   useEffect(() => {
     const t = setTimeout(() => {
       document.querySelectorAll('.reveal-on-scroll:not(.in-view)').forEach(el => el.classList.add('in-view'));

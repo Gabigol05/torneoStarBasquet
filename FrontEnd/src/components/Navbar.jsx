@@ -1,5 +1,5 @@
-﻿import logo from '../assets/logo_torneo.jpg';
-import { useState, useCallback } from 'react';
+import logo from '../assets/logo_torneo.jpg';
+import { useState, useCallback, useEffect } from 'react';
 import { GlobalSearch } from './GlobalSearch';
 import { useStats } from '../context/StatsContext';
 import { PlayerProfileModal } from './LazyModals';
@@ -7,16 +7,31 @@ import { useTournament } from '../context/TournamentContext';
 import { useActiveSection } from '../hooks/useActiveSection';
 import { useEquiposDeTemporada } from '../hooks/useEquiposDeTemporada';
 
+// Mismos íconos que las pestañas de la vista del torneo.
+const ICONOS = {
+  inicio: <><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+  tabla: <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></>,
+  resultados: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></>,
+  fixture: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+  equipos: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+  jugadores: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></>,
+};
+
 function dispatchTabChange(tabKey) {
   window.dispatchEvent(new CustomEvent('star:tab', { detail: { tab: tabKey } }));
 }
 
+// Menú de escritorio (rediseño 24/11): Inicio · Tabla · Resultados | TSB |
+// Fixture · Equipos · Jugadores. Las secciones del torneo bajan a la vista
+// del torneo y abren su pestaña. TSB queda siempre al centro de la pantalla
+// y debajo dice la categoría que se está mirando.
 export function Navbar() {
   const { equipos = [], partidos = [], fechas = [], statsPorPartido = {} } = useStats();
   const { mode } = useTournament();
   const activeSection = useActiveSection();
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  // Pestaña abierta en la vista del torneo (la avisa TorneoView).
+  const [tabActual, setTabActual] = useState('tabla');
   // ⚠️ FIX: el buscador global recibía `equipos` sin filtrar por temporada —
   // buscando mientras se mira una temporada archivada, podía devolver un
   // equipo que solo juega en la otra temporada (y su plantel actual, no el
@@ -24,29 +39,47 @@ export function Navbar() {
   // posiciones y los KPIs (ver useEquiposDeTemporada).
   const { equiposDeTemporada } = useEquiposDeTemporada(equipos, mode);
 
-  const closeMobile = () => setIsMobileOpen(false);
-
-  const handleEquiposClick = useCallback((e) => {
-    e.preventDefault();
-    closeMobile();
-    document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-    setTimeout(() => dispatchTabChange('equipos'), 400);
+  useEffect(() => {
+    const onTab = e => { if (e.detail?.tab) setTabActual(e.detail.tab); };
+    window.addEventListener('star:tab-actual', onTab);
+    window.addEventListener('star:tab', onTab);
+    return () => {
+      window.removeEventListener('star:tab-actual', onTab);
+      window.removeEventListener('star:tab', onTab);
+    };
   }, []);
 
-  const handleJugadoresClick = useCallback((e) => {
+  const irATab = useCallback((tab) => (e) => {
     e.preventDefault();
-    closeMobile();
     document.getElementById('torneo-view')?.scrollIntoView({ behavior: 'smooth' });
-    setTimeout(() => dispatchTabChange('jugadores'), 400);
+    setTabActual(tab);
+    setTimeout(() => dispatchTabChange(tab), 400);
   }, []);
 
-  const isActive = (href) => {
-    if (href === '#inicio')    return activeSection === 'inicio';
-    if (href === '#jugadores') return activeSection === 'jugadores' || activeSection === 'torneo-view';
-    if (href === '#equipos')   return activeSection === 'equipos';
-    if (href === '#bracket')   return activeSection === 'bracket';
-    return false;
-  };
+  const enTorneo = ['torneo-view', 'jugadores', 'equipos'].includes(activeSection);
+  const activo = activeSection === 'inicio' ? 'inicio' : enTorneo ? tabActual : null;
+
+  const izq = [
+    { key: 'inicio',     label: 'Inicio',     href: '#inicio' },
+    { key: 'tabla',      label: 'Tabla',      href: '#torneo-view' },
+    { key: 'resultados', label: 'Resultados', href: '#torneo-view' },
+  ];
+  const der = [
+    { key: 'fixture',   label: 'Fixture',   href: '#torneo-view' },
+    { key: 'equipos',   label: 'Equipos',   href: '#torneo-view' },
+    { key: 'jugadores', label: mode === 'femenino' ? 'Jugadoras' : 'Jugadores', href: '#torneo-view' },
+  ];
+  const boton = it => (
+    <a key={it.key} href={it.href}
+      className={`nv3-b${activo === it.key ? ' is-on' : ''}`}
+      aria-current={activo === it.key ? 'page' : undefined}
+      onClick={it.key === 'inicio' ? undefined : irATab(it.key)}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {ICONOS[it.key]}
+      </svg>
+      {it.label}
+    </a>
+  );
 
   return (
     <>
@@ -60,50 +93,23 @@ export function Navbar() {
         mode={mode}
       />
 
-      <nav className="navbar-sticky">
-        <a href="#inicio" className="nav-brand" onClick={closeMobile}>
-          <div className="nav-logo-ring">
-            <img src={logo} alt="logo" className="logo-img" width="60" />
-          </div>
+      <nav className={`navbar-sticky nv3 nv3--${mode}`} aria-label="Secciones">
+        <a href="#inicio" className="nv3-logo" title="Inicio">
+          <img src={logo} alt="Torneo Star Básquet" width="54" height="54" />
         </a>
 
-        <ul className={`nav-links ${isMobileOpen ? 'mobile-open' : ''}`}>
-          <li>
-            <a href="#inicio" className={isActive('#inicio') ? 'active' : ''} onClick={closeMobile}>
-              Inicio
-            </a>
-          </li>
-          <li>
-            
-              <a
-              href="#jugadores"
-              className={isActive('#jugadores') ? 'active' : ''}
-              onClick={handleJugadoresClick}
-            >
-              {mode === 'femenino' ? 'Jugadoras' : 'Jugadores'}
-            </a>
-          </li>
-          <li>
-            
-              <a
-              href="#equipos"
-              className={`nav-equipos-link ${isActive('#equipos') ? 'active' : ''} nav-mode-${mode}`}
-              onClick={handleEquiposClick}
-              title={`Ver equipos ${mode === 'femenino' ? 'femeninos' : 'masculinos'}`}
-            >
-              Equipos
-              <span className={`nav-mode-dot nav-mode-dot-${mode}`} />
-            </a>
-          </li>
-          <li>
-            <a href="#bracket" className={isActive('#bracket') ? 'active' : ''} onClick={closeMobile}>
-              Playoffs
-            </a>
-          </li>
-        </ul>
+        <div className="nv3-lado nv3-lado--izq"><div className="nv3-grupo">{izq.map(boton)}</div></div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <a href="#inicio" className="nv3-tsb" aria-label="Torneo Star Básquet">
+          <b>TSB</b>
+          <small>{mode === 'femenino' ? 'Femenino' : 'Masculino'}</small>
+        </a>
+
+        <div className="nv3-lado nv3-lado--der"><div className="nv3-grupo">{der.map(boton)}</div></div>
+
+        <div className="nv3-acciones">
           <GlobalSearch
+            compacto
             equipos={equiposDeTemporada}
             onSelectPlayer={setSelectedPlayer}
             onSelectTeam={() => {
@@ -112,23 +118,18 @@ export function Navbar() {
             }}
           />
 
-          <a href="https://www.youtube.com/@TorneoStarBasquet" target="_blank" rel="noopener noreferrer" className="social-btn social-btn--yt" title="Mirar en YouTube" aria-label="YouTube">
+          <a href="https://www.youtube.com/@TorneoStarBasquet" target="_blank" rel="noopener noreferrer" className="nv3-ic nv3-ic--yt" title="Mirar en YouTube" aria-label="YouTube">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
             </svg>
           </a>
-
-          <a href="https://www.instagram.com/torneostar.basquet/" target="_blank" rel="noopener noreferrer" className="social-btn social-btn--ig" title="Instagram @torneostar.basquet" aria-label="Instagram">
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+          <a href="https://www.instagram.com/torneostar.basquet/" target="_blank" rel="noopener noreferrer" className="nv3-ic nv3-ic--ig" title="Instagram @torneostar.basquet" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
             </svg>
           </a>
-
-          <button className="hamburger-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>&#9776;</button>
         </div>
       </nav>
     </>
   );
 }
-
-

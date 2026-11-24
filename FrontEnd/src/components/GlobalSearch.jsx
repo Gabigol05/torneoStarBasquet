@@ -27,7 +27,7 @@ const FILTROS = [
   { key: 'equipo',  label: 'Equipos' },
 ];
 
-export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
+export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam, compacto = false }) {
   const { mode } = useTournament();
   // equipos viene de PageHome (ya tiene stats) — sin doble fetch
   const {
@@ -91,7 +91,7 @@ export function GlobalSearch({ equipos = [], onSelectPlayer, onSelectTeam }) {
   return (
     <>
       {/* Trigger */}
-      <button className="gs-trigger" onClick={open} title="Buscar (Ctrl+K)">
+      <button className={`gs-trigger${compacto ? ' gs-trigger--compacto' : ''}`} onClick={open} title="Buscar (Ctrl+K)" aria-label="Buscar">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>

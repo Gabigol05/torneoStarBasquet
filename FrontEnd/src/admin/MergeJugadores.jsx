@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { recalcularTodos } from './RecalcularStats';
+import { UI } from './ui';
 
 export default function MergeJugadores({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('masculino');
@@ -278,3 +279,5 @@ const S = {
   logBox:  { marginTop: 20, background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 10,
              padding: '1rem', minHeight: 60 },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(S, { title: { display: 'none' }, hint: UI.hint, warning: UI.warning, label: UI.label, select: UI.input, btnSecondary: UI.btnBlue, btnDanger: UI.btnDanger, analisisBox: UI.card, logBox: UI.logBox });

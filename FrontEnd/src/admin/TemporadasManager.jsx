@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTemporada } from '../context/TemporadaContext';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
+import { UI } from './ui';
 
 const CATEGORIAS = [
   { key: 'femenino',  label: 'Femenino',  icon: '👧' },
@@ -450,3 +451,5 @@ const S = {
   progressTrack: { height: 5, borderRadius: 100, background: '#080C12', overflow: 'hidden', marginBottom: 8 },
   progressFill:  { height: '100%', borderRadius: 100, transition: 'width .3s' },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(S, { msgOk: UI.msgOk, msgErr: UI.msgErr, crearBox: UI.card, crearLabel: UI.label, crearInput: UI.input, btnNueva: UI.btnPrimary, btnCrearConfirmar: UI.btnPrimary, btnCancelar: UI.btnSec, archCard: { ...UI.cardSuave, userSelect: 'none' } });

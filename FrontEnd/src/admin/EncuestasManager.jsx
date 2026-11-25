@@ -4,6 +4,7 @@ import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
+import { UI } from './ui';
 
 const ROSTER = {
   femenino:  equiposFemenino.map(e => ({ id: e.id, nombre: e.name, color: e.color })),
@@ -311,3 +312,5 @@ const F = {
   btnSec: { padding: '10px 18px', background: 'transparent', border: '1px solid #4A566E', borderRadius: 9, color: '#6B7A99', cursor: 'pointer', fontSize: 13 },
   quickBtn: { padding: '6px 10px', background: 'transparent', border: '1px solid', borderRadius: 7, cursor: 'pointer', fontSize: 12 },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(F, { label: UI.label, input: UI.input, card: UI.card, btnPrimary: UI.btnPrimary, btnSec: UI.btnSec, quickBtn: UI.quickBtn });

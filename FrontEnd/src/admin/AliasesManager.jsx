@@ -4,6 +4,7 @@ import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
+import { UI } from './ui';
 
 const EQUIPOS_MAP = Object.fromEntries(
   [...equiposFemenino, ...equiposMasculino].map(e => [e.id, e])
@@ -198,3 +199,5 @@ const S = {
   delBtn:  { padding: '6px 12px', background: 'rgba(240,64,96,.08)', border: '1px solid rgba(240,64,96,.2)',
              borderRadius: 6, color: '#F04060', cursor: 'pointer', fontSize: 12, fontFamily: "'Barlow Condensed',sans-serif" },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(S, { title: { display: 'none' }, hint: UI.hint, search: { ...UI.input, maxWidth: 420 }, tableWrap: UI.tableWrap, th: UI.th, td: UI.td, delBtn: UI.btnDangerSoft });

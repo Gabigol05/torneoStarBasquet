@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { UI } from './ui';
 
 // ⚠️ FIX (importante, misma clase de bug que se arregló en StatsEditor.jsx y
 // en ExcelUpload.jsx esta sesión): desde que existen temporadas,
@@ -202,3 +203,5 @@ const S = {
   logBox: { marginTop:20, background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid #1C2535', borderRadius:10,
             padding:'1rem', minHeight:100 },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(S, { title: { display: 'none' }, hint: UI.hint, warning: UI.warningRojo, btn: UI.btnPrimary, logBox: UI.logBox });

@@ -7,6 +7,8 @@ import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
 import { recalcularPromedios } from '../lib/recalcularPromedios';
 import { analizarPlayoffs, labelCruce, esTextoPlayoff, slotsOcupados } from './playoffDetect';
+import { UI } from './ui';
+import './partidos.css';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -1123,13 +1125,13 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
       {/* Acciones principales */}
       {view==='lista' && (
         <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-          <button onClick={()=>setView('fixture')}
-            style={{ ...F.btnPrimary, background:'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
-            📅 CARGAR FIXTURE DE UNA FECHA
+          <button onClick={()=>setView('fixture')} style={UI.btnBlue}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+            Cargar fixture de una fecha
           </button>
-          <button onClick={()=>setView('nuevo')}
-            style={{ ...F.btnSec, display:'flex', alignItems:'center', gap:6 }}>
-            ➕ Partido individual
+          <button onClick={()=>setView('nuevo')} style={F.btnSec}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Partido individual
           </button>
         </div>
       )}
@@ -1198,76 +1200,79 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
       )}
 
       {/* Filtros */}
-      {view==='lista' && (
-        <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
-          <select value={filtroFecha} onChange={e=>setFiltroFecha(e.target.value)}
-            style={{ ...F.input, flex:1, minWidth:140 }}>
-            <option value="">Todas las fechas</option>
-            {fechas.map(f=><option key={f.id} value={f.id}>{f.descripcion??`Fecha ${f.numero}`}</option>)}
-          </select>
-          <select value={filtroEstado} onChange={e=>setFiltroEstado(e.target.value)}
-            style={{ ...F.input, flex:1, minWidth:140 }}>
-            <option value="">Todos los estados</option>
-            <option value="pendiente">Pendientes</option>
-            <option value="en_juego">En juego</option>
-            <option value="finalizado">Finalizados</option>
-          </select>
-          <div style={{ fontSize:13, color:'#6B7A99', display:'flex', alignItems:'center' }}>
-            {partidosFiltrados.length} partido(s)
+      {view==='lista' && (() => {
+        const base = partidos.filter(p => !filtroFecha || String(p.fecha_id) === String(filtroFecha));
+        const cuenta = e => base.filter(p => !e || p.estado === e).length;
+        return (
+          <div className="pm-filtros">
+            <div className="pm-chips">
+              {[['', 'Todos'], ['pendiente', 'Pendientes'], ['en_juego', 'En vivo'], ['finalizado', 'Finalizados']].map(([v, l]) => (
+                <button key={v || 'todos'} type="button" className={`pm-chip${filtroEstado === v ? ' is-on' : ''}`} onClick={() => setFiltroEstado(v)}>
+                  {l}<small>{cuenta(v)}</small>
+                </button>
+              ))}
+            </div>
+            <select value={filtroFecha} onChange={e=>setFiltroFecha(e.target.value)} className="pm-sel">
+              <option value="">Todas las fechas</option>
+              {fechas.map(f=><option key={f.id} value={f.id}>{f.descripcion??`Fecha ${f.numero}`}</option>)}
+            </select>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Lista agrupada por fecha */}
       {view==='lista' && (
         partidos.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'3rem', color:'#6B7A99' }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>📅</div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, color:'#EEF2F8', marginBottom:8 }}>Sin partidos cargados</div>
-            <div>Usá "Cargar Fixture de una Fecha" para empezar</div>
+          <div className="pm-vacio">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+            <b>Sin partidos cargados</b>
+            <span>Usá "Cargar fixture de una fecha" para empezar</span>
           </div>
+        ) : partidosFiltrados.length === 0 ? (
+          <div className="pm-vacio"><b>No hay partidos con ese filtro</b></div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+          <div className="pm-lista">
             {fechaIds.map(fid => {
               const fecha = fechas.find(f=>f.id===Number(fid));
               const ps    = porFecha[fid];
+              const todos = partidos.filter(p => String(p.fecha_id) === String(fid));
+              const jug   = todos.filter(p => p.estado === 'finalizado').length;
+              const pct   = todos.length ? Math.round((jug / todos.length) * 100) : 0;
+              const dia   = fecha?.fecha_dia ? new Date(fecha.fecha_dia + 'T12:00:00') : null;
               return (
-                <div key={fid}>
-                  {/* Header de fecha */}
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, paddingBottom:8, borderBottom:'1px solid #1C2535' }}>
-                    <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:1, color:'#F0B429' }}>
-                      {fecha ? (fecha.descripcion ?? `Fecha ${fecha.numero}`) : 'Sin fecha asignada'}
+                <section key={fid} className="pm-fecha">
+                  <header className="pm-fh">
+                    {dia ? (
+                      <span className="pm-cal"><small>{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][dia.getDay()]}</small><b>{dia.getDate()}</b></span>
+                    ) : <span className="pm-cal pm-cal--sin"><b>—</b></span>}
+                    <div className="pm-fh-t">
+                      <b>{fecha ? (fecha.descripcion ?? `Fecha ${fecha.numero}`) : 'Sin fecha asignada'}</b>
+                      <span>{dia ? dia.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : 'Sin día'} · {jug}/{todos.length} jugados</span>
                     </div>
-                    {fecha?.fecha_dia && (
-                      <div style={{ fontSize:12, color:'#6B7A99' }}>
-                        📅 {new Date(fecha.fecha_dia + 'T00:00:00').toLocaleDateString('es-AR')}
-                      </div>
-                    )}
-                    <div style={{ fontSize:11, color:'#4A566E' }}>{ps.length} partido(s)</div>
+                    <div className="pm-prog"><i style={{ width: `${pct}%` }}/></div>
                     {fecha && (
-                      <button onClick={() => abrirEditFecha(fecha)} title="Editar día/nombre de esta fecha"
-                        style={{ marginLeft:'auto', background:'transparent', border:'1px solid #1C2535', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:13 }}>
-                        ✏️
+                      <button type="button" onClick={() => abrirEditFecha(fecha)} title="Editar día/nombre de esta fecha" className="pm-ib">
+                        <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>
                       </button>
                     )}
-                  </div>
+                  </header>
 
                   {/* Editor inline de la fecha (número/nombre/día) */}
                   {fecha && editandoFechaId === fecha.id && (
-                    <div style={{ background:'linear-gradient(160deg,#101826,#0B111C)', border:'1px solid rgba(240,180,41,.25)', borderRadius:10, padding:14, marginBottom:14, display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
+                    <div className="pm-edit-fecha">
                       <div style={{ minWidth:100 }}>
-                        <label style={F.label}>NÚMERO</label>
+                        <label style={F.label}>Número</label>
                         <input type="number" value={fechaEditForm.numero} style={F.input}
                           onChange={e => setFechaEditForm(f => ({ ...f, numero:e.target.value }))}/>
                       </div>
                       <div style={{ flex:1, minWidth:160 }}>
-                        <label style={F.label}>NOMBRE / DESCRIPCIÓN</label>
+                        <label style={F.label}>Nombre / descripción</label>
                         <input type="text" value={fechaEditForm.descripcion} style={F.input}
                           placeholder={`Fecha ${fechaEditForm.numero || ''}`}
                           onChange={e => setFechaEditForm(f => ({ ...f, descripcion:e.target.value }))}/>
                       </div>
                       <div style={{ minWidth:160 }}>
-                        <label style={F.label}>DÍA</label>
+                        <label style={F.label}>Día</label>
                         <input type="date" value={fechaEditForm.fecha_dia} style={F.input}
                           onChange={e => setFechaEditForm(f => ({ ...f, fecha_dia:e.target.value }))}/>
                       </div>
@@ -1276,91 +1281,64 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                     </div>
                   )}
 
-                  {/* Partidos de esta fecha */}
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div className="pm-grid">
                     {ps.map(p => {
-                      const cA = EQUIPOS.find(e=>e.id===p.equipo_local_id)?.color ?? '#4A566E';
-                      const cB = EQUIPOS.find(e=>e.id===p.equipo_visit_id)?.color ?? '#4A566E';
-                      return (
-                      <div key={p.id}>
-                      <div style={{
-                        background:`linear-gradient(115deg, ${cA}22, #0E1420 45%, ${cB}22)`,
-                        border:'1px solid #1C2535',
-                        borderRadius:12, padding:'14px 16px',
-                        display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
-                      }}>
-                        {/* Equipos + marcador */}
-                        <div style={{ flex:1, minWidth:220 }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                            <LogoEq id={p.equipo_local_id} equipos={EQUIPOS} size={24}/>
-                            <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:14 }}>{nombreEq(p.equipo_local_id)}</span>
-                            {p.estado==='finalizado' && (
-                              <>
-                                <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:20, color:'#F0B429', margin:'0 4px' }}>
-                                  {p.puntos_local} – {p.puntos_visit}
-                                </span>
-                              </>
-                            )}
-                            {p.estado!=='finalizado' && (
-                              <span style={{ color:'#4A566E', margin:'0 6px' }}>vs</span>
-                            )}
-                            <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:14 }}>{nombreEq(p.equipo_visit_id)}</span>
-                            <LogoEq id={p.equipo_visit_id} equipos={EQUIPOS} size={24}/>
-                          </div>
-                          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                            <EstadoBadge estado={p.estado}/>
-                            {p.es_playoff && (
-                              <span style={{ fontSize:10, fontWeight:700, letterSpacing:1, padding:'2px 8px', borderRadius:4,
-                                background:'rgba(240,180,41,.15)', color:'#F0B429', border:'1px solid rgba(240,180,41,.35)' }}>
-                                🏆 PLAYOFFS{p.copa ? ` · ${COPAS_PLAYOFF.find(c=>c.value===p.copa)?.label ?? p.copa}` : ''}{p.instancia ? ` · ${INSTANCIAS_PLAYOFF.find(i=>i.value===p.instancia)?.label ?? p.instancia}` : ''}
-                              </span>
-                            )}
-                            {p.fecha_partido && (
-                              <span style={{ fontSize:11, color:'#4FA3FF', background:'rgba(79,163,255,.1)', border:'1px solid rgba(79,163,255,.25)', borderRadius:4, padding:'1px 6px' }}>
-                                📅 {new Date(p.fecha_partido + 'T00:00:00').toLocaleDateString('es-AR')}
-                              </span>
-                            )}
-                            {p.hora_inicio && <span style={{ fontSize:11, color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:14 }}>🕐 {p.hora_inicio.slice(0,5)}</span>}
-                    {p.lugar && <span style={{ fontSize:11, color:'#4A566E' }}>📍 {p.lugar}</span>}
-                            {/* Parciales */}
-                            {p.estado==='finalizado' && p.q1_local!=null && (
-                              <div style={{ display:'flex', gap:4 }}>
-                                {['q1','q2','q3','q4'].map(q => (
-                                  <span key={q} style={{ fontSize:10, background:'#141C2A', borderRadius:3, padding:'1px 5px', color:'#6B7A99' }}>
-                                    {p[`${q}_local`]}-{p[`${q}_visit`]}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                      const eL = EQUIPOS.find(e=>e.id===p.equipo_local_id);
+                      const eV = EQUIPOS.find(e=>e.id===p.equipo_visit_id);
+                      const cA = eL?.color ?? '#4A566E', cB = eV?.color ?? '#4A566E';
+                      const fin = p.estado === 'finalizado', vivo = p.estado === 'en_juego';
+                      const pl = p.puntos_local ?? 0, pv = p.puntos_visit ?? 0;
+                      const conPts = fin || vivo;
+                      const copa = p.es_playoff ? (COPAS_PLAYOFF.find(c=>c.value===p.copa)?.label ?? p.copa) : null;
+                      const inst = p.es_playoff ? (INSTANCIAS_PLAYOFF.find(i=>i.value===p.instancia)?.label ?? p.instancia) : null;
+                      const eq = (e, id, pts, gano) => (
+                        <div className={`pm-t${fin ? (gano ? ' is-g' : ' is-p') : ''}`}>
+                          <span className="pm-esc" style={{ borderColor: e?.color ?? '#4A566E' }}>
+                            {e?.logo && <img src={e.logo} alt="" loading="lazy" onError={ev=>{ev.target.style.visibility='hidden';}}/>}
+                          </span>
+                          <span className="pm-n">{nombreEq(id)}</span>
+                          <span className="pm-pts">{conPts ? pts : ''}</span>
                         </div>
-
-                        {/* Acciones */}
-                        <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-                          {/* Cambio rápido de estado */}
+                      );
+                      return (
+                      <div key={p.id} className="pm-item">
+                      <div className={`pm-card${vivo ? ' is-vivo' : ''}`} style={{ '--cl': cA, '--cv': cB }}>
+                        <div className="pm-h">
+                          <span className={`pm-st pm-st--${p.estado}`}>{fin ? 'Final' : vivo ? '● En vivo' : 'Pendiente'}</span>
+                          {p.es_playoff && <span className="pm-po">🏆 {[copa, inst].filter(Boolean).join(' · ') || 'Playoffs'}{p.llave && p.instancia !== 'final' ? ` ${p.llave}` : ''}</span>}
+                          <span className="pm-cuando">
+                            {p.fecha_partido && new Date(p.fecha_partido + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                            {p.hora_inicio && <b>{p.hora_inicio.slice(0,5)}</b>}
+                          </span>
+                        </div>
+                        {eq(eL, p.equipo_local_id, pl, pl > pv)}
+                        {eq(eV, p.equipo_visit_id, pv, pv > pl)}
+                        {(p.lugar || (fin && p.q1_local != null)) && (
+                          <div className="pm-meta">
+                            {p.lugar && <span className="pm-lugar">📍 {p.lugar}</span>}
+                            {fin && p.q1_local!=null && (
+                              <span className="pm-qs">
+                                {['q1','q2','q3','q4'].map(q => <i key={q}>{p[`${q}_local`]}-{p[`${q}_visit`]}</i>)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="pm-acc">
                           {p.estado==='pendiente' && (
-                            <button onClick={()=>handleEstado(p.id,'en_juego')}
-                              style={{ ...F.quickBtn, borderColor:'rgba(240,180,41,.3)', color:'#F0B429' }}>
-                              ▶ En vivo
-                            </button>
+                            <button type="button" onClick={()=>handleEstado(p.id,'en_juego')} className="pm-btn pm-btn--vivo">▶ En vivo</button>
                           )}
                           {p.estado==='en_juego' && (
-                            <button onClick={()=>handleEstado(p.id,'finalizado')}
-                              style={{ ...F.quickBtn, borderColor:'rgba(34,208,122,.3)', color:'#22D07A' }}>
-                              ✓ Finalizar
-                            </button>
+                            <button type="button" onClick={()=>handleEstado(p.id,'finalizado')} className="pm-btn pm-btn--fin">✓ Finalizar</button>
                           )}
-                          <button onClick={()=>handleEdit(p)} title="Editar partido"
-                            style={{ ...F.iconBtn, borderColor:'#1C2535', color:'#6B7A99' }}>
-                            ✏️
+                          <span className="pm-sp"/>
+                          <button type="button" onClick={()=>handleEdit(p)} title="Editar partido" className="pm-ib">
+                            <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>
                           </button>
-                          <button onClick={()=>toggleHistorial(p.id)} title="Ver historial de ediciones"
-                            style={{ ...F.iconBtn, borderColor: historialAbierto[p.id] ? 'rgba(240,180,41,.4)' : '#1C2535', color: historialAbierto[p.id] ? '#F0B429' : '#6B7A99' }}>
-                            🕘
+                          <button type="button" onClick={()=>toggleHistorial(p.id)} title="Ver historial de ediciones" className={`pm-ib${historialAbierto[p.id] ? ' is-on' : ''}`}>
+                            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 2"/></svg>
                           </button>
-                          <button onClick={()=>handleDelete(p.id)} title="Eliminar partido"
-                            style={{ ...F.iconBtn, borderColor:'rgba(240,64,96,.3)', color:'#F04060' }}>
-                            🗑️
+                          <button type="button" onClick={()=>handleDelete(p.id)} title="Eliminar partido" className="pm-ib pm-ib--del">
+                            <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
                           </button>
                         </div>
                       </div>
@@ -1376,7 +1354,7 @@ export default function PartidosManager({ categoria: categoriaProp, setCategoria
                       );
                     })}
                   </div>
-                </div>
+                </section>
               );
             })}
           </div>
@@ -1400,3 +1378,5 @@ const F = {
   quickBtn:  { padding:'6px 10px', background:'transparent', border:'1px solid', borderRadius:7, cursor:'pointer', fontSize:13 },
   iconBtn:   { width:32, height:32, padding:0, background:'rgba(255,255,255,.04)', border:'1px solid', borderRadius:'50%', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(F, { label: UI.label, input: UI.input, card: UI.card, btnPrimary: UI.btnPrimary, btnSec: UI.btnSec, quickBtn: UI.quickBtn, iconBtn: UI.iconBtn });

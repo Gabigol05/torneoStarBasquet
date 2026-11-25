@@ -4,7 +4,7 @@ import { useRealtimeStatus } from './useRealtimeStatus';
 import { useTournament } from '../context/TournamentContext';
 import { CategoriaToggle } from './categoriaAdmin';
 import { saludoCompleto } from './greeting';
-import Dashboard from './Dashboard';
+import ResumenV2 from './ResumenV2';
 import PartidosManager from './PartidosManager';
 import StatsEditor from './StatsEditor';
 import UploadHistory from './UploadHistory';
@@ -18,23 +18,47 @@ import PlantelManager from './PlantelManager';
 import PlayoffsAdmin from './PlayoffsAdmin';
 import AdminSearch from './AdminSearch';
 import logoTorneo from '../assets/logo_torneo.jpg';
+import './admin-theme.css';
 
 // Carga diferida: trae xlsx + fuse.js, que solo hacen falta el día que se
 // abre esta sección. Antes se importaba fijo arriba, así que ese peso se
 // descargaba en CUALQUIER sesión de admin, aunque nunca se tocara Excel.
 const ExcelUpload = lazy(() => import('./ExcelUpload'));
 
+
+// Íconos de línea (mismo trazo que la web) en vez de emoji.
+const ICONOS = {
+  dashboard: <><path d="M3 13h8V3H3zM13 21h8v-8h-8zM13 3v6h8V3zM3 21h8v-4H3z"/></>,
+  partidos: <><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></>,
+  playoffs: <><path d="M7 3h10v4a5 5 0 01-10 0zM5 5H3v2a4 4 0 004 4M19 5h2v2a4 4 0 01-4 4M9 21h6M12 12v9"/></>,
+  stats: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,
+  historial: <><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 2"/></>,
+  herramientas: <><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></>,
+  temporadas: <><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 22l5-3 5 3-1.5-9.5"/></>,
+  plantel: <><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a5 5 0 014 6"/></>,
+  encuestas: <><path d="M4 20V12M10 20V6M16 20v-9M22 20H2"/><path d="M14 4l2-2 2 2"/></>,
+  alias: <><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></>,
+  'equipo-alias': <><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12h6"/></>,
+  fusionar: <><path d="M6 3v6a6 6 0 006 6h0a6 6 0 016 6M18 3v6a6 6 0 01-3 5.2"/><circle cx="6" cy="3" r="1"/><circle cx="18" cy="3" r="1"/></>,
+  recalcular: <><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/></>,
+  excel: <><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></>,
+  mas: <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
+};
+function Icono({ id }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{ICONOS[id] ?? ICONOS.dashboard}</svg>;
+}
+
 // ── Navegación ────────────────────────────────────────────────────────────────
 const TABS = [
   { id:'dashboard', icon:'🏀', label:'Resumen',       desc:'Vista general del torneo' },
   { id:'partidos',  icon:'📅', label:'Partidos',       desc:'Fixture y resultados' },
+  { id:'playoffs',  icon:'🥇', label:'Playoffs',       desc:'Armar y corregir los cruces de playoff' },
   { id:'stats',     icon:'📊', label:'Estadísticas',   desc:'Corrección manual' },
   { id:'historial', icon:'🗂️', label:'Historial',      desc:'Ver cargas anteriores' },
 ];
 const TOOLS = [
   { id:'temporadas', icon:'🏆', label:'Temporadas',         desc:'Ver y crear temporada/torneo' },
   { id:'plantel',    icon:'👥', label:'Plantel',            desc:'Altas, bajas y cambios de equipo' },
-  { id:'playoffs',   icon:'🥇', label:'Playoffs',           desc:'Armar y corregir los cruces de playoff' },
   { id:'encuestas',  icon:'🗳️', label:'Encuestas',          desc:'Votaciones públicas' },
   { id:'alias',      icon:'🔗', label:'Alias',              desc:'Ver/borrar nombres vinculados' },
   { id:'equipo-alias', icon:'🛡️', label:'Alias de Equipos', desc:'Nombres de equipo distintos al oficial (ej: apodos del Excel)' },
@@ -104,17 +128,11 @@ function SectionHeader({ nav, sec }) {
   const item = nav.find(n => n.id === sec);
   if (!item) return null;
   return (
-    <div style={{ marginBottom:24, paddingBottom:18, borderBottom:'1px solid #1C2535', display:'flex', alignItems:'center', gap:12 }}>
-      <div style={{ width:40, height:40, borderRadius:11, background:'rgba(240,180,41,.1)', border:'1px solid rgba(240,180,41,.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
-        {item.icon}
-      </div>
+    <div className="adm-sh">
+      <span className="ic"><Icono id={item.id}/></span>
       <div>
-        <h2 style={{ margin:0, fontFamily:"'Bebas Neue',sans-serif", fontSize:24, letterSpacing:1, color:'#EEF2F8' }}>
-          {item.label}
-        </h2>
-        <p style={{ margin:0, fontSize:12, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:.5 }}>
-          {item.desc}
-        </p>
+        <h2>{item.label}</h2>
+        <p>{item.desc}</p>
       </div>
     </div>
   );
@@ -123,15 +141,8 @@ function SectionHeader({ nav, sec }) {
 // ── Botón de pestaña (desktop) ──────────────────────────────────────────────────
 function NavButton({ item, active, onClick }) {
   return (
-    <button onClick={onClick} style={{
-      display:'flex', alignItems:'center', gap:7, padding:'9px 14px', borderRadius:9, cursor:'pointer',
-      background: active ? 'linear-gradient(135deg,rgba(240,180,41,.15),rgba(255,107,43,.08))' : 'transparent',
-      border: active ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
-      color: active ? '#F0B429' : '#8899BB',
-      fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:14, letterSpacing:.4,
-      transition:'all .15s', whiteSpace:'nowrap',
-    }}>
-      <span style={{ fontSize:14 }}>{item.icon}</span>{item.label}
+    <button type="button" onClick={onClick} className={`adm-tab${active ? ' is-on' : ''}`} title={item.label}>
+      <Icono id={item.id}/><span>{item.label}</span>
     </button>
   );
 }
@@ -150,37 +161,20 @@ function ToolsDropdown({ sec, setSec }) {
   }, [open]);
 
   return (
-    <div ref={ref} style={{ position:'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        display:'flex', alignItems:'center', gap:7, padding:'9px 14px', borderRadius:9, cursor:'pointer',
-        background: activo ? 'linear-gradient(135deg,rgba(240,180,41,.15),rgba(255,107,43,.08))' : 'transparent',
-        border: activo ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
-        color: activo ? '#F0B429' : '#8899BB',
-        fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, fontSize:14, letterSpacing:.4,
-      }}>
-        🛠️ Herramientas <span style={{ fontSize:9, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .15s' }}>▼</span>
+    <div ref={ref} className="adm-tools">
+      <button type="button" onClick={() => setOpen(o => !o)} className={`adm-tab${activo ? ' is-on' : ''}`} title="Herramientas">
+        <Icono id="herramientas"/><span>Herramientas</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 12, height: 12, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {open && (
-        <div style={{
-          position:'absolute', top:'calc(100% + 6px)', left:0, minWidth:220, zIndex:60,
-          background:'#0E1420', border:'1px solid #1C2535', borderRadius:11, padding:6,
-          boxShadow:'0 12px 32px rgba(0,0,0,.5)',
-        }}>
-          {TOOLS.map(t => {
-            const active = sec === t.id;
-            return (
-              <button key={t.id} onClick={() => { setSec(t.id); setOpen(false); }} style={{
-                display:'flex', alignItems:'center', gap:10, width:'100%', padding:'9px 10px', borderRadius:8,
-                background: active ? 'rgba(240,180,41,.1)' : 'transparent', border:'none', cursor:'pointer', textAlign:'left',
-              }}>
-                <span style={{ fontSize:15 }}>{t.icon}</span>
-                <div>
-                  <div style={{ fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, color: active ? '#F0B429' : '#CBD5E8' }}>{t.label}</div>
-                  <div style={{ fontSize:10, color:'#4A566E', fontFamily:"'Barlow Condensed',sans-serif" }}>{t.desc}</div>
-                </div>
-              </button>
-            );
-          })}
+        <div className="adm-tools-menu">
+          {TOOLS.map(t => (
+            <button type="button" key={t.id} onClick={() => { setSec(t.id); setOpen(false); }}
+              className={`adm-tools-item${sec === t.id ? ' is-on' : ''}`}>
+              <span className="ic"><Icono id={t.id}/></span>
+              <span><b>{t.label}</b><small>{t.desc}</small></span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -286,19 +280,19 @@ function DrawerItem({ item, active, onClick }) {
   return (
     <button onClick={onClick} style={{
       display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 12px',
-      background: active ? 'linear-gradient(135deg,rgba(240,180,41,.15),rgba(255,107,43,.08))' : 'transparent',
-      border: active ? '1px solid rgba(240,180,41,.25)' : '1px solid transparent',
+      background: active ? 'rgba(59,130,246,.14)' : 'transparent',
+      border: active ? '1px solid rgba(96,165,250,.3)' : '1px solid transparent',
       borderRadius:10, cursor:'pointer', textAlign:'left',
     }}>
       <div style={{
         width:30, height:30, borderRadius:8, flexShrink:0,
-        background: active ? 'rgba(240,180,41,.15)' : 'rgba(255,255,255,.04)',
-        display:'flex', alignItems:'center', justifyContent:'center', fontSize:14,
-      }}>{item.icon}</div>
-      <div style={{ fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.4, color: active ? '#F0B429' : '#8899BB' }}>
+        background: active ? 'rgba(59,130,246,.18)' : 'rgba(255,255,255,.04)',
+        display:'flex', alignItems:'center', justifyContent:'center', color: active ? '#7FB2FF' : '#8899BB',
+      }}><span className="adm-drawer-ic"><Icono id={item.id}/></span></div>
+      <div style={{ fontSize:15, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:.4, color: active ? '#7FB2FF' : '#AEB8CB' }}>
         {item.label}
       </div>
-      {active && <div style={{ marginLeft:'auto', width:3, height:16, background:'#F0B429', borderRadius:2 }}/>}
+      {active && <div style={{ marginLeft:'auto', width:3, height:16, background:'#3b82f6', borderRadius:2 }}/>}
     </button>
   );
 }
@@ -320,7 +314,7 @@ export default function AdminPanel() {
   const showToggle        = SECCIONES_CON_CATEGORIA.includes(sec);
 
   return (
-    <div style={S.shell}>
+    <div style={S.shell} data-admin-shell>
       <style>{`
         @keyframes pulse-rt { 0%,100%{opacity:1}50%{opacity:.4} }
         @keyframes drawerFade { from{opacity:0} to{opacity:1} }
@@ -351,53 +345,32 @@ export default function AdminPanel() {
       `}</style>
 
       {/* Top bar desktop */}
-      <header data-admin-topbar style={S.topbar}>
-        <div style={S.topbarRow}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:56, height:56, borderRadius:13, overflow:'hidden', border:'2px solid rgba(240,180,41,.45)', boxShadow:'0 0 18px rgba(240,180,41,.2)', flexShrink:0 }}>
-              <img src={logoTorneo} alt="Torneo Star" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-            </div>
-            <div>
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", ...GOLD_TEXT, fontSize:22, letterSpacing:1.5, lineHeight:1 }}>TORNEO STAR</div>
-              <div style={{ color:'#4A566E', fontSize:10, letterSpacing:1.5, textTransform:'uppercase', marginTop:2 }}>Admin Panel</div>
-            </div>
+      <header data-admin-topbar className="adm-top">
+        <div className="adm-row">
+          <div className="adm-brand">
+            <img src={logoTorneo} alt="Torneo Star"/>
+            <div><b>Torneo Star</b><small>Panel admin</small></div>
           </div>
-
-          <div style={{ fontSize:14, color:'#CBD5E8', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:600 }}>
-            {greeting}
-          </div>
-
-          <div style={{ flex:'1 1 260px', maxWidth:360, minWidth:0 }}>
-            <AdminSearch setSec={setSec} setCategoria={setCategoria} setFoco={setFoco}/>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <RealtimeDot status={rtStatus}/>
-            <button onClick={logout} style={S.logoutBtnSmall}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              Salir
-            </button>
-          </div>
-        </div>
-
-        <nav style={S.navRow}>
-          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+          <nav className="adm-nav">
             {TABS.map(item => (
               <NavButton key={item.id} item={item} active={sec === item.id} onClick={() => setSec(item.id)}/>
             ))}
             <ToolsDropdown sec={sec} setSec={setSec}/>
+          </nav>
+          <span className="adm-sp"/>
+          <div className="adm-search">
+            <AdminSearch setSec={setSec} setCategoria={setCategoria} setFoco={setFoco}/>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-            {showToggle && <CategoriaToggle categoria={categoria} setCategoria={setCategoria}/>}
-            {sec !== 'excel' && (
-              <button onClick={() => setSec('excel')} style={S.cargarBtn}>+ Cargar partido</button>
-            )}
-          </div>
-        </nav>
+          {showToggle && <CategoriaToggle categoria={categoria} setCategoria={setCategoria}/>}
+          <RealtimeDot status={rtStatus}/>
+          {sec !== 'excel' && <button type="button" onClick={() => setSec('excel')} className="adm-cta">+ Cargar partido</button>}
+          <button type="button" onClick={logout} className="adm-salir" title="Cerrar sesión">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Salir
+          </button>
+        </div>
       </header>
 
       {/* Mobile top bar */}
@@ -425,11 +398,21 @@ export default function AdminPanel() {
           setFoco={setFoco} onClose={() => setOpen(false)}/>
       )}
 
+      {/* Celular: barra de abajo */}
+      <div className="adm-bnav" role="navigation" aria-label="Secciones">
+        {[['dashboard', 'Resumen'], ['partidos', 'Partidos']].map(([id, l]) => (
+          <button key={id} type="button" className={sec === id ? 'is-on' : ''} onClick={() => setSec(id)}><Icono id={id}/>{l}</button>
+        ))}
+        <button type="button" className="cta" onClick={() => setSec('excel')}><Icono id="excel"/>Cargar</button>
+        <button type="button" className={sec === 'playoffs' ? 'is-on' : ''} onClick={() => setSec('playoffs')}><Icono id="playoffs"/>Playoffs</button>
+        <button type="button" className={!['dashboard', 'partidos', 'playoffs', 'excel'].includes(sec) ? 'is-on' : ''} onClick={() => setOpen(true)}><Icono id="mas"/>Más</button>
+      </div>
+
       {/* Contenido */}
       <main data-admin-main style={S.main}>
         <div data-admin-content style={S.content}>
-          <SectionHeader nav={NAV_TODO} sec={sec}/>
-          {sec === 'dashboard'  && <Dashboard irACargarPartido={() => setSec('excel')} onNavigate={setSec} categoria={categoria} setCategoria={setCategoria} />}
+          {sec !== 'dashboard' && <SectionHeader nav={NAV_TODO} sec={sec}/>}
+          {sec === 'dashboard'  && <ResumenV2 irACargarPartido={() => setSec('excel')} onNavigate={setSec} categoria={categoria} greeting={greeting} />}
           {sec === 'excel'      && (
             <Suspense fallback={<div style={{ padding:'2rem', textAlign:'center', color:'#8899BB', fontFamily:"'Barlow Condensed',sans-serif" }}>Cargando…</div>}>
               <ExcelUpload categoria={categoria} setCategoria={setCategoria} />

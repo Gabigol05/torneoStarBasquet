@@ -5,6 +5,7 @@ import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
+import { UI } from './ui';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -652,3 +653,5 @@ const S = {
   stickyBar:   { position:'sticky', bottom:16, background:'linear-gradient(160deg,#141F30,#0B111C)', border:'1px solid rgba(240,180,41,.3)', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.5)', zIndex:50 },
   emptyState:  { textAlign:'center', padding:'4rem 2rem', color:'#6B7A99' },
 };
+// Rediseño 24/11: estilos compartidos del panel (ver ./ui.js).
+Object.assign(S, { label: UI.label, input: UI.input, select: UI.input, warning: UI.warning, btnPrimary: UI.btnPrimary, btnSec: UI.btnSec, emptyState: UI.empty, th: { ...UI.th, textAlign: 'center' }, viewBtn: UI.chip(false), viewBtnActive: { background: '#3b82f6', border: '1px solid #3b82f6', color: '#fff' } });

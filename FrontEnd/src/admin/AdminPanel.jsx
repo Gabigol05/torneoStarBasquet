@@ -363,7 +363,12 @@ export default function AdminPanel() {
           </div>
           {showToggle && <CategoriaToggle categoria={categoria} setCategoria={setCategoria}/>}
           <RealtimeDot status={rtStatus}/>
-          {sec !== 'excel' && <button type="button" onClick={() => setSec('excel')} className="adm-cta">+ Cargar partido</button>}
+          {sec !== 'excel' && (
+            <button type="button" onClick={() => setSec('excel')} className="adm-cta" title="Subir la planilla Excel de un partido">
+              <span className="adm-cta-ic"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></span>
+              <span className="adm-cta-tx"><b>Cargar partido</b><small>Subir planilla Excel</small></span>
+            </button>
+          )}
           <button type="button" onClick={logout} className="adm-salir" title="Cerrar sesión">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>

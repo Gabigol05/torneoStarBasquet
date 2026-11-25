@@ -8,6 +8,8 @@ import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { useTemporada } from '../context/TemporadaContext';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { UI } from './ui';
+import './historial.css';
 
 export default function UploadHistory({ categoria: categoriaProp, setCategoria: setCategoriaProp } = {}) {
   const [categoriaLocal, setCategoriaLocal] = useState('femenino');
@@ -215,22 +217,33 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
           a subir el Excel después. */}
       {!loadingSinStats && sinStats.length > 0 && (
         <div style={{ marginTop: 18 }}>
-          <h3 style={s.subtitle}>⚠️ Partidos finalizados sin estadísticas ({sinStats.length})</h3>
+          <h3 style={{ ...s.subtitle, color:'#FF6B6B' }}>Partidos finalizados sin estadísticas ({sinStats.length})</h3>
           <p style={s.hint}>
             Tienen marcador y quedaron como "Final", pero no hay ni una jugadora/jugador cargado en la tabla de stats —
             en el sitio se van a ver con el resultado bien pero sin planteles ni individuales.
           </p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div className="uh-grid">
             {sinStats.map(p => {
               const eqL = equipoPorId(p.equipo_local_id);
               const eqV = equipoPorId(p.equipo_visit_id);
-              return (
-                <div key={p.id} style={s.cardAlert}>
-                  <span style={s.badge}>Fecha {fechaPorId[p.fecha_id] ?? '?'}</span>
-                  <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:14, flex:1 }}>
-                    {eqL?.name ?? p.equipo_local_id} <span style={{ color:'#6B7A99' }}>{p.puntos_local ?? 0} - {p.puntos_visit ?? 0}</span> {eqV?.name ?? p.equipo_visit_id}
+              const pl = p.puntos_local ?? 0, pv = p.puntos_visit ?? 0;
+              const fila = (eq, id, pts, gano) => (
+                <div className={`uh-t${gano ? ' is-g' : ' is-p'}`}>
+                  <span className="uh-esc" style={{ borderColor: eq?.color ?? '#4A566E' }}>
+                    {eq?.logo && <img src={eq.logo} alt="" loading="lazy"/>}
                   </span>
-                  <span style={s.chipSkip}>0 stats</span>
+                  <span className="uh-n">{eq?.name ?? id}</span>
+                  <span className="uh-p">{pts}</span>
+                </div>
+              );
+              return (
+                <div key={p.id} className="uh-card">
+                  <div className="uh-h">
+                    <span className="uh-f">Fecha {fechaPorId[p.fecha_id] ?? '?'}</span>
+                    <span className="uh-0">Sin planilla · 0 stats</span>
+                  </div>
+                  {fila(eqL, p.equipo_local_id, pl, pl > pv)}
+                  {fila(eqV, p.equipo_visit_id, pv, pv > pl)}
                 </div>
               );
             })}
@@ -265,8 +278,16 @@ export default function UploadHistory({ categoria: categoriaProp, setCategoria: 
                 <div style={{ flex:1 }}>
                   <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4, flexWrap:'wrap' }}>
                     <span style={s.badge}>Fecha {numeroFecha(l)}</span>
-                    <span style={{ color:'#EEF2F8', fontWeight:600, fontSize:15 }}>
-                      {l.equipo_local} vs {l.equipo_visit}
+                    {partido && (
+                      <span className="uh-vs">
+                        {[partido.equipo_local_id, partido.equipo_visit_id].map(id => {
+                          const eq = equipoPorId(id);
+                          return <span key={id} className="uh-esc uh-esc--s" style={{ borderColor: eq?.color ?? '#4A566E' }}>{eq?.logo && <img src={eq.logo} alt="" loading="lazy"/>}</span>;
+                        })}
+                      </span>
+                    )}
+                    <span style={{ color:'#EEF2F8', fontWeight:700, fontSize:16 }}>
+                      {partido ? `${equipoPorId(partido.equipo_local_id)?.name ?? l.equipo_local} vs ${equipoPorId(partido.equipo_visit_id)?.name ?? l.equipo_visit}` : `${l.equipo_local} vs ${l.equipo_visit}`}
                     </span>
                     {partido && (
                       <span style={s.marcador}>{partido.puntos_local} - {partido.puntos_visit}</span>
@@ -366,3 +387,14 @@ const s = {
   },
   btnDel:     { background:'transparent', border:'1px solid rgba(240,64,96,.3)', borderRadius:6, padding:'6px 10px', cursor:'pointer', fontSize:16, flexShrink:0 },
 };
+// Rediseño 24/11 (ver ./ui.js)
+Object.assign(s, {
+  title: { display: 'none' },
+  subtitle: { color: '#EEF2F8', fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, letterSpacing: 1, margin: '0 0 6px', fontWeight: 400 },
+  hint: { ...UI.hint, fontSize: 14.5 },
+  btnRefresh: { ...UI.btnSec, padding: '8px 14px', marginBottom: 4 },
+  card: { background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 16, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' },
+  badge: { background: 'rgba(240,180,41,.15)', color: '#F0B429', padding: '3px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: .4, flexShrink: 0 },
+  marcador: { background: 'rgba(255,255,255,.07)', color: '#F0B429', padding: '2px 12px', borderRadius: 999, fontSize: 17, fontFamily: "'Bebas Neue',sans-serif" },
+  btnDel: { width: 36, height: 36, padding: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,90,90,.08)', border: '1px solid rgba(255,90,90,.28)', borderRadius: 10, cursor: 'pointer', fontSize: 15, flexShrink: 0 },
+});

@@ -8,6 +8,7 @@ import { TABLAS } from './categoriaAdmin';
 import { COPA_LABEL, INSTANCIA_LABEL } from '../lib/fechaLabel';
 import { useTemporada } from '../context/TemporadaContext';
 import { recalcularPromedios } from '../lib/recalcularPromedios';
+import { UI } from './ui';
 
 // ─── Normalización ────────────────────────────────────────────────────────────
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
@@ -1759,3 +1760,28 @@ const s = {
   successBox: {textAlign:'center',padding:'3rem 1rem',background:'linear-gradient(160deg,rgba(34,208,122,.08),#0B111C)',border:'1px solid rgba(34,208,122,.2)',borderRadius:14},
   dupeBox:    {textAlign:'center',padding:'2.5rem 1.5rem',background:'linear-gradient(160deg,rgba(240,180,41,.08),#0B111C)',border:'1px solid rgba(240,180,41,.2)',borderRadius:14},
 };
+// Rediseño 24/11: misma línea visual que el resto del panel (ver ./ui.js).
+Object.assign(s, {
+  stepDot: { ...s.stepDot, width: 36, height: 36, fontSize: 14.5 },
+  metaRow: { display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
+  metaCard: { flex: 1, minWidth: 200, background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 16, padding: '13px 16px 12px' },
+  metaTop: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6, color: '#7A879E' },
+  label: { fontSize: 11.5, fontWeight: 700, letterSpacing: 1.4, color: '#7A879E', textTransform: 'uppercase' },
+  metaInput: { width: '100%', minHeight: 32, background: 'transparent', border: 'none', outline: 'none', color: '#EEF2F8', fontSize: 20, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, padding: '2px 0', letterSpacing: .3, colorScheme: 'dark' },
+  input: { ...UI.input, minHeight: 38, padding: '8px 11px', fontSize: 14.5 },
+  poCard: on => ({ borderRadius: 16, marginBottom: 20, border: on ? '1px solid rgba(240,180,41,.45)' : '1px solid rgba(255,255,255,.09)', background: on ? 'linear-gradient(160deg,rgba(240,180,41,.09),#0b0f18 70%)' : 'linear-gradient(165deg,#111827,#0b0f18)', overflow: 'hidden', transition: '.2s' }),
+  poIcon: on => ({ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: '.2s', background: on ? 'linear-gradient(135deg,#F0B429,#e8731a)' : 'rgba(255,255,255,.05)', color: on ? '#241900' : '#7A879E' }),
+  switchBase: { ...s.switchBase, width: 46, height: 26, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)' },
+  dropCta: { display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 16, padding: '10px 22px', borderRadius: 30, background: 'linear-gradient(135deg,#F0B429,#e8731a)', border: 'none', color: '#0B1018', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, fontSize: 14.5, letterSpacing: .4 },
+  errBox: { ...UI.warningRojo, display: 'block' },
+  warnBox: { ...UI.warning, display: 'block', color: '#F0D58A' },
+  recientesBox: { background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 18, padding: '16px 16px 8px' },
+  recientesTitle: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, letterSpacing: 1.8, color: '#F0B429', marginBottom: 12, textTransform: 'uppercase' },
+  recienteRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' },
+  marcadorCard: { ...s.marcadorCard, background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.09)' },
+  pctCard: { ...s.pctCard, background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.09)' },
+  resumenBar: { ...s.resumenBar, background: 'linear-gradient(165deg,#111827,#0b0f18)', border: '1px solid rgba(255,255,255,.09)' },
+  th: { ...s.th, background: 'rgba(255,255,255,.04)', color: '#7A879E', fontSize: 11, letterSpacing: .8 },
+  td: { ...s.td, borderBottom: '1px solid rgba(255,255,255,.06)', fontSize: 13 },
+  btnCancel: UI.btnSec,
+});

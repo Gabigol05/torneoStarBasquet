@@ -4,6 +4,8 @@ import { equiposFemenino } from '../data/femeninoData';
 import { equiposMasculino } from '../data/masculinoData';
 import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
+import { UI } from './ui';
+import './plantel.css';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 const normStr = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ'`]/g,'').toLowerCase().trim();
@@ -138,30 +140,28 @@ export default function PlantelManager({ categoria: categoriaProp, setCategoria:
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: 1, color: '#EEF2F8', margin: 0 }}>
-          👥 PLANTEL
-        </h2>
-        <p style={{ color: '#6B7A99', fontSize: 13, margin: '4px 0 0' }}>
-          Altas, cambios de equipo y correcciones de nombre — sin pasar por SQL.
-        </p>
+      <div className="pl-equipos" role="listbox" aria-label="Elegí un equipo">
+        {roster.map(e => (
+          <button key={e.id} type="button" role="option" aria-selected={equipoId === e.id}
+            className={`pl-eq${equipoId === e.id ? ' is-on' : ''}`} style={{ '--k': e.color ?? '#5A6B85' }}
+            onClick={() => setEquipoId(e.id)}>
+            <span className="pl-esc">{e.logo && <img src={e.logo} alt="" loading="lazy"/>}</span>
+            <span className="pl-eq-n">{e.name}</span>
+          </button>
+        ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={equipoId} onChange={e => setEquipoId(e.target.value)} style={{
-          padding: '10px 14px', borderRadius: 8, border: '1px solid #1C2535', background: '#0E1420',
-          color: '#EEF2F8', fontSize: 14, minWidth: 220,
-        }}>
-          <option value="">— Elegí un equipo —</option>
-          {roster.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
-        {equipoActual && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: equipoActual.color, fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>
-            {equipoActual.logo && <img src={equipoActual.logo} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />}
-            {equipoActual.name}
-          </span>
-        )}
-      </div>
+      {equipoActual ? (
+        <div className="pl-banner" style={{ '--k': equipoActual.color ?? '#5A6B85' }}>
+          <span className="pl-esc pl-esc--xl">{equipoActual.logo && <img src={equipoActual.logo} alt=""/>}</span>
+          <div>
+            <b>{equipoActual.name}</b>
+            <span>{loading ? 'Cargando plantel…' : `${jugadoras.length} ${jugadoras.length === 1 ? 'integrante' : 'integrantes'} en el plantel`}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="pl-vacio">Elegí un equipo para ver y editar su plantel.</div>
+      )}
 
       {msg && (
         <div style={{
@@ -179,26 +179,24 @@ export default function PlantelManager({ categoria: categoriaProp, setCategoria:
           {/* Alta de jugadora/or nueva */}
           <div style={{
             display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 20,
-            padding: 16, borderRadius: 10, background: 'linear-gradient(160deg,rgba(34,208,122,.06),#0B111C)',
-            border: '1px solid rgba(34,208,122,.25)',
+            padding: 16, borderRadius: 16, background: 'linear-gradient(160deg,rgba(46,224,138,.08),#0b0f18 70%)',
+            border: '1px solid rgba(46,224,138,.28)',
           }}>
             <div style={{ flex: '1 1 220px' }}>
-              <label style={{ display: 'block', fontSize: 11, color: '#8899BB', marginBottom: 6 }}>NOMBRE COMPLETO</label>
+              <label style={UI.label}>Nombre completo</label>
               <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} placeholder="Nombre y apellido"
                 style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #1C2535', background: '#080C12', color: '#EEF2F8', boxSizing: 'border-box' }} />
             </div>
             <div style={{ flex: '0 0 120px' }}>
-              <label style={{ display: 'block', fontSize: 11, color: '#8899BB', marginBottom: 6 }}>NÚMERO (opcional)</label>
+              <label style={UI.label}>Número (opcional)</label>
               <input type="number" min="0" value={nuevoNumero} onChange={e => setNuevoNumero(e.target.value)}
                 style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #1C2535', background: '#080C12', color: '#EEF2F8', boxSizing: 'border-box' }} />
             </div>
             <button onClick={handleCrear} disabled={creando} style={{
-              padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg,#22D07A,#0E9F5A)', color: '#080C12',
-              fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, letterSpacing: 1,
+              ...UI.btnPrimary, minHeight: 42, background: 'linear-gradient(135deg,#2EE08A,#0E9F5A)', boxShadow: '0 6px 18px rgba(46,224,138,.2)',
               opacity: creando ? 0.6 : 1,
             }}>
-              {creando ? 'Agregando...' : '➕ AGREGAR AL PLANTEL'}
+              {creando ? 'Agregando...' : '+ Agregar al plantel'}
             </button>
           </div>
 
@@ -207,32 +205,24 @@ export default function PlantelManager({ categoria: categoriaProp, setCategoria:
           ) : jugadoras.length === 0 ? (
             <p style={{ color: '#6B7A99', fontSize: 13 }}>Este equipo todavía no tiene jugadoras/es cargados.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="pl-grid">
               {jugadoras.map(j => {
                 const ed = editando[j.id];
                 return (
-                  <div key={j.id} style={{
-                    padding: '12px 16px', borderRadius: 10, background: '#0E1420', border: '1px solid #1C2535',
-                  }}>
+                  <div key={j.id} className={`pl-j${ed ? ' is-ed' : ''}`} style={{ '--k': equipoActual?.color ?? '#5A6B85' }}>
                     {!ed ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                        <div>
-                          <span style={{ color: '#EEF2F8', fontWeight: 600, fontSize: 14 }}>
-                            {j.numero != null && <span style={{ color: '#F0B429', marginRight: 8 }}>#{j.numero}</span>}
-                            {j.nombre}
-                          </span>
-                          {j.fecha_nac && <span style={{ color: '#6B7A99', fontSize: 12, marginLeft: 10 }}>🎂 {j.fecha_nac}</span>}
+                      <div className="pl-j-row">
+                        <span className="pl-num">{j.numero != null ? j.numero : '–'}</span>
+                        <div className="pl-j-t">
+                          <b>{j.nombre}</b>
+                          {j.fecha_nac && <small>Nac. {new Date(j.fecha_nac + 'T12:00:00').toLocaleDateString('es-AR')}</small>}
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => startEdit(j)} style={{
-                            padding: '6px 12px', borderRadius: 6, border: '1px solid #1C2535', background: 'transparent',
-                            color: '#8899BB', fontSize: 12, cursor: 'pointer',
-                          }}>✏️ Editar</button>
-                          <button onClick={() => handleBorrar(j)} style={{
-                            padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(240,64,96,.3)', background: 'transparent',
-                            color: '#F04060', fontSize: 12, cursor: 'pointer',
-                          }}>🗑️ Borrar</button>
-                        </div>
+                        <button type="button" onClick={() => startEdit(j)} className="pl-ib" title="Editar">
+                          <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>
+                        </button>
+                        <button type="button" onClick={() => handleBorrar(j)} className="pl-ib pl-ib--del" title="Borrar">
+                          <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+                        </button>
                       </div>
                     ) : (
                       <div>
@@ -257,16 +247,12 @@ export default function PlantelManager({ categoria: categoriaProp, setCategoria:
                         )}
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => handleGuardar(j.id)} disabled={guardandoId === j.id} style={{
-                            padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: '#F0B429', color: '#080C12', fontWeight: 700, fontSize: 12,
+                            ...UI.btnPrimary, padding: '8px 16px', fontSize: 14,
                             opacity: guardandoId === j.id ? 0.6 : 1,
                           }}>
-                            {guardandoId === j.id ? 'Guardando...' : '💾 Guardar'}
+                            {guardandoId === j.id ? 'Guardando...' : 'Guardar'}
                           </button>
-                          <button onClick={() => cancelEdit(j.id)} style={{
-                            padding: '7px 14px', borderRadius: 6, border: '1px solid #1C2535', background: 'transparent',
-                            color: '#8899BB', fontSize: 12, cursor: 'pointer',
-                          }}>Cancelar</button>
+                          <button onClick={() => cancelEdit(j.id)} style={{ ...UI.btnSec, padding: '8px 14px' }}>Cancelar</button>
                         </div>
                       </div>
                     )}

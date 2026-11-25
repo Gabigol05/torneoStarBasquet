@@ -150,16 +150,18 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx, mostrar })
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             {/* Avatar */}
             <div style={{
-              width:32, height:32, borderRadius:'50%', flexShrink:0,
-              background:`${equipo.color}20`, color:equipo.color,
-              border:`1.5px solid ${equipo.color}40`,
+              width:36, height:36, borderRadius:'50%', flexShrink:0, overflow:'hidden',
+              background:'#0E1420', color:equipo.color,
+              border:`2px solid ${equipo.color}`, boxShadow:`0 0 10px ${equipo.color}40`,
               display:'flex', alignItems:'center', justifyContent:'center',
               fontSize:11, fontWeight:700,
             }}>
-              {jugadora.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
+              {equipo.logo
+                ? <img src={equipo.logo} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                : jugadora.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
             </div>
             <div style={{ minWidth:0 }}>
-              <div style={{ color: tieneEdits?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              <div style={{ color: tieneEdits?'#F0B429':'#EEF2F8', fontWeight:700, fontSize:15.5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {jugadora.nombre}
                 {tieneEdits && <span style={{ marginLeft:6, fontSize:9, color:'#F0B429', verticalAlign:'middle' }}>● editado</span>}
               </div>
@@ -179,10 +181,10 @@ function JugadoraRow({ jugadora, equipo, stats, editado, onEdit, idx, mostrar })
           </div>
         </td>
         {/* Stats resumidas */}
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('pts_prom','pts_total')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#60A5FA', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('reb_prom','reb_total')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#22D07A', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('ast_prom','ast_total')}</td>
-        <td style={{ padding:'10px 8px', textAlign:'center', color:'#6B7A99', fontFamily:"'Bebas Neue',sans-serif", fontSize:18 }}>{valResumen('val_prom','val_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#F0B429', fontFamily:"'Bebas Neue',sans-serif", fontSize:22 }}>{valResumen('pts_prom','pts_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#60A5FA', fontFamily:"'Bebas Neue',sans-serif", fontSize:22 }}>{valResumen('reb_prom','reb_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#22D07A', fontFamily:"'Bebas Neue',sans-serif", fontSize:22 }}>{valResumen('ast_prom','ast_total')}</td>
+        <td style={{ padding:'10px 8px', textAlign:'center', color:'#AEB8CB', fontFamily:"'Bebas Neue',sans-serif", fontSize:22 }}>{valResumen('val_prom','val_total')}</td>
         <td style={{ padding:'10px 8px', textAlign:'center', color:'#4A566E', fontSize:12 }}>
           {expanded ? '▲' : '▼'}
         </td>
@@ -493,7 +495,7 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr>
-                <th style={{ ...S.th, textAlign:'left', minWidth:200, position:'sticky', left:0, zIndex:2, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>Jugadora</th>
+                <th style={{ ...S.th, textAlign:'left', minWidth:200, position:'sticky', left:0, zIndex:2, boxShadow:'2px 0 4px rgba(0,0,0,.3)' }}>{categoria === 'femenino' ? 'Jugadora' : 'Jugador'}</th>
                 <th style={{ ...S.th, color:'#F0B429' }}>PTS</th>
                 <th style={{ ...S.th, color:'#60A5FA' }}>REB</th>
                 <th style={{ ...S.th, color:'#22D07A' }}>AST</th>
@@ -543,8 +545,10 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
               }}>
                 {/* Header */}
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-                  <div style={{ width:40, height:40, borderRadius:'50%', background:`${equipo.color}20`, color:equipo.color, border:`1.5px solid ${equipo.color}50`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, flexShrink:0 }}>
-                    {j.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
+                  <div style={{ width:42, height:42, borderRadius:'50%', overflow:'hidden', background:'#0E1420', color:equipo.color, border:`2px solid ${equipo.color}`, boxShadow:`0 0 12px ${equipo.color}40`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, flexShrink:0 }}>
+                    {equipo.logo
+                      ? <img src={equipo.logo} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                      : j.nombre.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ color: hasEdit?'#F0B429':'#EEF2F8', fontWeight:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>

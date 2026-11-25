@@ -1,0 +1,27 @@
+/* Plantel (rediseño 24/11) */
+.pl-equipos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.pl-eq { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 9px; padding: 7px 10px 7px 7px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); font-family: 'Barlow Condensed', sans-serif; transition: border-color .15s, background .15s; }
+.pl-eq:hover { border-color: color-mix(in srgb, var(--k) 50%, transparent); }
+.pl-eq.is-on { background: linear-gradient(120deg, color-mix(in srgb, var(--k) 24%, transparent), rgba(255,255,255,.02)); border-color: var(--k); box-shadow: 0 6px 18px color-mix(in srgb, var(--k) 22%, transparent); }
+.pl-eq-n { min-width: 0; font-size: 14.5px; font-weight: 700; color: #C7D1DD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-eq.is-on .pl-eq-n { color: #fff; }
+.pl-esc { display: inline-block; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--k); overflow: hidden; background: #0E1420; }
+.pl-esc img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-esc--xl { width: 64px; height: 64px; border-width: 3px; box-shadow: 0 0 22px color-mix(in srgb, var(--k) 45%, transparent); }
+.pl-banner { display: flex; align-items: center; gap: 16px; padding: 16px 18px; margin-bottom: 16px; border-radius: 18px; font-family: 'Barlow Condensed', sans-serif; border: 1px solid color-mix(in srgb, var(--k) 40%, transparent); background: radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--k) 26%, transparent), transparent 60%), linear-gradient(165deg,#111827,#0b0f18); }
+.pl-banner b { display: block; font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 34px; letter-spacing: 1px; line-height: 1; color: #fff; }
+.pl-banner span:not(.pl-esc) { font-size: 15px; font-weight: 600; color: #AEB8CB; }
+.pl-vacio { padding: 2rem; text-align: center; color: #7A879E; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; border-radius: 16px; border: 1px dashed rgba(255,255,255,.1); }
+.pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.pl-j { padding: 10px 12px; border-radius: 14px; font-family: 'Barlow Condensed', sans-serif; background: linear-gradient(100deg, color-mix(in srgb, var(--k) 10%, transparent), transparent 45%), linear-gradient(165deg,#111827,#0b0f18); border: 1px solid rgba(255,255,255,.08); }
+.pl-j.is-ed { grid-column: 1 / -1; border-color: rgba(240,180,41,.4); }
+.pl-j-row { display: flex; align-items: center; gap: 10px; }
+.pl-num { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; font-family: 'Bebas Neue', sans-serif; font-size: 24px; line-height: 1; color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); border: 1px solid color-mix(in srgb, var(--k) 40%, transparent); }
+.pl-j-t { flex: 1; min-width: 0; }
+.pl-j-t b { display: block; font-size: 17px; font-weight: 700; color: #EEF2F8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-j-t small { font-size: 12.5px; font-weight: 600; color: #7A879E; }
+.pl-ib { all: unset; cursor: pointer; width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #AEB8CB; }
+.pl-ib svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pl-ib:hover { color: #fff; }
+.pl-ib--del { color: #FF6B6B; border-color: rgba(255,107,107,.25); }
+@media (max-width: 640px) { .pl-equipos { grid-template-columns: repeat(2, minmax(0,1fr)); } .pl-grid { grid-template-columns: minmax(0,1fr); } }

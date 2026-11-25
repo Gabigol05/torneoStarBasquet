@@ -6,6 +6,7 @@ import { TABLAS } from './categoriaAdmin';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
 import { UI } from './ui';
+import './plantel.css';
 
 const ROSTER = { femenino: equiposFemenino, masculino: equiposMasculino };
 
@@ -401,16 +402,18 @@ export default function StatsEditor({ categoria: categoriaProp, setCategoria: se
       )}
 
       {/* Toolbar */}
+      <label style={S.label}>Equipo</label>
+      <div className="pl-equipos" role="listbox" aria-label="Elegí un equipo">
+        {roster.map(e => (
+          <button key={e.id} type="button" role="option" aria-selected={equipoId === e.id}
+            className={`pl-eq${equipoId === e.id ? ' is-on' : ''}`} style={{ '--k': e.color ?? '#5A6B85' }}
+            onClick={() => setEquipoId(e.id)}>
+            <span className="pl-esc">{e.logo && <img src={e.logo} alt="" loading="lazy"/>}</span>
+            <span className="pl-eq-n">{e.name ?? e.nombre}</span>
+          </button>
+        ))}
+      </div>
       <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'flex-end' }}>
-        <div style={{ flex:1, minWidth:180 }}>
-          <label style={S.label}>EQUIPO</label>
-          <select value={equipoId} onChange={e => setEquipoId(e.target.value)} style={S.select}>
-            <option value="">— Seleccionar equipo —</option>
-            {roster.map(e => (
-              <option key={e.id} value={e.id}>{e.name ?? e.nombre}</option>
-            ))}
-          </select>
-        </div>
 
         {equipo && (
           <div style={{ flex:1, minWidth:160 }}>

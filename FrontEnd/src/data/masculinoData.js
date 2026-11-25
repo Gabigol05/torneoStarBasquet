@@ -24,9 +24,7 @@ import logoSanFrancisco   from '../assets/logo_masc_san_francisco.png';
 import logoVillaAzalais   from '../assets/logo_masc_villa_azalais.webp';
 
 export const equiposMasculino = [
-  // San Francisco arriba de Independencia a pedido (temporal, hasta que
-  // haya puntos/zonas reales cargados y el orden se defina solo).
-  { id: 'm_san_francisco',  name: 'San Francisco',     logo: logoSanFrancisco,   color: '#facc15' },
+  // Independencia primero y San Francisco entre los últimos (pedido de Alvaro, 24/11).
   { id: 'm_independencia',  name: 'Independencia',    logo: logoIndependencia,  color: '#D4A017' },
   { id: 'm_jurasicos',      name: 'Jurásicos',         logo: logoJurasicos,      color: '#E8A020' },
   { id: 'm_walkers',        name: "Walker's",          logo: logoWalkers,        color: '#dc2626' },
@@ -49,5 +47,6 @@ export const equiposMasculino = [
   { id: 'm_oro_negro',      name: 'Oro Negro',         logo: logoOroNegro,       color: '#F0B429' },
   { id: 'm_real_norte',     name: 'Real Norte',        logo: logoRealNorte,      color: '#16a34a' },
   { id: 'm_el_rejunte',     name: 'El Rejunte',        logo: logoElRejunte,      color: '#d97706' },
+  { id: 'm_san_francisco',  name: 'San Francisco',     logo: logoSanFrancisco,   color: '#facc15' },
   { id: 'm_villa_azalais',  name: 'Villa Azalais',     logo: logoVillaAzalais,   color: '#E63946' },
 ];

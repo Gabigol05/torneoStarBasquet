@@ -5,10 +5,11 @@ import { equiposMasculino } from '../data/masculinoData';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useTemporada } from '../context/TemporadaContext';
 import { UI } from './ui';
+import './encuestas.css';
 
 const ROSTER = {
-  femenino:  equiposFemenino.map(e => ({ id: e.id, nombre: e.name, color: e.color })),
-  masculino: equiposMasculino.map(e => ({ id: e.id, nombre: e.name, color: e.color })),
+  femenino:  equiposFemenino.map(e => ({ id: e.id, nombre: e.name, color: e.color, logo: e.logo })),
+  masculino: equiposMasculino.map(e => ({ id: e.id, nombre: e.name, color: e.color, logo: e.logo })),
   general:   [],
 };
 
@@ -27,6 +28,16 @@ function CategoriaBadge({ categoria }) {
       {s.label}
     </span>
   );
+}
+
+// Equipos de una encuesta "¿Quién gana? A vs B" (para mostrar los escudos).
+const normE = t => (t ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+function equiposDeEncuesta(enc) {
+  const m = /qui[eé]n gana\??\s*(.+?)\s+vs\.?\s+(.+)$/i.exec(enc?.pregunta ?? '');
+  if (!m) return null;
+  const lista = [...(ROSTER[enc.categoria] ?? []), ...ROSTER.femenino, ...ROSTER.masculino];
+  const buscar = n => lista.find(e => normE(e.nombre) === normE(n)) ?? { nombre: n.trim(), color: '#5A6B85' };
+  return [buscar(m[1]), buscar(m[2])];
 }
 
 // ── Formulario de creación ────────────────────────────────────────────────────
@@ -116,7 +127,7 @@ function EncuestaForm({ form, setForm, onSave, onCancel, loading }) {
 }
 
 // ── Resultados de una encuesta ────────────────────────────────────────────────
-function Resultados({ encuestaId }) {
+function Resultados({ encuestaId, equipos }) {
   const [rows, setRows] = useState(null);
 
   useEffect(() => {
@@ -126,26 +137,24 @@ function Resultados({ encuestaId }) {
     return () => { alive = false; };
   }, [encuestaId]);
 
-  if (!rows) return <div style={{ fontSize: 12, color: '#4A566E' }}>Cargando resultados...</div>;
+  if (!rows) return <div className="en-res"><span className="en-cargando">Cargando resultados…</span></div>;
   const total = rows.reduce((s, r) => s + Number(r.votos || 0), 0);
+  const max = Math.max(0, ...rows.map(r => Number(r.votos || 0)));
 
   return (
-    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rows.map(r => {
+    <div className="en-res">
+      {rows.map((r, i) => {
         const pct = total > 0 ? Math.round((r.votos / total) * 100) : 0;
+        const eq = equipos?.find(e => normE(e.nombre) === normE(r.texto));
+        const color = eq?.color ?? ['#F0B429', '#60A5FA', '#22D07A', '#A78BFA'][i % 4];
         return (
-          <div key={r.opcion_id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#EEF2F8', marginBottom: 3 }}>
-              <span>{r.texto}</span>
-              <span style={{ color: '#4A566E' }}>{r.votos} · {pct}%</span>
-            </div>
-            <div style={{ height: 6, borderRadius: 3, background: '#141C2A', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: '#F0B429', transition: 'width .5s' }} />
-            </div>
+          <div key={r.opcion_id} className={`en-op${Number(r.votos) === max && max > 0 ? ' is-top' : ''}`} style={{ '--k': color }}>
+            <div className="en-op-h"><span>{r.texto}</span><b>{pct}%</b><small>{r.votos} {Number(r.votos) === 1 ? 'voto' : 'votos'}</small></div>
+            <div className="en-bar"><i style={{ width: `${pct}%` }}/></div>
           </div>
         );
       })}
-      <div style={{ fontSize: 11, color: '#4A566E', textAlign: 'right' }}>{total} voto(s) en total</div>
+      <div className="en-total">{total} {total === 1 ? 'voto' : 'votos'} en total</div>
     </div>
   );
 }
@@ -158,6 +167,7 @@ export default function EncuestasManager() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]       = useState(null);
   const [abiertaId, setAbiertaId] = useState(null);
+  const [filtro, setFiltro] = useState('activas');
   const { confirm, ConfirmDialog } = useConfirm();
   const { temporadaActivaId, temporadas } = useTemporada();
 
@@ -242,8 +252,15 @@ export default function EncuestasManager() {
       )}
 
       {view === 'lista' && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          <button onClick={() => setView('nueva')} style={F.btnPrimary}>➕ NUEVA ENCUESTA</button>
+        <div className="en-top">
+          <div className="en-chips">
+            {[['activas', 'Activas'], ['cerradas', 'Cerradas'], ['todas', 'Todas']].map(([k, l]) => (
+              <button key={k} type="button" className={`en-chip${filtro === k ? ' is-on' : ''}`} onClick={() => setFiltro(k)}>
+                {l}<small>{k === 'todas' ? encuestas.length : encuestas.filter(e => (k === 'activas') === !!e.activa).length}</small>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setView('nueva')} style={UI.btnPrimary}>+ Nueva encuesta</button>
         </div>
       )}
 
@@ -251,53 +268,62 @@ export default function EncuestasManager() {
         <EncuestaForm form={form} setForm={setForm} onSave={handleSave} onCancel={() => { setForm(EMPTY_FORM); setView('lista'); }} loading={loading} />
       )}
 
-      {view === 'lista' && (
-        encuestas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7A99' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🗳️</div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 20, color: '#EEF2F8', marginBottom: 8 }}>Sin encuestas todavía</div>
-            <div>Creá una para que la gente vote desde la página</div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {encuestas.map(enc => (
-              <div key={enc.id} style={{ background: 'linear-gradient(160deg,#101826,#0B111C)', border: '1px solid #1C2535', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <CategoriaBadge categoria={enc.categoria} />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4,
-                    background: enc.activa ? 'rgba(34,208,122,.12)' : 'rgba(107,122,153,.15)',
-                    color: enc.activa ? '#22D07A' : '#6B7A99' }}>
-                    {enc.activa ? 'ACTIVA' : 'CERRADA'}
-                  </span>
-                  {enc.temporada_id != null && (
-                    <span style={{ fontSize: 10, color: '#4A566E' }}>
-                      {temporadas.find(t => t.id === enc.temporada_id)?.nombre ?? `Temporada #${enc.temporada_id}`}
-                    </span>
+      {view === 'lista' && (() => {
+        const lista = encuestas.filter(e => filtro === 'todas' || (filtro === 'activas') === !!e.activa);
+        if (encuestas.length === 0 || lista.length === 0) {
+          return (
+            <div className="en-vacio">
+              <svg viewBox="0 0 24 24"><path d="M4 20V12M10 20V6M16 20v-9M22 20H2"/></svg>
+              <b>{encuestas.length === 0 ? 'Sin encuestas todavía' : filtro === 'activas' ? 'No hay encuestas activas' : 'No hay encuestas cerradas'}</b>
+              <span>Creá una para que la gente vote desde la página</span>
+            </div>
+          );
+        }
+        return (
+          <div className="en-grid">
+            {lista.map(enc => {
+              const eqs = equiposDeEncuesta(enc);
+              const temp = enc.temporada_id != null ? (temporadas.find(t => t.id === enc.temporada_id)?.nombre ?? `Temporada #${enc.temporada_id}`) : null;
+              const abierta = abiertaId === enc.id;
+              return (
+                <div key={enc.id} className={`en-card${enc.activa ? ' is-activa' : ''}${abierta ? ' is-abierta' : ''}`}>
+                  <div className="en-h">
+                    <CategoriaBadge categoria={enc.categoria} />
+                    <span className={`en-st${enc.activa ? ' on' : ''}`}><i/>{enc.activa ? 'Activa' : 'Cerrada'}</span>
+                    {(enc.subtitulo || temp) && <span className="en-sub">{enc.subtitulo || temp}</span>}
+                  </div>
+                  {eqs ? (
+                    <div className="en-vs">
+                      {eqs.map((e, i) => (
+                        <div key={i} className="en-eq" style={{ '--k': e.color }}>
+                          <span className="en-esc">{e.logo && <img src={e.logo} alt="" loading="lazy"/>}</span>
+                          <span className="en-eq-n">{e.nombre}</span>
+                        </div>
+                      )).reduce((acc, el, i) => (i ? [...acc, <span key="vs" className="en-vs-x">VS</span>, el] : [el]), [])}
+                    </div>
+                  ) : (
+                    <div className="en-q">{enc.pregunta}</div>
                   )}
-                  <span style={{ color: '#EEF2F8', fontWeight: 600, fontSize: 14 }}>{enc.pregunta}</span>
-                  {enc.subtitulo && <span style={{ color: '#4A566E', fontSize: 12 }}>· {enc.subtitulo}</span>}
-
-                  <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
-                    <button onClick={() => setAbiertaId(id => id === enc.id ? null : enc.id)}
-                      style={{ ...F.quickBtn, borderColor: '#1C2535', color: '#6B7A99' }}>
-                      {abiertaId === enc.id ? '▲ Ocultar' : '▼ Resultados'}
+                  {eqs && <div className="en-q en-q--chica">¿Quién gana?</div>}
+                  <div className="en-acc">
+                    <button type="button" className={`en-btn${abierta ? ' is-on' : ''}`} onClick={() => setAbiertaId(id => id === enc.id ? null : enc.id)}>
+                      {abierta ? 'Ocultar resultados' : 'Ver resultados'}
                     </button>
-                    <button onClick={() => toggleActiva(enc)}
-                      style={{ ...F.quickBtn, borderColor: enc.activa ? 'rgba(240,64,96,.2)' : 'rgba(34,208,122,.3)', color: enc.activa ? '#F04060' : '#22D07A' }}>
-                      {enc.activa ? '⏸ Cerrar' : '▶ Reabrir'}
+                    <span className="en-sp"/>
+                    <button type="button" className={`en-btn ${enc.activa ? 'en-btn--cerrar' : 'en-btn--abrir'}`} onClick={() => toggleActiva(enc)}>
+                      {enc.activa ? 'Cerrar' : 'Reabrir'}
                     </button>
-                    <button onClick={() => handleDelete(enc.id)}
-                      style={{ ...F.quickBtn, borderColor: 'rgba(240,64,96,.2)', color: '#F04060' }}>
-                      🗑️
+                    <button type="button" className="en-ib" onClick={() => handleDelete(enc.id)} title="Eliminar encuesta">
+                      <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
                     </button>
                   </div>
+                  {abierta && <Resultados encuestaId={enc.id} equipos={eqs} />}
                 </div>
-                {abiertaId === enc.id && <Resultados encuestaId={enc.id} />}
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )
-      )}
+        );
+      })()}
     </div>
   );
 }
